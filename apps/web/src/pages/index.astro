@@ -4,6 +4,9 @@ import { format } from "@/lib/format";
 import { library } from "@/lib/library";
 
 const rows = await library();
+const FILTERS = ["all", "processed", "triage", "issues"];
+const initialFilter = FILTERS.find((f) => f === Astro.url.searchParams.get("f")) ?? "all";
+const initialQuery = Astro.url.searchParams.get("q") ?? "";
 const processedCount = rows.filter((r) => r.state === "processed").length;
 ---
 <Layout title="Music library">
@@ -16,13 +19,14 @@ const processedCount = rows.filter((r) => r.state === "processed").length;
     <input
       id="q"
       autofocus
+      value={initialQuery}
       class="min-w-64 border border-rule bg-bg px-3 py-1.5"
       placeholder="Filter by artist, album or issue"
     />
-    {["all", "processed", "triage", "issues"].map((f) => (
+    {FILTERS.map((f) => (
       <button
         data-f={f}
-        aria-pressed={f === "all" ? "true" : "false"}
+        aria-pressed={f === initialFilter ? "true" : "false"}
         class="border border-rule bg-bg px-3 py-1 capitalize aria-pressed:border-accent aria-pressed:bg-accent aria-pressed:text-bg"
       >
         {f === "issues" ? "with issues" : f}
@@ -71,7 +75,24 @@ const processedCount = rows.filter((r) => r.state === "processed").length;
   const n = document.querySelector("#n");
   const rows = [...document.querySelectorAll<HTMLTableRowElement>("#rows tr")];
   const buttons = [...document.querySelectorAll<HTMLButtonElement>("[data-f]")];
-  let filter = "all";
+  let filter = buttons.find((b) => b.getAttribute("aria-pressed") === "true")?.dataset["f"] ?? "all";
+
+  function remember(push: boolean) {
+    const url = new URL(location.href);
+    const s = q?.value ?? "";
+    if (filter === "all") url.searchParams.delete("f");
+    else url.searchParams.set("f", filter);
+    if (s) url.searchParams.set("q", s);
+    else url.searchParams.delete("q");
+    if (url.href === location.href) return;
+    if (push) history.pushState(null, "", url);
+    else history.replaceState(null, "", url);
+  }
+
+  function select(f: string) {
+    filter = f;
+    for (const x of buttons) x.setAttribute("aria-pressed", String(x.dataset["f"] === f));
+  }
 
   function matches(r: HTMLTableRowElement, s: string): boolean {
     if (s && !r.dataset["q"]?.includes(s)) return false;
@@ -90,13 +111,22 @@ const processedCount = rows.filter((r) => r.state === "processed").length;
     if (n) n.textContent = `${shown} shown`;
   }
 
-  q?.addEventListener("input", run);
+  q?.addEventListener("input", () => {
+    run();
+    remember(false);
+  });
   for (const b of buttons) {
     b.addEventListener("click", () => {
-      filter = b.dataset["f"] ?? "all";
-      for (const x of buttons) x.setAttribute("aria-pressed", String(x === b));
+      select(b.dataset["f"] ?? "all");
       run();
+      remember(true);
     });
   }
+  addEventListener("popstate", () => {
+    const params = new URLSearchParams(location.search);
+    if (q) q.value = params.get("q") ?? "";
+    select(params.get("f") ?? "all");
+    run();
+  });
   run();
 </script>

@@ -18,7 +18,7 @@ const fallback = pictures.find((p) => p.type === 3)?.sha256 ?? extras.find((x) =
 const img = cover ? `/data/${cover.master}` : fallback ? `/blob/${fallback}` : null;
 ---
 <Layout title={a.album_dir}>
-  <p><a href="/">← Library</a></p>
+  <p><a id="back" href="/">← Library</a></p>
   <div class="mt-3 flex flex-wrap items-start gap-5">
     {img ? <img class="size-56 bg-faint object-cover" src={img} alt="" /> : <div class="size-56 bg-faint" />}
     <div>
@@ -40,3 +40,15 @@ const img = cover ? `/data/${cover.master}` : fallback ? `/blob/${fallback}` : n
   {cover && <Cover choice={cover} candidates={candidates} />}
   <FileDetails files={files} tags={tags} pictures={pictures} extras={extras} />
 </Layout>
+
+<script>
+  const back = document.querySelector<HTMLAnchorElement>("#back");
+  const from = document.referrer ? new URL(document.referrer) : null;
+  if (back && from?.origin === location.origin && from.pathname === "/") {
+    back.href = from.pathname + from.search;
+    back.addEventListener("click", (e) => {
+      e.preventDefault();
+      history.back();
+    });
+  }
+</script>
