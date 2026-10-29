@@ -65,7 +65,8 @@ from "### Next: the catalogue" onward.
   commits, no Python, no browser.
 - Never print secrets.
 - Long commands (covers, lyrics): run them in the background and wait
-  for the notification. Don't start a second copy.
+  for the notification. Don't start a second copy, and don't start
+  extra watch or monitor loops; one notification per command is enough.
 - If a command fails twice, flag the album with the exact error instead
   of editing scripts.
 
