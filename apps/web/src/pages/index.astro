@@ -4,7 +4,15 @@ import { format, size } from "@/lib/format";
 import { library } from "@/lib/library";
 
 const rows = await library();
-const FILTERS = ["all", "triage", "processed", "approved", "issues"];
+const FILTERS = ["all", "triage", "review", "changes", "accepted", "issues"];
+const GROUP: Record<string, string> = {
+  "accepted, then changed": "review",
+  "awaiting review": "review",
+  "changes requested": "changes",
+  "updated since request": "review",
+};
+const BADGE: Record<string, string> = { accepted: "badge-processed", triage: "" };
+const LABELS: Record<string, string> = { changes: "changes requested", issues: "with issues", review: "to review" };
 const initialFilter = FILTERS.find((f) => f === Astro.url.searchParams.get("f")) ?? "all";
 const initialQuery = Astro.url.searchParams.get("q") ?? "";
 const count = (s: string) => rows.filter((r) => r.state === s).length;
@@ -14,7 +22,8 @@ const totalBytes = rows.reduce((s, r) => s + r.bytes, 0);
   <h1 class="text-2xl font-bold">Music library</h1>
   <p class="mt-1 text-muted">
     {rows.length} albums in sol's Music ({size(totalBytes)}), scanned 29 Oct. {count("triage")} in triage,
-    {count("processed")} processed, {count("approved")} approved for writing. Nothing written yet.
+    {count("awaiting review") + count("updated since request") + count("accepted, then changed")} to review,
+    {count("changes requested")} with changes requested, {count("accepted")} accepted. Nothing written yet.
   </p>
   <div class="my-4 flex flex-wrap items-center gap-2">
     <input
@@ -30,7 +39,7 @@ const totalBytes = rows.reduce((s, r) => s + r.bytes, 0);
         aria-pressed={f === initialFilter ? "true" : "false"}
         class="border border-rule bg-bg px-3 py-1 capitalize aria-pressed:border-accent aria-pressed:bg-accent aria-pressed:text-bg"
       >
-        {f === "issues" ? "with issues" : f}
+        {LABELS[f] ?? f}
       </button>
     ))}
     <span id="n" class="text-muted"></span>
@@ -43,7 +52,7 @@ const totalBytes = rows.reduce((s, r) => s + r.bytes, 0);
       <tbody id="rows">
         {rows.map((r) => (
           <tr
-            data-state={r.state}
+            data-state={GROUP[r.state] ?? r.state}
             data-issues={r.issues.length}
             data-q={`${r.path} ${r.issues.join(" ")}`.toLowerCase()}
           >
@@ -58,7 +67,7 @@ const totalBytes = rows.reduce((s, r) => s + r.bytes, 0);
               <a href={`/album/${r.id}`}>{r.album_dir}</a>
               <span class="src">{r.artist_dir}</span>
             </td>
-            <td><span class={`badge ${r.state === "triage" ? "" : "badge-processed"}`}>{r.state}</span></td>
+            <td><span class={`badge whitespace-nowrap ${BADGE[r.state] ?? "chg border-transparent"}`}>{r.state}</span></td>
             <td class="whitespace-nowrap">{r.dates.join(", ")}</td>
             <td class="whitespace-nowrap">{format(r.codec, r.bits, r.sr)}</td>
             <td class="whitespace-nowrap">{size(r.bytes)}</td>

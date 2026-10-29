@@ -1,44 +1,50 @@
 ---
-import Approve from "@/app/album/Approve.astro";
 import InFiles from "@/app/album/InFiles.astro";
-import Notes from "@/app/album/Notes.astro";
+import Conversation from "@/app/album/Conversation.astro";
 import Proposed from "@/app/album/Proposed.astro";
 import Section from "@/app/album/Section.astro";
 import Sources from "@/app/album/Sources.astro";
 import Layout from "@/app/Layout.astro";
-import { approvals, stateOf } from "@/lib/approvals";
 import { quality, size } from "@/lib/format";
 import { album } from "@/lib/inventory";
 import { rawFiles } from "@/lib/raw";
 import { coverCandidates, coverChoices, notesFor, processed, redCopies } from "@/lib/records";
+import { reviews, statusOf } from "@/lib/reviews";
 
 const data = album(Number(Astro.params["id"]));
 if (!data) return new Response("not found", { status: 404 });
 const { album: a, files, tags, pictures, extras } = data;
-const [done, covers, red, notes, approved] = await Promise.all([
+const [done, covers, red, notes, allReviews] = await Promise.all([
   processed(),
   coverChoices(),
   redCopies(),
   notesFor(a.path),
-  approvals(),
+  reviews(),
 ]);
 const rec = done.get(a.path);
 const cover = rec ? covers[rec.slug] : undefined;
 const candidates = rec ? await coverCandidates(rec.slug) : [];
 const raw = rec ? await rawFiles(rec) : [];
-const approval = stateOf(rec, approved.get(a.path));
-const state = approval.status === "approved" ? "approved" : rec ? "processed" : "triage";
+const albumReviews = allReviews.get(a.path) ?? [];
+const status = rec ? statusOf(rec, albumReviews) : null;
+const state = status ?? "triage";
 const fallback =
   pictures.find((p) => p.type === 3)?.sha256 ?? extras.find((x) => /\.(jpe?g|png)$/i.test(x.relpath))?.sha256;
 const img = cover ? `/data/${cover.master}` : fallback ? `/blob/${fallback}` : null;
 const here = Astro.url.pathname;
 const totalBytes = files.reduce((s, f) => s + f.size, 0) + extras.reduce((s, x) => s + x.size, 0);
 const minutes = Math.round(files.reduce((s, f) => s + (f.duration ?? 0), 0) / 60);
+const BADGE: Record<string, string> = {
+  accepted: "badge-processed",
+  "accepted, then changed": "chg border-transparent",
+  "changes requested": "chg border-transparent",
+  "updated since request": "chg border-transparent",
+};
 const nav = [
   ["files", "01 In the files"],
   ["sources", "02 Fetched"],
   ["proposed", "03 Proposed"],
-  ["notes", `04 Notes (${notes.length})`],
+  ["conversation", `04 Conversation (${notes.length + albumReviews.length})`],
 ];
 ---
 <Layout title={a.album_dir}>
@@ -48,7 +54,7 @@ const nav = [
     <div class="min-w-0">
       <h1 class="text-2xl font-bold">{a.album_dir}</h1>
       <p class="text-muted">{a.artist_dir}</p>
-      <p class="mt-2"><span class={`badge ${state === "triage" ? "" : "badge-processed"}`}>{state}</span></p>
+      <p class="mt-2"><span class={`badge ${BADGE[state] ?? ""}`}>{state}</span></p>
       <dl class="mt-3 grid grid-cols-[auto_1fr] gap-x-4 text-sm">
         <dt class="text-muted">Audio</dt><dd>{quality(files)}</dd>
         <dt class="text-muted">Size</dt><dd>{size(totalBytes)} · {files.length} tracks · {minutes} min</dd>
@@ -77,7 +83,10 @@ const nav = [
   <Section id="proposed" n={3} title="Proposed" lede="What the resolver suggests writing, picked from the sources by the agreed order.">
     {rec ? (
       <>
-        <Approve state={approval} album={a.path} back={here} />
+        <p class="mb-6 border border-rule bg-bg p-3 text-sm">
+          Review status: <span class={`badge ${BADGE[state] ?? ""}`}>{state}</span>
+          <a class="ml-2" href="#review">Review it</a>
+        </p>
         <Proposed rec={rec} tags={tags} cover={cover} />
       </>
     ) : (
@@ -85,8 +94,8 @@ const nav = [
     )}
   </Section>
 
-  <Section id="notes" n={4} title="Notes" lede="Judgement calls and instructions, left by agents and by you. Newest first.">
-    <Notes notes={notes} album={a.path} back={here} />
+  <Section id="conversation" n={4} title="Conversation" lede="Agents' notes on their judgement calls and your reviews, oldest first, like a pull request.">
+    <Conversation notes={notes} reviews={albumReviews} album={a.path} back={here} status={status} />
   </Section>
 </Layout>
 

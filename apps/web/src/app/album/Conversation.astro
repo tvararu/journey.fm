@@ -1,0 +1,43 @@
+---
+import type { Note } from "@/lib/records";
+import type { Review, ReviewStatus } from "@/lib/reviews";
+
+type Props = { notes: Note[]; reviews: Review[]; album: string; back: string; status: ReviewStatus | null };
+const { notes, reviews, album, back, status } = Astro.props;
+type Entry = { at: string; by: string; text: string; verdict?: Review["verdict"] };
+const entries: Entry[] = [
+  ...notes.map((n) => ({ at: n.at, by: n.by, text: n.text })),
+  ...reviews.map((r) => ({ at: r.at, by: r.by, text: r.message, verdict: r.verdict })),
+].sort((a, b) => a.at.localeCompare(b.at));
+const VERDICT = { accept: "accepted", request_changes: "requested changes" } as const;
+---
+{entries.length === 0 && <p class="mb-4 text-muted">Nothing yet.</p>}
+<ol class="space-y-4">
+  {entries.map((e) => (
+    <li class={`border-l-2 pl-3 ${e.verdict === "accept" ? "border-new-fg" : e.verdict ? "border-chg-fg" : "border-rule"}`}>
+      <div class="text-xs text-muted">
+        {e.at} · <b class="text-fg">{e.by}</b>
+        {e.verdict && <span class={`badge ml-1 border-transparent ${e.verdict === "accept" ? "new" : "chg"}`}>{VERDICT[e.verdict]}</span>}
+      </div>
+      {e.text && <p class="whitespace-pre-line">{e.text}</p>}
+    </li>
+  ))}
+</ol>
+
+{status && (
+  <form id="review" method="post" action="/api/review" class="mt-6 flex flex-col gap-2 border border-rule bg-bg p-3">
+    <input type="hidden" name="album" value={album} />
+    <input type="hidden" name="back" value={back} />
+    <div class="text-sm font-bold">Review the proposal <span class="font-normal text-muted">· currently {status}</span></div>
+    <textarea
+      name="message"
+      rows="3"
+      class="w-full border border-rule bg-gap p-2"
+      placeholder="What should change? Optional when accepting."
+    ></textarea>
+    <div class="flex flex-wrap justify-end gap-2">
+      <button name="verdict" value="request_changes" class="border border-chg-fg bg-chg px-3 py-1 text-chg-fg">Request changes</button>
+      <button name="verdict" value="accept" class="border border-new-fg bg-new px-3 py-1 text-new-fg">Accept</button>
+    </div>
+  </form>
+)}

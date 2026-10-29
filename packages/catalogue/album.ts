@@ -49,9 +49,15 @@ const notesFile = Bun.file(`${import.meta.dir}/../notes.jsonl`);
 const notes = (await notesFile.exists() ? (await notesFile.text()).split("\n").filter(Boolean) : [])
   .map((l) => JSON.parse(l) as { at: string; album: string; by: string; text: string })
   .filter((n) => n.album === a.path);
-if (notes.length) {
-  console.log("Notes:");
-  for (const n of notes) console.log(`  ${n.at} ${n.by}: ${n.text}`);
+const reviewsFile = Bun.file(`${import.meta.dir}/../reviews.jsonl`);
+const reviews = (await reviewsFile.exists() ? (await reviewsFile.text()).split("\n").filter(Boolean) : [])
+  .map((l) => JSON.parse(l) as { at: string; album: string; by: string; verdict: string; message: string })
+  .filter((r) => r.album === a.path)
+  .map((r) => ({ at: r.at, by: r.by, text: `[${r.verdict === "accept" ? "accepted" : "requested changes"}] ${r.message}` }));
+const conversation = [...notes, ...reviews].sort((x, y) => x.at.localeCompare(y.at));
+if (conversation.length) {
+  console.log("Conversation:");
+  for (const n of conversation) console.log(`  ${n.at} ${n.by}: ${n.text}`);
   console.log("");
 }
 const rec = records.find((r) => r.path === a.path);

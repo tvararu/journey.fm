@@ -8,11 +8,10 @@ function flag(name: string, fallback: string): string {
   return at >= 0 ? (args.splice(at, 2)[1] ?? fallback) : fallback;
 }
 const by = flag("--by", "claude");
-const kind = flag("--kind", "note") === "instruction" ? "instruction" : "note";
 const [query, ...rest] = args;
 const text = rest.join(" ").trim();
 if (!(query && text)) {
-  console.error('usage: music:note <album id | slug | text in its path> "<note>" [--by deity] [--kind instruction]');
+  console.error('usage: music:note <album id | slug | text in its path> "<note>" [--by deity]');
   process.exit(1);
 }
 
@@ -30,6 +29,6 @@ if (rows.length !== 1) {
 }
 
 const at = new Date().toLocaleString("sv-SE", { timeZone: "Europe/London" }).slice(0, 16);
-const entry = { album: rows[0]?.path, at, by, kind, text };
+const entry = { album: rows[0]?.path, at, by, text };
 appendFileSync(NOTES, `${JSON.stringify(entry)}\n`);
 console.log(`noted on ${entry.album}`);
