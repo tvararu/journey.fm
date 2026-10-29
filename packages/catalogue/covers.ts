@@ -1,11 +1,11 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { relative } from "node:path";
 
-import { UA } from "./lib/fetch";
+import { fetchJson, UA } from "./lib/fetch";
 import { inventory } from "./lib/inventory";
 import { CATALOGUE, INV, META, RAW } from "./lib/paths";
-import { basename, dump, py, stamp, truthy } from "./lib/py";
-import { load } from "./lib/raw";
+import { basename, dump, py, squash, stamp, truthy } from "./lib/py";
+import { load, save } from "./lib/raw";
 
 const EMBED_PX = 1200;
 const AUTO_UPSCALE_BELOW = 2000;
@@ -86,6 +86,28 @@ function candidate(source: string, path: string, url: string | null, types: stri
   };
 }
 
+type Credit = { name: string; joinphrase?: string };
+
+async function stores(slug: string, choice: Choice): Promise<void> {
+  const rel = load(slug, `mb_release_${choice.release}`) as { title: string; "artist-credit": Credit[] } | null;
+  if (!rel) return;
+  const artist = rel["artist-credit"].map((a) => a.name + (a.joinphrase ?? "")).join("");
+  const first = rel["artist-credit"][0]?.name ?? artist;
+  const same = (a: string | undefined, b: string) => {
+    const x = squash(a);
+    const y = squash(b);
+    return !!x && (x === y || x.startsWith(y) || y.startsWith(x));
+  };
+  const q = new URLSearchParams({ entity: "album", limit: "10", term: `${first} ${rel.title}` });
+  const it = await fetchJson<{ results?: { artistName?: string; collectionName?: string }[] }>(`https://itunes.apple.com/search?${q}`, 3.1);
+  const hit = (it?.results ?? []).find((r) => same(r.artistName, first) && same(r.collectionName, rel.title)) ?? null;
+  save(slug, "itunes", hit);
+  const dq = new URLSearchParams({ q: `artist:"${first}" album:"${rel.title}"` });
+  const dz = await fetchJson<{ data?: { id: number; title?: string; artist?: { name?: string } }[] }>(`https://api.deezer.com/search/album?${dq}`, 0.3);
+  const dhit = (dz?.data ?? []).find((r) => same(r.artist?.name, first) && same(r.title, rel.title));
+  save(slug, "deezer", dhit ? await fetchJson(`https://api.deezer.com/album/${dhit.id}`, 0.3) : null);
+}
+
 async function candidates(slug: string, choice: Choice): Promise<Candidate[]> {
   const d = `${RAW}/${slug}/covers`;
   mkdirSync(d, { recursive: true });
@@ -127,6 +149,7 @@ async function candidates(slug: string, choice: Choice): Promise<Candidate[]> {
       add("Cover Art Archive (release group)", p, i.image, i.types, i.comment || "");
     }
   }
+  if (!existsSync(`${RAW}/${slug}/itunes.json`) || !existsSync(`${RAW}/${slug}/deezer.json`)) await stores(slug, choice);
   const it = load(slug, "itunes") as { artworkUrl100?: string | null; collectionName?: string | null } | null;
   if (truthy(it) && it?.artworkUrl100) {
     const u = it.artworkUrl100.replaceAll("100x100bb", "3000x3000bb");
