@@ -5,7 +5,7 @@ import { coverChoices, processed } from "@/lib/records";
 import { addReview, fingerprint } from "@/lib/reviews";
 
 function run(args: string[]): void {
-  const p = Bun.spawnSync(["python3", ...args], { cwd: ROOT, stderr: "pipe" });
+  const p = Bun.spawnSync(["bun", ...args], { cwd: ROOT, stderr: "pipe" });
   if (p.exitCode !== 0) throw new Error(`${args[0]} failed: ${p.stderr.toString().slice(0, 400)}`);
 }
 
@@ -21,8 +21,8 @@ export const POST: APIRoute = async ({ request, redirect, cookies }) => {
   const cover = String(form.get("cover") ?? "");
   const current = (await coverChoices())[rec.slug]?.chosen.id;
   if (cover && cover !== current) {
-    run(["covers.py", "choose", rec.slug, cover, "Picked as master by deity in review"]);
-    run(["resolve.py"]);
+    run(["scripts/covers.ts", "choose", rec.slug, cover, "Picked as master by deity in review"]);
+    run(["scripts/resolve.ts"]);
     rec = (await processed()).get(album) ?? rec;
   }
   const at = new Date().toLocaleString("sv-SE", { timeZone: "Europe/London" }).slice(0, 16);

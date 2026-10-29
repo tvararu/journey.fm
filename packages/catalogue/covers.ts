@@ -8,6 +8,7 @@ import { basename, dump, py, stamp, truthy } from "./lib/py";
 import { load } from "./lib/raw";
 
 const EMBED_PX = 1200;
+const AUTO_UPSCALE_BELOW = 2000;
 const EMBED_QUALITY = 88;
 const MASTER_QUALITY = 95;
 const MOZJPEG = process.env.MOZJPEG ?? ["/opt/homebrew/opt/mozjpeg/bin/cjpeg", "/usr/bin/mozjpeg-cjpeg"].find(existsSync) ?? "cjpeg";
@@ -218,8 +219,18 @@ function choose(slug: string, cid: string, why: string): void {
     embed_size: dims(small),
   };
   dump(p, all);
+  autoUpscale(slug, c, cands);
   const kb = (n: number) => Math.floor(n / 1024);
   console.log([slug, c.width, "x", c.height, kb(c.bytes), "KB ->", kb(size(master)), "KB", method].join(" "));
+}
+
+function autoUpscale(slug: string, c: Candidate, cands: Candidate[]): void {
+  if (Math.max(c.width, c.height) >= AUTO_UPSCALE_BELOW || c.source.startsWith("Upscaled")) return;
+  if (cands.some((x) => x.source === "Upscaled (ultrasharpv2)" && x.note?.startsWith(`${c.source} ${c.width}x${c.height}`))) return;
+  const log = Bun.file(`${RAW}/${slug}/covers/upscale.log`);
+  const p = Bun.spawn(["bun", `${import.meta.dir}/upscale.ts`, slug, c.id, "ultrasharpv2"], { stdio: ["ignore", log, log], detached: true });
+  p.unref();
+  console.log(`upscaling ${c.width}x${c.height} with 4x-UltraSharpV2 in the background, log in raw/${slug}/covers/upscale.log`);
 }
 
 async function addCover(slug: string, url: string, source: string, note: string): Promise<void> {
