@@ -10,6 +10,7 @@ import { load } from "./lib/raw";
 const EMBED_PX = 1200;
 const EMBED_QUALITY = 88;
 const MASTER_QUALITY = 95;
+const MOZJPEG = process.env.MOZJPEG ?? ["/opt/homebrew/opt/mozjpeg/bin/cjpeg", "/usr/bin/mozjpeg-cjpeg"].find(existsSync) ?? "cjpeg";
 
 type Image = { image: string; types: string[]; comment?: string | null; front?: boolean };
 type Caa = { images?: Image[] };
@@ -146,8 +147,10 @@ async function candidates(slug: string, choice: Choice): Promise<Candidate[]> {
     )
     .all(album.id);
   for (const { relpath, sha256: h } of extras) add("files (folder)", blob(h), undefined, undefined, relpath);
-  dump(`${d}/candidates.json`, out);
-  return out;
+  const prev = existsSync(`${d}/candidates.json`) ? readJson<Candidate[]>(`${d}/candidates.json`) : [];
+  const kept = prev.filter((c) => /^(added|upscaled)-/.test(basename(c.path)) && !out.some((x) => x.id === c.id));
+  dump(`${d}/candidates.json`, [...out, ...kept]);
+  return [...out, ...kept];
 }
 
 function previews(slug: string, cands: Candidate[], outdir: string): void {
@@ -167,7 +170,7 @@ export function embed(src: string, dest: string): void {
     `scale=${px}:${px}:force_original_aspect_ratio=decrease:flags=lanczos+accurate_rnd+full_chroma_int`,
     "-pix_fmt", "rgb24", "-frames:v", "1", ppm,
   ]);
-  run(["cjpeg", "-quality", String(EMBED_QUALITY), "-optimize", "-progressive", "-sample", "2x2", "-outfile", dest, ppm]);
+  run([MOZJPEG, "-quality", String(EMBED_QUALITY), "-optimize", "-progressive", "-sample", "2x2", "-outfile", dest, ppm]);
   rmSync(ppm);
 }
 
