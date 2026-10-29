@@ -65,3 +65,22 @@ export const unescapeHtml = (s: string): string =>
     const n = e[1] === "x" || e[1] === "X" ? parseInt(e.slice(2), 16) : parseInt(e.slice(1), 10);
     return n === 0 || n > 0x10ffff || (n >= 0xd800 && n <= 0xdfff) ? "�" : String.fromCodePoint(n);
   });
+
+export function editDistance(a: string, b: string): number {
+  let prev = Array.from({ length: b.length + 1 }, (_, j) => j);
+  for (let i = 1; i <= a.length; i++) {
+    const row = [i];
+    for (let j = 1; j <= b.length; j++) row[j] = Math.min(prev[j]! + 1, row[j - 1]! + 1, prev[j - 1]! + (a[i - 1] === b[j - 1] ? 0 : 1));
+    prev = row;
+  }
+  return prev[b.length]!;
+}
+
+export const squash = (s: string | null | undefined): string =>
+  (s ?? "").toLowerCase().normalize("NFKD").replace(/[^a-z0-9]+/g, "");
+
+export function similarTitle(a: string | null | undefined, b: string | null | undefined): boolean {
+  const x = squash(a);
+  const y = squash(b);
+  return x === y || (x.length > 3 && editDistance(x, y) <= Math.max(2, x.length / 10));
+}

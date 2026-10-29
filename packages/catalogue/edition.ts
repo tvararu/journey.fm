@@ -3,11 +3,11 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { mb, red, REL_INC } from "./lib/fetch";
 import { files, type InvFile } from "./lib/inventory";
 import { INV, RAW } from "./lib/paths";
-import { basename, dumps, fixed1, py, unescapeHtml } from "./lib/py";
+import { basename, dumps, fixed1, py, similarTitle, unescapeHtml } from "./lib/py";
 import { save } from "./lib/raw";
 
 type LabelInfo = { label?: { name?: string | null } | null; "catalog-number"?: string | null };
-type Medium = { format?: string | null; tracks?: { length?: number | null }[] };
+type Medium = { format?: string | null; tracks?: { length?: number | null; title?: string | null }[] };
 export type Release = {
   id: string;
   date?: string | null;
@@ -62,10 +62,22 @@ function order(a: InvFile, b: InvFile): number {
 
 export function matchLengths(rel: Release, fs: InvFile[]): string {
   const tr = (rel.media ?? []).flatMap((m) => m.tracks ?? []);
-  if (tr.length !== fs.length) return `${tr.length} tracks vs ${fs.length} files`;
   const sorted = [...fs].sort(order);
-  const off = tr.map((t, i) => Math.abs((t.length || 0) / 1000 - sorted[i]!.duration));
-  return `${tr.length} tracks, worst length gap ${fixed1(Math.max(...off))} s`;
+  const gap = (t: (typeof tr)[number], f: InvFile) => Math.abs((t.length || 0) / 1000 - f.duration);
+  if (tr.length === fs.length) {
+    const off = tr.map((t, i) => gap(t, sorted[i]!));
+    if (Math.max(...off) < 2) return `${tr.length} tracks, worst length gap ${fixed1(Math.max(...off))} s`;
+  }
+  const used = new Set<number>();
+  const off: number[] = [];
+  for (const t of tr) {
+    const j = sorted.findIndex((f, k) => !used.has(k) && similarTitle(t.title, f.tags["TITLE"]) && gap(t, f) <= 3);
+    if (j < 0) return `${tr.length} tracks vs ${fs.length} files, only ${off.length} matched by title`;
+    used.add(j);
+    off.push(gap(t, sorted[j]!));
+  }
+  const extra = fs.length - tr.length;
+  return `${tr.length} tracks${extra ? ` (+${extra} extra files)` : ""}, matched by title, worst length gap ${fixed1(Math.max(...off))} s`;
 }
 
 const GAPS = Array.from({ length: 20 }, (_, x) => `gap ${fixed1(x / 10)} s`);
