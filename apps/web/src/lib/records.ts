@@ -53,6 +53,8 @@ export type CoverChoice = {
   chosen: CoverCandidate;
   why: string;
   master: string;
+  master_bytes: number;
+  master_method: string;
   embed: string;
   embed_bytes: number;
   embed_size: [number, number];

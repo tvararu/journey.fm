@@ -14,9 +14,10 @@ const kb = (n: number) => `${Math.floor(n / 1024)} KB`;
       <figure>
         <a href={`/data/${cover.master}`}><img class="size-72 bg-faint object-cover" src={`/data/${cover.master}`} alt="" /></a>
         <figcaption class="mt-2 text-xs text-muted">
-          cover.{cover.master.split(".").at(-1)}<br />
-          {cover.chosen.width}x{cover.chosen.height}, {kb(cover.chosen.bytes)}<br />
-          {cover.chosen.source}
+          cover.jpg<br />
+          {cover.chosen.width}x{cover.chosen.height}, {kb(cover.master_bytes)}<br />
+          {cover.master_method}<br />
+          from {cover.chosen.source}, {kb(cover.chosen.bytes)}
         </figcaption>
       </figure>
       <figure>
