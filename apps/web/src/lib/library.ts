@@ -11,7 +11,7 @@ export type LibraryEntry = LibraryRow & {
   thumb: string | undefined;
 };
 
-function issuesFor(r: LibraryRow, keys: Map<string, Set<string>>, red: Record<string, string[]>): string[] {
+function issuesFor(r: LibraryRow, keys: Map<string, Set<string>>, red: Record<string, string[]>, done: boolean): string[] {
   const out: string[] = [];
   if (r.sr.includes(",") || r.bits.includes(",")) out.push("mixed format");
   if (r.id3 > 0) out.push("ID3 in FLAC");
@@ -19,7 +19,7 @@ function issuesFor(r: LibraryRow, keys: Map<string, Set<string>>, red: Record<st
   for (const k of ["ALBUM", "ALBUMARTIST", "DATE"]) {
     if ((keys.get(k)?.size ?? 0) > 1) out.push(`${k.toLowerCase()} differs across tracks`);
   }
-  if (!(keys.has("MUSICBRAINZ_ALBUMID") || keys.has("MUSICBRAINZ ALBUM ID"))) out.push("no MusicBrainz ID");
+  if (!done && !(keys.has("MUSICBRAINZ_ALBUMID") || keys.has("MUSICBRAINZ ALBUM ID"))) out.push("no MusicBrainz ID");
   if (!red[r.path]) out.push("no RED copy");
   return out;
 }
@@ -40,7 +40,7 @@ export async function library(): Promise<LibraryEntry[]> {
       ...r,
       agent: rec ? agentState(rec, allVerdicts.get(r.path)) : null,
       dates: [...(k.get("DATE") ?? [])].sort(),
-      issues: issuesFor(r, k, red),
+      issues: issuesFor(r, k, red, !!rec),
       state: stateFor(done, allReviews, r.path),
       thumb: thumbs.get(r.id),
     };
