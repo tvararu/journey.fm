@@ -307,6 +307,7 @@ function resolve(slug: string, choice: J) {
   const caa = load(slug, `caa_release_${rid}`) ?? load(slug, `caa_rg_${choice.release_group}`);
   const f0 = fs[0]!;
   const lrclib = load(slug, "lrclib") ?? {};
+  const lyricsFix: Record<string, { set: "instrumental" | "none"; by: string; why: string }> = load(slug, "lyrics-overrides") ?? {};
   const cr = load(slug, `mb_credits_${rid}`);
   const crTracks = new Map<string, J>((cr?.media ?? []).flatMap((m: J) => (m.tracks ?? []).map((t: J) => [t.id, t.recording])));
 
@@ -411,7 +412,8 @@ function resolve(slug: string, choice: J) {
   const tracks = fs.map((f, i) => {
     const [disc, t, count] = pairs[i] === undefined ? [null, null, null] : mtracks[pairs[i]]!;
     const rec = t?.recording ?? {};
-    const ly = lrclib[f.relpath]?.result;
+    const fix = lyricsFix[f.relpath];
+    const ly = fix ? { id: null, instrumental: fix.set === "instrumental" } : lrclib[f.relpath]?.result;
     const ac = (acoustid[f.relpath] ?? []).filter((m: J) => m.score >= 0.8);
     const acHeard = ac.flatMap((m: J) => m.recordings as string[]);
     const acTop = ac.find((m: J) => !rec.id || m.recordings.includes(rec.id)) ?? ac[0];

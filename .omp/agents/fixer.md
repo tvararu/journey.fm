@@ -49,7 +49,8 @@ from "### Next: the catalogue" onward.
    - **Lyrics.** Spot-check two tracks: is the text for that song?
      Plain lyrics on an instrumental track, or text that's obviously
      another song, is wrong. Many obscure albums have none, which is
-     fine.
+     fine. Fix a wrong one with `music:lyrics-set <slug> <track> none
+     "<why>"` (or `instrumental`), then `music:resolve`.
 3. Record the verdict:
    `mise run music:verdict <slug> approve "<one paragraph>"` or
    `mise run music:verdict <slug> flag "<what's wrong, what you checked>"`.
