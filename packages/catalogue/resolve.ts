@@ -205,6 +205,33 @@ export function timestamp(d = new Date()): string {
 
 const round1 = (x: number) => Math.round(x * 10) / 10;
 
+const norm = (s: string | null | undefined) => (s ?? "").toLowerCase().normalize("NFKD").replace(/[^a-z0-9]+/g, "");
+
+function pairTracks(fs: Inv[], mtracks: [unknown, J, number][]): (number | undefined)[] {
+  const out: (number | undefined)[] = fs.map(() => undefined);
+  const used = new Set<number>();
+  const claim = (i: number, j: number) => {
+    if (j < 0 || used.has(j) || out[i] !== undefined) return;
+    out[i] = j;
+    used.add(j);
+  };
+  const ids = (f: Inv, ...keys: string[]) => keys.map((k) => tag(f, k)).filter(Boolean);
+  fs.forEach((f, i) => {
+    const rt = ids(f, "MUSICBRAINZ_RELEASETRACKID", "MUSICBRAINZ RELEASE TRACK ID");
+    claim(i, mtracks.findIndex(([, t]) => rt.includes(t.id)));
+  });
+  fs.forEach((f, i) => {
+    const rec = ids(f, "MUSICBRAINZ_TRACKID", "MUSICBRAINZ TRACK ID");
+    claim(i, mtracks.findIndex(([, t], j) => !used.has(j) && rec.includes(t.recording?.id)));
+  });
+  fs.forEach((f, i) => {
+    claim(i, mtracks.findIndex(([, t], j) =>
+      !used.has(j) && norm(t.title) === norm(tag(f, "TITLE")) && Math.abs((t.length ?? 0) / 1000 - f.duration) <= 3));
+  });
+  if (fs.length === mtracks.length) fs.forEach((_, i) => claim(i, i));
+  return out;
+}
+
 function resolve(slug: string, choice: J) {
   const { path, release: rid } = choice;
   const fs = inventory(path).sort(trackOrder);
@@ -313,8 +340,9 @@ function resolve(slug: string, choice: J) {
   album.links = siteLinks(album.ids, album.rym_links?.artists ?? [], rel, rg);
 
   const mtracks: [unknown, J, number][] = rel.media.flatMap((m: J) => (m.tracks ?? []).map((t: J) => [m.position, t, m["track-count"]]));
+  const pairs = pairTracks(fs, mtracks);
   const tracks = fs.map((f, i) => {
-    const [disc, t, count] = i < mtracks.length && mtracks.length === fs.length ? mtracks[i]! : [null, null, null];
+    const [disc, t, count] = pairs[i] === undefined ? [null, null, null] : mtracks[pairs[i]]!;
     const rec = t?.recording ?? {};
     const ly = lrclib[f.relpath]?.result;
     return {
@@ -334,10 +362,12 @@ function resolve(slug: string, choice: J) {
         }, ["LRCLIB synced", "files", "LRCLIB plain"]),
         instrumental: field({ LRCLIB: ly?.instrumental || null }, ["LRCLIB"]),
       },
+      order: pairs[i] ?? 1e6 + i,
       ids: { musicbrainz_track: t?.id ?? null, musicbrainz_recording: rec.id ?? null, lrclib: ly?.id ?? null, musicbrainz_artist: t ? t["artist-credit"].map((a: J) => a.artist.id) : [] },
     };
   });
-  return { slug, path, state: "processed", resolved: timestamp(), edition_choice: choice, album, tracks };
+  const ordered = tracks.sort((a, b) => a.order - b.order).map(({ order: _, ...t }) => t);
+  return { slug, path, state: "processed", resolved: timestamp(), edition_choice: choice, album, tracks: ordered };
 }
 
 if (import.meta.main) {
