@@ -57,10 +57,10 @@ for (const slug of slugs.length ? slugs : all) {
   const instrumental = (rym?.data?.descriptors ?? rym?.descriptors ?? []).includes("instrumental");
   for (const t of rec.tracks) {
     const f = t.fields;
-    if (!out[t.file] && instrumental) out[t.file] = { candidates: [], match: "RYM instrumental", result: { id: 0, instrumental: true } };
     if (!out[t.file]) {
       try {
-        out[t.file] = await lookup(f["artist"]!.value, f["title"]!.value, rec.album.title.value, t.duration);
+        const found = await lookup(f["artist"]!.value, f["title"]!.value, rec.album.title.value, t.duration);
+        out[t.file] = instrumental && !found.result ? { ...found, match: "RYM instrumental", result: { id: 0, instrumental: true } } : found;
         writeFileSync(partial, JSON.stringify(out));
       } catch (e) {
         failed++;

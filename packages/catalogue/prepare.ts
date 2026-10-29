@@ -9,7 +9,7 @@ import { squash } from "./lib/py";
 import { load } from "./lib/raw";
 
 type Candidate = { how: string; id: string; date: string | null; evidence: string[]; lengths: string };
-type Cover = { id: string; source: string; types: string[]; width: number; height: number };
+type Cover = { id: string; source: string; types: string[]; width: number; height: number; path: string };
 type Release = { media: { tracks?: { recording?: { id: string } }[] }[] };
 type Album = { path: string; slug: string; artist: string; title: string; log: string[] };
 
@@ -34,8 +34,8 @@ function run(cmd: string[], cwd = HERE): string {
   return p.stdout.toString();
 }
 
-async function runAsync(cmd: string[], cwd = HERE): Promise<{ code: number; out: string }> {
-  const p = Bun.spawn(cmd, { cwd, stderr: "pipe", stdout: "pipe" });
+async function runAsync(cmd: string[], cwd = HERE, env: Record<string, string> = {}): Promise<{ code: number; out: string }> {
+  const p = Bun.spawn(cmd, { cwd, env: { ...process.env, ...env }, stderr: "pipe", stdout: "pipe" });
   const [out, err, code] = await Promise.all([new Response(p.stdout).text(), new Response(p.stderr).text(), p.exited]);
   return { code, out: out + err };
 }
@@ -72,14 +72,26 @@ function fingerprints(): void {
 }
 
 async function rym(): Promise<void> {
+  const tab = JSON.parse(run(["orca", "tab", "create", "--url", "https://rateyourmusic.com/", "--json"])) as { result?: { browserPageId?: string } };
+  const page = tab.result?.browserPageId;
+  if (!page) throw new Error("could not open an Orca tab for RYM");
+  const env = { ORCA_PAGE: page };
+  try {
+    await rymEach(env);
+  } finally {
+    run(["orca", "tab", "close", "--page", page, "--json"]);
+  }
+}
+
+async function rymEach(env: Record<string, string>): Promise<void> {
   for (const a of albums) {
-    const found = await runAsync(["bun", `${MUSIC}/tagging/rym-find.ts`, a.artist, a.title]);
+    const found = await runAsync(["bun", `${MUSIC}/tagging/rym-find.ts`, a.artist, a.title], HERE, env);
     const url = (JSON.parse(found.out.trim().split("\n").at(-1) || "{}") as { url?: string | null }).url;
     if (!url) {
       say(a, `RYM: no exact match for "${a.artist} - ${a.title}"; grab it by hand`);
       continue;
     }
-    const grab = await runAsync(["bash", `${MUSIC}/tagging/rym-album.sh`, a.slug, url]);
+    const grab = await runAsync(["bash", `${MUSIC}/tagging/rym-album.sh`, a.slug, url], HERE, env);
     const flags = grab.out.match(/CHALLENGE|NOT LOGGED IN/g);
     say(a, flags ? `RYM: ${flags.join(", ")} at ${url}` : `RYM: ${url}`);
   }
@@ -126,19 +138,47 @@ async function edition(a: Album): Promise<boolean> {
   return true;
 }
 
+const SAME_ART = 15;
+
+async function thumb(path: string): Promise<Uint8Array> {
+  const p = Bun.spawn(["ffmpeg", "-nostdin", "-v", "error", "-i", `${META}/${path}`, "-vf", "scale=24:24:flags=area,format=gray", "-frames:v", "1", "-f", "rawvideo", "-"], { stdout: "pipe", stderr: "ignore" });
+  return new Uint8Array(await new Response(p.stdout).arrayBuffer());
+}
+
+function difference(a: Uint8Array, b: Uint8Array): number {
+  if (a.length !== b.length || !a.length) return 255;
+  let sum = 0;
+  for (let i = 0; i < a.length; i++) sum += Math.abs(a[i]! - b[i]!);
+  return sum / a.length;
+}
+
 async function cover(a: Album): Promise<void> {
   const cands = JSON.parse(readFileSync(`${RAW}/${a.slug}/covers/candidates.json`, "utf8")) as Cover[];
   const fronts = cands.filter((c) =>
     COVER_TIERS.includes(c.source) && (c.types.includes("Front") || !c.types.length) &&
     Math.max(c.width, c.height) / Math.min(c.width, c.height) <= 1.2);
   fronts.sort((x, y) => COVER_TIERS.indexOf(x.source) - COVER_TIERS.indexOf(y.source) || y.width * y.height - x.width * x.height);
-  const c = fronts[0];
-  if (!c) {
+  const edition = fronts[0];
+  if (!edition) {
     say(a, "cover: no front candidate; pick one by hand");
     return;
   }
-  const { out } = await runAsync(["bun", "scripts/covers.ts", "choose", a.slug, c.id, `auto-picked: ${c.source} front, ${c.width}x${c.height}`]);
-  say(a, `cover: ${c.source} ${c.width}x${c.height}${out.includes("upscaling") ? ", upscaling to master" : ""}`);
+  let c = edition;
+  let why = `auto-picked: ${c.source} front, ${c.width}x${c.height}`;
+  if (Math.max(c.width, c.height) < 2000) {
+    const mine = await thumb(c.path);
+    const big = fronts.filter((x) => Math.max(x.width, x.height) >= 2000).sort((x, y) => y.width * y.height - x.width * x.height);
+    for (const x of big) {
+      const d = difference(mine, await thumb(x.path));
+      if (d <= SAME_ART) {
+        why = `auto-picked: ${x.source} ${x.width}x${x.height}, the same art as the ${c.source} front (${c.width}x${c.height}, difference ${d.toFixed(1)}) at full resolution`;
+        c = x;
+        break;
+      }
+    }
+  }
+  const { out } = await runAsync(["bun", "scripts/covers.ts", "choose", a.slug, c.id, why]);
+  say(a, `cover: ${c.source} ${c.width}x${c.height}${c !== edition ? ` (same art as the ${edition.width} px edition front)` : ""}${out.includes("upscaling") ? ", upscaling to master" : ""}`);
 }
 
 async function upscalesDone(started: number): Promise<void> {
