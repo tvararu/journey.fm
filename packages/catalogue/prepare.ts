@@ -237,7 +237,7 @@ class Gate {
 }
 
 const coverGate = new Gate(6);
-const lyricsGate = new Gate(3);
+const lyricsGate = new Gate(8);
 
 async function album(a: Album): Promise<boolean> {
   const times: Record<string, number> = {};
