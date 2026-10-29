@@ -15,7 +15,7 @@ export const GET: APIRoute = async ({ params }) => {
     return new Response("not found", { status: 404 });
   }
   const file = Bun.file(full);
-  const allowed = full.includes("/covers/") || full.startsWith(`${root}/raw/`);
+  const allowed = full.includes("/covers/") || full.includes("/blobs/") || full.startsWith(`${root}/raw/`);
   if (!full.startsWith(`${root}/`) || !allowed || !(await file.exists())) {
     return new Response("not found", { status: 404 });
   }
