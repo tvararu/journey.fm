@@ -5,7 +5,8 @@ import { CATALOGUE, META, RAW } from "./lib/paths";
 type Cand = { id: string; source: string; path: string; types: string[]; width: number; height: number };
 
 const TILE = 360;
-const FONT = process.env["SHEET_FONT"] ?? ["/System/Library/Fonts/Supplemental/Arial.ttf", "/usr/share/fonts/TTF/DejaVuSans.ttf"].find(existsSync);
+const FONT = process.env["SHEET_FONT"] ?? (existsSync("/System/Library/Fonts/Supplemental/Arial.ttf") ? "/System/Library/Fonts/Supplemental/Arial.ttf"
+  : Bun.spawnSync(["fc-match", "-f", "%{file}", "sans-serif"]).stdout.toString().trim() || undefined);
 const slug = Bun.argv[2];
 if (!slug) {
   console.error("usage: sheet <slug>");
