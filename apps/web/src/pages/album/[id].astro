@@ -92,6 +92,13 @@ const minutes = Math.round(files.reduce((s, f) => s + (f.duration ?? 0), 0) / 60
 
 <script>
   const back = document.querySelector<HTMLAnchorElement>("#back");
+  let list: string | null = null;
+  try {
+    list = sessionStorage.getItem("list");
+  } catch {}
+  const field = document.querySelector<HTMLInputElement>("input[name=list]");
+  if (field && list?.startsWith("/")) field.value = list;
+  if (back && list?.startsWith("/")) back.href = list;
   const from = document.referrer ? new URL(document.referrer) : null;
   if (back && from?.origin === location.origin && from.pathname === "/") {
     back.href = from.pathname + from.search;

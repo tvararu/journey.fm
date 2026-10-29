@@ -15,6 +15,7 @@ export const POST: APIRoute = async ({ request, redirect, cookies }) => {
   const message = String(form.get("message") ?? "").trim();
   const verdict = form.get("verdict") === "request_changes" ? "request_changes" : "accept";
   const back = String(form.get("back") ?? "/");
+  const list = String(form.get("list") ?? "");
   let rec = (await processed()).get(album);
   if (!rec) return new Response("only processed albums can be reviewed", { status: 400 });
   if (verdict === "request_changes" && !message) return new Response("say what should change", { status: 400 });
@@ -29,7 +30,7 @@ export const POST: APIRoute = async ({ request, redirect, cookies }) => {
   await addReview({ album, at, by: "deity", cover: cover || current || "", fingerprint: fingerprint(rec), message, verdict });
   if (verdict === "accept") {
     cookies.set("flash", `Accepted ${album.split("/").slice(1).join(" - ")}`, { maxAge: 60, path: "/" });
-    return redirect("/?f=review", 303);
+    return redirect(/^\/(\?|$)/.test(list) ? list : "/?f=review", 303);
   }
   return redirect(`${back.startsWith("/album/") ? back : "/"}#conversation`, 303);
 };

@@ -115,6 +115,9 @@ const totalBytes = rows.reduce((s, r) => s + r.bytes, 0);
     else url.searchParams.set("f", filter);
     if (s) url.searchParams.set("q", s);
     else url.searchParams.delete("q");
+    try {
+      sessionStorage.setItem("list", url.pathname + url.search);
+    } catch {}
     if (url.href === location.href) return;
     if (push) history.pushState(null, "", url);
     else history.replaceState(null, "", url);
@@ -160,4 +163,7 @@ const totalBytes = rows.reduce((s, r) => s + r.bytes, 0);
     run();
   });
   run();
+  try {
+    sessionStorage.setItem("list", location.pathname + location.search);
+  } catch {}
 </script>
