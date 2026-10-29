@@ -33,6 +33,7 @@ const good = (v: Entry["verdict"]) => v === "accept" || v === "approve";
     <input type="hidden" name="album" value={album} />
     <input type="hidden" name="back" value={back} />
     <input type="hidden" name="list" value="/?f=review" />
+    <input type="hidden" name="next" value="" />
     <textarea
       name="message"
       rows="3"
@@ -42,6 +43,7 @@ const good = (v: Entry["verdict"]) => v === "accept" || v === "approve";
     <div class="flex flex-wrap justify-end gap-2">
       <button name="verdict" value="request_changes" class="border border-chg-fg bg-chg px-3 py-1 text-chg-fg">Request changes</button>
       <button name="verdict" value="accept" class="border border-new-fg bg-new px-3 py-1 text-new-fg">Accept</button>
+      <button id="accept-next" name="verdict" value="accept_next" hidden class="border border-new-fg bg-new-fg px-3 py-1 font-bold text-bg">Accept, next album →</button>
     </div>
   </form>
 )}

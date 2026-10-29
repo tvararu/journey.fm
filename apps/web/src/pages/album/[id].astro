@@ -99,6 +99,16 @@ const minutes = Math.round(files.reduce((s, f) => s + (f.duration ?? 0), 0) / 60
   const field = document.querySelector<HTMLInputElement>("input[name=list]");
   if (field && list?.startsWith("/")) field.value = list;
   if (back && list?.startsWith("/")) back.href = list;
+  try {
+    const items = JSON.parse(sessionStorage.getItem("listItems") ?? "[]") as string[];
+    const next = items[items.indexOf(location.pathname) + 1];
+    const nextField = document.querySelector<HTMLInputElement>("input[name=next]");
+    const nextButton = document.querySelector<HTMLButtonElement>("#accept-next");
+    if (items.includes(location.pathname) && next && nextField && nextButton) {
+      nextField.value = next;
+      nextButton.hidden = false;
+    }
+  } catch {}
   const from = document.referrer ? new URL(document.referrer) : null;
   if (back && from?.origin === location.origin && from.pathname === "/") {
     back.href = from.pathname + from.search;

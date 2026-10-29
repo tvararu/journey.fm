@@ -143,6 +143,10 @@ const totalBytes = rows.reduce((s, r) => s + r.bytes, 0);
       if (!r.hidden) shown++;
     }
     if (n) n.textContent = `${shown} shown`;
+    const order = rows.filter((r) => !r.hidden).map((r) => r.querySelector("a")?.getAttribute("href")).filter(Boolean);
+    try {
+      sessionStorage.setItem("listItems", JSON.stringify(order));
+    } catch {}
   }
 
   q?.addEventListener("input", () => {
