@@ -12,7 +12,7 @@ function filesValue(k: string, v: Value | undefined): Value | undefined {
   return (k === "disc" || k === "track") && typeof v === "string" ? (v.split("/")[0] ?? v) : v;
 }
 ---
-<h3 class="mt-8 mb-2 font-bold">Tracks</h3>
+<h3>Tracks</h3>
 <div class="card">
   <table class="grid-table">
     <thead><tr><th>File</th>{keys.map((k) => <th>{k}</th>)}</tr></thead>

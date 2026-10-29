@@ -1,12 +1,12 @@
 ---
 import { CHIP_FIELDS, change, FIELD_NAMES, FIELD_TAGS, type Tag, valuesFor } from "@/lib/album";
 import { empty, show } from "@/lib/format";
-import type { AlbumRecord, CoverChoice, Field, RymLink, Value } from "@/lib/records";
+import type { AlbumRecord, Field, RymLink, Value } from "@/lib/records";
 import Tracks from "./Tracks.astro";
 import ValueView from "./Value.astro";
 
-type Props = { rec: AlbumRecord; tags: Map<number, Tag[]>; cover: CoverChoice | undefined };
-const { rec, tags, cover } = Astro.props;
+type Props = { rec: AlbumRecord; tags: Map<number, Tag[]> };
+const { rec, tags } = Astro.props;
 const rl = rec.album.rym_links;
 const links = new Map<string, RymLink>(
   [...(rl?.primary ?? []), ...(rl?.secondary ?? []), ...(rl?.scenes ?? [])].map((g) => [g.name, g]),
@@ -20,10 +20,7 @@ const proposed = (k: string, f: Field): Value => (k === "scene" && typeof f.valu
 const ids = Object.entries(rec.album.ids).filter(([, v]) => v !== null && !(Array.isArray(v) && v.length === 0));
 const STATUS = { "": "same", chg: "changed", new: "new" } as const;
 ---
-<div class="mb-2 flex gap-4 text-xs text-muted">
-  <span><i class="mr-1 inline-block size-3 bg-chg align-[-1px]"></i>changes what the files say</span>
-  <span><i class="mr-1 inline-block size-3 bg-new align-[-1px]"></i>new, the files have nothing</span>
-</div>
+<h2>Tags</h2>
 <div class="card">
   <table class="grid-table">
     <thead><tr><th>Field</th><th>Proposed</th><th>From</th><th>Files have</th></tr></thead>
@@ -50,18 +47,3 @@ const STATUS = { "": "same", chg: "changed", new: "new" } as const;
 </div>
 
 <Tracks rec={rec} />
-
-{cover && (
-  <>
-    <h3 class="mt-8 mb-2 font-bold">Cover</h3>
-    <div class="flex flex-wrap items-start gap-4">
-      <a href={`/data/${cover.master}`}><img class="size-48 bg-faint object-cover" src={`/data/${cover.master}`} alt="" /></a>
-      <div class="text-sm">
-        <div>Master: {cover.chosen.source}, {cover.chosen.width}x{cover.chosen.height}</div>
-        <div class="text-muted">{cover.master}</div>
-        <div class="mt-2">Embedded copy: {cover.embed_size[0]}x{cover.embed_size[1]}, {Math.floor(cover.embed_bytes / 1024)} KB</div>
-        <div class="text-muted">{cover.embed}</div>
-      </div>
-    </div>
-  </>
-)}

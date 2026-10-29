@@ -11,7 +11,7 @@ const entries: Entry[] = [
 ].sort((a, b) => a.at.localeCompare(b.at));
 const VERDICT = { accept: "accepted", request_changes: "requested changes" } as const;
 ---
-{entries.length === 0 && <p class="mb-4 text-muted">Nothing yet.</p>}
+<h2>Conversation</h2>
 <ol class="space-y-4">
   {entries.map((e) => (
     <li class={`border-l-2 pl-3 ${e.verdict === "accept" ? "border-new-fg" : e.verdict ? "border-chg-fg" : "border-rule"}`}>
@@ -28,12 +28,11 @@ const VERDICT = { accept: "accepted", request_changes: "requested changes" } as 
   <form id="review" method="post" action="/api/review" class="mt-6 flex flex-col gap-2 border border-rule bg-bg p-3">
     <input type="hidden" name="album" value={album} />
     <input type="hidden" name="back" value={back} />
-    <div class="text-sm font-bold">Review the proposal <span class="font-normal text-muted">· currently {status}</span></div>
     <textarea
       name="message"
       rows="3"
       class="w-full border border-rule bg-gap p-2"
-      placeholder="What should change? Optional when accepting."
+      placeholder="Leave a comment"
     ></textarea>
     <div class="flex flex-wrap justify-end gap-2">
       <button name="verdict" value="request_changes" class="border border-chg-fg bg-chg px-3 py-1 text-chg-fg">Request changes</button>

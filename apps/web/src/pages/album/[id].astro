@@ -1,8 +1,8 @@
 ---
-import InFiles from "@/app/album/InFiles.astro";
 import Conversation from "@/app/album/Conversation.astro";
+import Cover from "@/app/album/Cover.astro";
+import InFiles from "@/app/album/InFiles.astro";
 import Proposed from "@/app/album/Proposed.astro";
-import Section from "@/app/album/Section.astro";
 import Sources from "@/app/album/Sources.astro";
 import Layout from "@/app/Layout.astro";
 import { quality, size } from "@/lib/format";
@@ -28,75 +28,42 @@ const raw = rec ? await rawFiles(rec) : [];
 const albumReviews = allReviews.get(a.path) ?? [];
 const status = rec ? statusOf(rec, albumReviews) : null;
 const state = status ?? "triage";
-const fallback =
-  pictures.find((p) => p.type === 3)?.sha256 ?? extras.find((x) => /\.(jpe?g|png)$/i.test(x.relpath))?.sha256;
-const img = cover ? `/data/${cover.master}` : fallback ? `/blob/${fallback}` : null;
+const BADGE: Record<string, string> = { accepted: "badge-processed", triage: "" };
+const embedded = pictures.find((p) => p.type === 3)?.sha256;
+const folder = extras.find((x) => /\.(jpe?g|png)$/i.test(x.relpath))?.sha256;
+const fallback = embedded ?? folder;
 const here = Astro.url.pathname;
 const totalBytes = files.reduce((s, f) => s + f.size, 0) + extras.reduce((s, x) => s + x.size, 0);
 const minutes = Math.round(files.reduce((s, f) => s + (f.duration ?? 0), 0) / 60);
-const BADGE: Record<string, string> = {
-  accepted: "badge-processed",
-  "accepted, then changed": "chg border-transparent",
-  "changes requested": "chg border-transparent",
-  "updated since request": "chg border-transparent",
-};
-const nav = [
-  ["files", "01 In the files"],
-  ["sources", "02 Fetched"],
-  ["proposed", "03 Proposed"],
-  ["conversation", `04 Conversation (${notes.length + albumReviews.length})`],
-];
 ---
 <Layout title={a.album_dir}>
   <p><a id="back" href="/">← Library</a></p>
-  <header class="mt-3 flex flex-wrap items-start gap-5">
-    {img ? <img class="size-48 bg-faint object-cover" src={img} alt="" /> : <div class="size-48 bg-faint" />}
-    <div class="min-w-0">
-      <h1 class="text-2xl font-bold">{a.album_dir}</h1>
-      <p class="text-muted">{a.artist_dir}</p>
-      <p class="mt-2"><span class={`badge ${BADGE[state] ?? ""}`}>{state}</span></p>
-      <dl class="mt-3 grid grid-cols-[auto_1fr] gap-x-4 text-sm">
-        <dt class="text-muted">Audio</dt><dd>{quality(files)}</dd>
-        <dt class="text-muted">Size</dt><dd>{size(totalBytes)} · {files.length} tracks · {minutes} min</dd>
-        <dt class="text-muted">On sol</dt><dd class="break-all">{a.path}</dd>
-        <dt class="text-muted">RED copy</dt><dd class="break-all">{(red[a.path] ?? []).join(", ") || "none"}</dd>
-      </dl>
-    </div>
+  <header class="mt-4">
+    <h1>{a.album_dir}</h1>
+    <p class="text-muted">{a.artist_dir}</p>
+    <p class="mt-2"><span class={`badge ${BADGE[state] ?? "chg border-transparent"}`}>{state}</span></p>
+    <dl class="mt-3 grid grid-cols-[auto_1fr] gap-x-4 text-sm">
+      <dt class="text-muted">Audio</dt><dd>{quality(files)}</dd>
+      <dt class="text-muted">Size</dt><dd>{size(totalBytes)} · {files.length} tracks · {minutes} min</dd>
+      <dt class="text-muted">On sol</dt><dd class="break-all">{a.path}</dd>
+      <dt class="text-muted">RED</dt><dd class="break-all">{(red[a.path] ?? []).join(", ") || "none"}</dd>
+    </dl>
   </header>
 
-  <nav class="sticky top-0 z-10 mt-6 flex flex-wrap gap-x-5 gap-y-1 border-y border-rule bg-gap py-2 text-sm">
-    {nav.map(([id, text]) => <a href={`#${id}`}>{text}</a>)}
-  </nav>
+  <Cover cover={cover} candidates={candidates} fallback={fallback ? `/blob/${fallback}` : null} />
+  {rec && <Proposed rec={rec} tags={tags} />}
+  <Conversation notes={notes} reviews={albumReviews} album={a.path} back={here} status={status} />
 
-  <Section id="files" n={1} title="In the files" lede="What's on disk now, exactly as scanned from sol on 29 Oct. Nothing here has been changed.">
+  {rec && (
+    <details>
+      <summary>Sources</summary>
+      <Sources rec={rec} raw={raw} />
+    </details>
+  )}
+  <details>
+    <summary>Files on disk</summary>
     <InFiles files={files} tags={tags} pictures={pictures} extras={extras} />
-  </Section>
-
-  <Section id="sources" n={2} title="Fetched from sources" lede="What each source says about this exact edition, plus the raw responses behind it.">
-    {rec ? (
-      <Sources rec={rec} raw={raw} cover={cover} candidates={candidates} />
-    ) : (
-      <p class="text-muted">Nothing fetched yet. This album is still in triage.</p>
-    )}
-  </Section>
-
-  <Section id="proposed" n={3} title="Proposed" lede="What the resolver suggests writing, picked from the sources by the agreed order.">
-    {rec ? (
-      <>
-        <p class="mb-6 border border-rule bg-bg p-3 text-sm">
-          Review status: <span class={`badge ${BADGE[state] ?? ""}`}>{state}</span>
-          <a class="ml-2" href="#review">Review it</a>
-        </p>
-        <Proposed rec={rec} tags={tags} cover={cover} />
-      </>
-    ) : (
-      <p class="text-muted">Not resolved yet.</p>
-    )}
-  </Section>
-
-  <Section id="conversation" n={4} title="Conversation" lede="Agents' notes on their judgement calls and your reviews, oldest first, like a pull request.">
-    <Conversation notes={notes} reviews={albumReviews} album={a.path} back={here} status={status} />
-  </Section>
+  </details>
 </Layout>
 
 <script>

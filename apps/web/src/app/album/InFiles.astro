@@ -17,8 +17,7 @@ const images = extras.filter((x) => IMAGE.test(x.relpath));
 const others = extras.filter((x) => !IMAGE.test(x.relpath));
 const cut = (v: string) => (v.length > 300 ? `${v.slice(0, 300)}…` : v);
 ---
-<h3 class="mb-2 font-bold">Album tags</h3>
-<p class="mb-2 text-xs text-muted">Every tag key across the tracks, each distinct value and how many tracks carry it.</p>
+<h3>Album tags</h3>
 <div class="card">
   <table class="grid-table">
     <thead><tr><th>Key</th><th>Values</th><th>Tracks</th></tr></thead>
@@ -39,7 +38,7 @@ const cut = (v: string) => (v.length > 300 ? `${v.slice(0, 300)}…` : v);
   </table>
 </div>
 
-<h3 class="mt-8 mb-2 font-bold">Files</h3>
+<h3>Files</h3>
 <div class="card">
   <table class="grid-table">
     <thead><tr><th>File</th><th>Format</th><th>Length</th><th>Size</th><th>Audio MD5</th><th>Encoder</th><th>Blocks</th></tr></thead>
@@ -60,10 +59,10 @@ const cut = (v: string) => (v.length > 300 ? `${v.slice(0, 300)}…` : v);
 </div>
 
 <details class="mt-4">
-  <summary class="cursor-pointer text-accent">Every tag, track by track</summary>
+  <summary>Every tag, track by track</summary>
   {files.map((f) => (
     <>
-      <h4 class="mt-4 mb-1 text-sm font-bold">{f.relpath}</h4>
+      <h4>{f.relpath}</h4>
       <div class="card">
         <table class="grid-table">
           <tbody>
@@ -75,7 +74,7 @@ const cut = (v: string) => (v.length > 300 ? `${v.slice(0, 300)}…` : v);
   ))}
 </details>
 
-<h3 class="mt-8 mb-2 font-bold">Pictures</h3>
+<h3>Pictures</h3>
 <div class="flex flex-wrap gap-4">
   {[...embedded.entries()].map(([h, { p, n }]) => (
     <figure class="w-32">
@@ -92,7 +91,7 @@ const cut = (v: string) => (v.length > 300 ? `${v.slice(0, 300)}…` : v);
 </div>
 {others.length > 0 && (
   <>
-    <h3 class="mt-8 mb-2 font-bold">Other files</h3>
+    <h3>Other files</h3>
     <ul>{others.map((x) => <li>{x.relpath} ({x.size} B)</li>)}</ul>
   </>
 )}

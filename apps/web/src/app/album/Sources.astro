@@ -1,26 +1,19 @@
 ---
 import { FIELD_NAMES } from "@/lib/album";
 import { label, type RawFile } from "@/lib/raw";
-import type { AlbumRecord, CoverCandidate, CoverChoice, Field } from "@/lib/records";
+import type { AlbumRecord, Field } from "@/lib/records";
 import ValueView from "./Value.astro";
 
-type Props = { rec: AlbumRecord; raw: RawFile[]; cover: CoverChoice | undefined; candidates: CoverCandidate[] };
-const { rec, raw, cover, candidates } = Astro.props;
+type Props = { rec: AlbumRecord; raw: RawFile[] };
+const { rec, raw } = Astro.props;
 const ORDER = ["files", "MusicBrainz", "RYM", "RED", "Discogs"];
 const fields = Object.entries(rec.album).filter(([k]) => !["ids", "rym_links", "cover"].includes(k)) as [string, Field][];
 const seen = new Set(fields.flatMap(([, f]) => Object.keys(f.candidates)));
 const sources = [...ORDER.filter((s) => seen.has(s)), ...[...seen].filter((s) => !ORDER.includes(s)).sort()];
 const picked = (f: Field, s: string) => (f.source ?? "").split(", refined by ").includes(s);
 const short = (v: unknown) => (Array.isArray(v) && v.length > 8 ? [...v.slice(0, 8), `+${v.length - 8} more`] : v);
-const fronts = candidates.filter((c) => c.types.includes("Front"));
-const archived = candidates.length - fronts.length;
-const fetchedDates = raw.map((r) => r.fetched).filter((d): d is string => d !== null).sort();
 ---
-<h3 class="mb-2 font-bold">Every source, field by field</h3>
-<p class="mb-2 text-xs text-muted">
-  <i class="mr-1 inline-block size-3 border-2 border-new-fg align-[-1px]"></i>the value the resolver picked.
-  Values are as each source gave them, before ASCII clean-up.
-</p>
+<h3>By field</h3>
 <div class="card">
   <table class="grid-table">
     <thead><tr><th>Field</th>{sources.map((s) => <th>{s}</th>)}</tr></thead>
@@ -39,29 +32,7 @@ const fetchedDates = raw.map((r) => r.fetched).filter((d): d is string => d !== 
   </table>
 </div>
 
-<h3 class="mt-8 mb-2 font-bold">Cover candidates</h3>
-<div class="flex flex-wrap gap-4">
-  {fronts.map((c) => {
-    const pick = c.id === cover?.chosen.id;
-    return (
-      <figure class={`w-40 ${pick ? "outline-2 outline-offset-4 outline-new-fg" : ""}`}>
-        <a href={`/data/${c.path}`}>
-          <img class="size-40 bg-faint object-cover" loading="lazy" src={`/data/${c.path}`} alt="" />
-        </a>
-        <figcaption class="mt-1 text-xs text-muted">
-          {c.source}<br />{c.width}x{c.height}, {Math.floor(c.bytes / 1024)} KB{c.note && <><br />{c.note}</>}
-        </figcaption>
-      </figure>
-    );
-  })}
-</div>
-{archived > 0 && <p class="mt-2 text-xs text-muted">Plus {archived} other images archived (back, booklet, disc, tray).</p>}
-
-<h3 class="mt-8 mb-2 font-bold">Raw responses</h3>
-<p class="mb-2 text-xs text-muted">
-  Everything fetched for this album, kept whole{fetchedDates.length > 0 && <>, {fetchedDates[0]} to {fetchedDates.at(-1)}</>}.
-  Bold ones feed the resolver.
-</p>
+<h3>Raw responses</h3>
 <div class="card">
   <table class="grid-table">
     <thead><tr><th>File</th><th>What</th><th>Fetched</th><th>Size</th></tr></thead>
