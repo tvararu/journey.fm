@@ -201,7 +201,20 @@ async function cover(a: Album): Promise<void> {
   }
   let c = edition;
   let why = `auto-picked: ${c.source} front, ${c.width}x${c.height}`;
-  if (Math.max(c.width, c.height) < 2000) {
+  const own = fronts.filter((x) => x.source.startsWith("files") && Math.min(x.width, x.height) >= 500 && x !== edition)
+    .sort((x, y) => y.width * y.height - x.width * x.height);
+  if (!edition.source.startsWith("files") && own.length) {
+    const mine = await thumb(edition.path);
+    for (const x of own) {
+      const d = difference(mine, await thumb(x.path));
+      if (d <= SAME_ART) {
+        why = `auto-picked: the files' own ${x.source} image ${x.width}x${x.height}, the same art as the ${edition.source} front (difference ${d.toFixed(1)}); deity prefers the art already in the files over scans`;
+        c = x;
+        break;
+      }
+    }
+  }
+  if (c === edition && Math.max(c.width, c.height) < 2000) {
     const mine = await thumb(c.path);
     const big = fronts.filter((x) => Math.max(x.width, x.height) > Math.max(c.width, c.height)).sort((x, y) => y.width * y.height - x.width * x.height);
     for (const x of big) {
