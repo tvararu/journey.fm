@@ -12,7 +12,7 @@ const kind = flag("--kind", "note") === "instruction" ? "instruction" : "note";
 const [query, ...rest] = args;
 const text = rest.join(" ").trim();
 if (!(query && text)) {
-  console.error('usage: music:note <album id | slug | text in its path> "<note>" [--by theo] [--kind instruction]');
+  console.error('usage: music:note <album id | slug | text in its path> "<note>" [--by deity] [--kind instruction]');
   process.exit(1);
 }
 

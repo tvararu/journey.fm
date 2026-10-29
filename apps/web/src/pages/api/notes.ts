@@ -10,6 +10,6 @@ export const POST: APIRoute = async ({ request, redirect }) => {
   const back = String(form.get("back") ?? "/");
   if (!(album && text)) return new Response("album and text are required", { status: 400 });
   const at = new Date().toLocaleString("sv-SE", { timeZone: "Europe/London" }).slice(0, 16);
-  await addNote({ album, at, by: "theo", kind, text });
+  await addNote({ album, at, by: "deity", kind, text });
   return redirect(`${back.startsWith("/album/") ? back : "/"}#notes`, 303);
 };
