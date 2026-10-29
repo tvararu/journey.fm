@@ -4,11 +4,11 @@ import { format, size } from "@/lib/format";
 import { library } from "@/lib/library";
 
 const rows = await library();
-const FILTERS = ["all", "triage", "blocked", "agents", "changes", "accepted", "claude", "deity", "issues"];
+const FILTERS = ["all", "triage", "blocked", "agents", "changes", "accepted", "issues"];
 const GROUP: Record<string, string> = { "awaiting agents": "agents", "changes requested": "changes" };
 const BADGE: Record<string, string> = { accepted: "badge-processed", blocked: "badge-issue", triage: "" };
 const LABELS: Record<string, string> = {
-  agents: "awaiting agents", changes: "changes requested", claude: "accepted by claude", deity: "accepted by deity", issues: "with issues",
+  agents: "awaiting agents", changes: "changes requested", issues: "with issues",
 };
 const bucket = (r: (typeof rows)[number]): string => GROUP[r.state] ?? r.state;
 const initialFilter = FILTERS.find((f) => f === Astro.url.searchParams.get("f")) ?? "all";
@@ -17,7 +17,6 @@ const count = (s: string) => rows.filter((r) => r.state === s).length;
 const tally = (f: string): number =>
   f === "all" ? rows.length
   : f === "issues" ? rows.filter((r) => r.issues.length).length
-  : f === "claude" || f === "deity" ? rows.filter((r) => r.state === "accepted" && r.by === f).length
   : rows.filter((r) => bucket(r) === f).length;
 const totalBytes = rows.reduce((s, r) => s + r.bytes, 0);
 ---
@@ -26,7 +25,7 @@ const totalBytes = rows.reduce((s, r) => s + r.bytes, 0);
   <p class="mt-1 text-muted">
     {rows.length} albums in sol's Music ({size(totalBytes)}), scanned 29 Oct. {count("triage")} in triage,
     {count("blocked")} blocked, {count("awaiting agents")} awaiting agents, {count("changes requested")} with changes requested,
-    {count("accepted")} accepted ({tally("claude")} by claude, {tally("deity")} by deity). Nothing written yet.
+    {count("accepted")} accepted. Nothing written yet.
   </p>
   <div class="my-4 flex flex-wrap items-center gap-2">
     <input
@@ -57,7 +56,6 @@ const totalBytes = rows.reduce((s, r) => s + r.bytes, 0);
           <tr
             data-state={bucket(r)}
             data-issues={r.issues.length}
-            data-by={r.state === "accepted" ? (r.by ?? "") : ""}
             data-q={`${r.path} ${r.issues.join(" ")} ${r.state === "blocked" ? (r.message ?? "") : ""}`.toLowerCase()}
           >
             <td>
@@ -122,7 +120,6 @@ const totalBytes = rows.reduce((s, r) => s + r.bytes, 0);
     if (s && !r.dataset["q"]?.includes(s)) return false;
     if (filter === "all") return true;
     if (filter === "issues") return Number(r.dataset["issues"]) > 0;
-    if (filter === "claude" || filter === "deity") return r.dataset["by"] === filter;
     return r.dataset["state"] === filter;
   }
 
