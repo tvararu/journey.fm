@@ -23,6 +23,8 @@ const bucket = (r: (typeof rows)[number]): string => {
 const initialFilter = FILTERS.find((f) => f === Astro.url.searchParams.get("f")) ?? "all";
 const initialQuery = Astro.url.searchParams.get("q") ?? "";
 const count = (s: string) => rows.filter((r) => r.state === s).length;
+const tally = (f: string): number =>
+  f === "all" ? rows.length : f === "issues" ? rows.filter((r) => r.issues.length).length : rows.filter((r) => bucket(r) === f).length;
 const totalBytes = rows.reduce((s, r) => s + r.bytes, 0);
 ---
 <Layout title="journey.fm">
@@ -47,7 +49,7 @@ const totalBytes = rows.reduce((s, r) => s + r.bytes, 0);
         aria-pressed={f === initialFilter ? "true" : "false"}
         class="border border-rule bg-bg px-3 py-1 capitalize aria-pressed:border-accent aria-pressed:bg-accent aria-pressed:text-bg"
       >
-        {LABELS[f] ?? f}
+        {LABELS[f] ?? f} <span class="opacity-70">{tally(f)}</span>
       </button>
     ))}
     <span id="n" class="text-muted"></span>
