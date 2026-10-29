@@ -14,5 +14,6 @@ export const POST: APIRoute = async ({ request, redirect }) => {
   if (verdict === "request_changes" && !message) return new Response("say what should change", { status: 400 });
   const at = new Date().toLocaleString("sv-SE", { timeZone: "Europe/London" }).slice(0, 16);
   await addReview({ album, at, by: "deity", fingerprint: fingerprint(rec), message, verdict });
+  if (verdict === "accept") return redirect("/?f=review", 303);
   return redirect(`${back.startsWith("/album/") ? back : "/"}#conversation`, 303);
 };
