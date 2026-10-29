@@ -11,7 +11,7 @@ const rl = rec.album.rym_links;
 const links = new Map<string, RymLink>(
   [...(rl?.primary ?? []), ...(rl?.secondary ?? []), ...(rl?.scenes ?? [])].map((g) => [g.name, g]),
 );
-const fields = Object.entries(rec.album).filter(([k]) => !["ids", "rym_links", "cover", "ratings"].includes(k)) as [string, Field][];
+const fields = Object.entries(rec.album).filter(([k]) => !["ids", "rym_links", "cover", "ratings", "links"].includes(k)) as [string, Field][];
 const had = (k: string): Value => {
   const keys = FIELD_TAGS[k];
   return keys ? valuesFor(tags, keys) : null;
@@ -38,6 +38,14 @@ const STATUS = { "": "same", chg: "changed", new: "new" } as const;
           </tr>
         );
       })}
+      {Object.entries(rec.album.ratings).map(([s, r]) => (
+        <tr>
+          <th>{s} rating</th>
+          <td class="new">{r.value.toFixed(2)} <span class="text-muted">({r.count.toLocaleString("en-GB")} votes{r.as_of && `, as of ${r.as_of}`})</span></td>
+          <td class="text-xs whitespace-nowrap text-muted">{s}</td>
+          <td class="text-xs text-muted">new</td>
+        </tr>
+      ))}
       <tr>
         <th>IDs</th>
         <td colspan="3" class="text-xs">{ids.map(([k, v]) => <div>{k}: <ValueView value={v} /></div>)}</td>

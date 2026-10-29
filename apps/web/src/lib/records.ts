@@ -12,7 +12,7 @@ export type Field = {
 
 export type RymLink = { name: string; id: number; url: string };
 
-export type Rating = { value: number; count: number; scale: number };
+export type Rating = { value: number; count: number; scale: number; as_of: string | null };
 
 export type AlbumRecord = {
   slug: string;
@@ -22,6 +22,7 @@ export type AlbumRecord = {
   album: Record<string, Field> & {
     ids: Record<string, Value>;
     ratings: Record<string, Rating>;
+    links: { label: string; url: string }[];
     rym_links: {
       artists: RymLink[];
       primary: RymLink[];
