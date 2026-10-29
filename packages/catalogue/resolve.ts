@@ -1,5 +1,5 @@
 import { Database } from "bun:sqlite";
-import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 
 import { unescapeHtml } from "./lib/py";
 
@@ -449,17 +449,29 @@ function resolve(slug: string, choice: J) {
   return { slug, path, state: "processed", resolved: timestamp(), edition_choice: choice, album, tracks: ordered };
 }
 
+function writeAtomic(path: string, text: string): void {
+  const tmp = `${path}.${process.pid}.tmp`;
+  writeFileSync(tmp, text);
+  renameSync(tmp, path);
+}
+
 if (import.meta.main) {
   const choices: Record<string, J> = JSON.parse(readFileSync(`${OUT}/editions.json`, "utf8"));
-  const rym: [string, string, string][] = [];
-  for (const [slug, ch] of Object.entries(choices)) {
+  const only = Bun.argv.slice(2);
+  for (const slug of only.length ? only : Object.keys(choices)) {
+    const ch = choices[slug];
+    if (!ch) throw new Error(`no edition chosen for ${slug}`);
     const rec = resolve(slug, ch);
-    const ids = rec.album.ids;
-    if (ids.rym_id) rym.push([ch.path.split("/").slice(1).join("/"), ids.rym_id, ids.rym_path]);
-    writeFileSync(`${OUT}/${slug}.json`, JSON.stringify(rec, null, 1));
+    writeAtomic(`${OUT}/${slug}.json`, JSON.stringify(rec, null, 1));
     const keys = ["title", "original_date", "date", "label", "catalogue_number", "genre"];
     console.log(slug, Object.fromEntries(keys.map((k) => [k, rec.album[k].value])));
   }
+  const rym: [string, string, string][] = [];
+  for (const [slug, ch] of Object.entries(choices)) {
+    if (!existsSync(`${OUT}/${slug}.json`)) continue;
+    const ids = JSON.parse(readFileSync(`${OUT}/${slug}.json`, "utf8")).album.ids;
+    if (ids.rym_id) rym.push([ch.path.split("/").slice(1).join("/"), ids.rym_id, ids.rym_path]);
+  }
   rym.sort((a, b) => (a.join("\t") < b.join("\t") ? -1 : 1));
-  writeFileSync(process.env.JOURNEY_RYM_IDS ?? `${HERE}/rym-ids.tsv`, `folder\trym_id\trym_path\n${rym.map((r) => `${r.join("\t")}\n`).join("")}`);
+  writeAtomic(process.env.JOURNEY_RYM_IDS ?? `${HERE}/rym-ids.tsv`, `folder\trym_id\trym_path\n${rym.map((r) => `${r.join("\t")}\n`).join("")}`);
 }

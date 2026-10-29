@@ -223,7 +223,7 @@ export function masterCopy(src: string, dest: string): string {
   return `quality ${MASTER_QUALITY}, 4:4:4, colour profile kept`;
 }
 
-function choose(slug: string, cid: string, why: string, keep = false): void {
+function choose(slug: string, cid: string, why: string, keep = false, wait = false): void {
   const cands = readJson<Candidate[]>(`${RAW}/${slug}/covers/candidates.json`);
   const c = cands.find((x) => x.id === cid);
   if (!c) throw new Error(`no candidate ${cid} for ${slug}`);
@@ -248,14 +248,21 @@ function choose(slug: string, cid: string, why: string, keep = false): void {
     embed_size: dims(small),
   };
   dump(p, all);
-  if (!keep) autoUpscale(slug, c, cands);
+  if (!keep) autoUpscale(slug, c, cands, wait);
   const kb = (n: number) => Math.floor(n / 1024);
   console.log([slug, c.width, "x", c.height, kb(c.bytes), "KB ->", kb(size(master)), "KB", method].join(" "));
 }
 
-function autoUpscale(slug: string, c: Candidate, cands: Candidate[]): void {
+function autoUpscale(slug: string, c: Candidate, cands: Candidate[], wait = false): void {
   if (Math.max(c.width, c.height) >= AUTO_UPSCALE_BELOW || c.source.startsWith("Upscaled")) return;
   if (cands.some((x) => x.source === "Upscaled (ultrasharpv2)" && x.note?.startsWith(`${c.source} ${c.width}x${c.height}`))) return;
+  const args = ["bun", `${import.meta.dir}/upscale.ts`, slug, c.id, "ultrasharpv2", "--master"];
+  if (wait) {
+    console.log(`upscaling ${c.width}x${c.height} with 4x-UltraSharpV2 and waiting for it`);
+    const p = Bun.spawnSync(args, { stderr: "inherit", stdout: "inherit" });
+    if (p.exitCode !== 0) throw new Error("upscale failed");
+    return;
+  }
   const log = Bun.file(`${RAW}/${slug}/covers/upscale.log`);
   const p = Bun.spawn(["bun", `${import.meta.dir}/upscale.ts`, slug, c.id, "ultrasharpv2", "--master"], { stdio: ["ignore", log, log], detached: true });
   p.unref();
@@ -276,7 +283,7 @@ async function addCover(slug: string, url: string, source: string, note: string)
 if (import.meta.main) {
   const [cmd, ...rest] = Bun.argv.slice(2);
   if (cmd === "choose" && rest.length >= 3) {
-    choose(rest[0]!, rest[1]!, rest[2]!, rest.includes("--keep"));
+    choose(rest[0]!, rest[1]!, rest[2]!, rest.includes("--keep"), rest.includes("--wait"));
   } else if (cmd === "add" && rest.length >= 4) {
     await addCover(rest[0]!, rest[1]!, rest[2]!, rest[3]!);
   } else if (cmd && cmd !== "choose" && cmd !== "add") {
@@ -294,7 +301,7 @@ if (import.meta.main) {
       });
     }
   } else {
-    console.error("usage: music:covers [slug...] | add <slug> <url> <source> <note> | choose <slug> <candidate-id> <why> [--keep]");
+    console.error("usage: music:covers [slug...] | add <slug> <url> <source> <note> | choose <slug> <candidate-id> <why> [--keep] [--wait]");
     process.exit(1);
   }
 }

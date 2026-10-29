@@ -27,7 +27,7 @@ const album = editions[slug]?.path ?? slug;
 const what = `Upscaled the ${c.source} cover (${c.width}x${c.height}) with ${u.label} to ${made.width}x${made.height}.`;
 if (master) {
   const why = `${u.label} upscale of the chosen ${c.width}x${c.height} ${c.source} cover, made master automatically because the original is under 2000 px`;
-  for (const cmd of [["scripts/covers.ts", "choose", slug, made.id, why, "--keep"], ["scripts/resolve.ts"]]) {
+  for (const cmd of [["scripts/covers.ts", "choose", slug, made.id, why, "--keep"], ["scripts/resolve.ts", slug]]) {
     const p = Bun.spawnSync(["bun", ...cmd], { cwd: `${import.meta.dir}/..`, stderr: "pipe", stdout: "ignore" });
     if (p.exitCode !== 0) throw new Error(`${cmd[0]} failed: ${p.stderr.toString().slice(0, 400)}`);
   }

@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+#MISE description="Everything a reviewer needs about one album as text: music:inspect <slug>"
+set -euo pipefail
+cd "$MISE_PROJECT_ROOT/hobbies/music/catalogue"
+exec bun scripts/inspect.ts "$@"
