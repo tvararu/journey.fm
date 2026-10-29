@@ -18,6 +18,7 @@ export type AlbumRecord = {
   slug: string;
   path: string;
   state: "processed";
+  resolved: string;
   edition_choice: { release: string; how: string };
   album: Record<string, Field> & {
     ids: Record<string, Value>;

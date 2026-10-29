@@ -29,15 +29,21 @@ export async function library(): Promise<LibraryEntry[]> {
   const [done, red, allReviews, allVerdicts] = await Promise.all([processed(), redCopies(), reviews(), verdicts()]);
   const keys = albumKeyTags();
   const thumbs = thumbnails();
-  return libraryRows().map((r) => {
+  const touched = new Map<string, number>();
+  const rows = libraryRows().map((r) => {
     const k = keys.get(r.id) ?? new Map<string, Set<string>>();
     const rec = done.get(r.path);
+    const rs = allReviews.get(r.path) ?? [];
+    const vs = allVerdicts.get(r.path) ?? [];
+    const events = [...rs, ...vs].map((x) => Date.parse(x.at));
+    touched.set(r.path, events.length ? Math.max(...events) : rec ? Date.parse(rec.resolved) : 0);
     return {
       ...r,
       dates: [...(k.get("DATE") ?? [])].sort(),
       issues: issuesFor(r, k, red, !!rec),
-      ...(rec ? statusOf(rec, allReviews.get(r.path), allVerdicts.get(r.path)) : { by: null, message: null, state: "triage" as const }),
+      ...(rec ? statusOf(rec, rs, vs) : { by: null, message: null, state: "triage" as const }),
       thumb: thumbs.get(r.id),
     };
   });
+  return rows.sort((a, b) => touched.get(b.path)! - touched.get(a.path)!);
 }
