@@ -3,7 +3,7 @@ import type { APIRoute } from "astro";
 import { addReview, fingerprint } from "@/lib/reviews";
 import { processed } from "@/lib/records";
 
-export const POST: APIRoute = async ({ request, redirect }) => {
+export const POST: APIRoute = async ({ request, redirect, cookies }) => {
   const form = await request.formData();
   const album = String(form.get("album") ?? "");
   const message = String(form.get("message") ?? "").trim();
@@ -14,6 +14,9 @@ export const POST: APIRoute = async ({ request, redirect }) => {
   if (verdict === "request_changes" && !message) return new Response("say what should change", { status: 400 });
   const at = new Date().toLocaleString("sv-SE", { timeZone: "Europe/London" }).slice(0, 16);
   await addReview({ album, at, by: "deity", fingerprint: fingerprint(rec), message, verdict });
-  if (verdict === "accept") return redirect("/?f=review", 303);
+  if (verdict === "accept") {
+    cookies.set("flash", `Accepted ${album.split("/").slice(1).join(" - ")}`, { maxAge: 60, path: "/" });
+    return redirect("/?f=review", 303);
+  }
   return redirect(`${back.startsWith("/album/") ? back : "/"}#conversation`, 303);
 };

@@ -128,3 +128,14 @@
     @apply text-accent hover:underline;
   }
 }
+
+.flash {
+  animation: flash-out 0.4s ease-in 3s forwards;
+}
+
+@keyframes flash-out {
+  to {
+    opacity: 0;
+    visibility: hidden;
+  }
+}
