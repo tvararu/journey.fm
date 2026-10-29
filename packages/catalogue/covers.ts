@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { closeSync, existsSync, mkdirSync, openSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { relative } from "node:path";
 
 import { fetchJson, UA } from "./lib/fetch";
@@ -115,8 +115,8 @@ async function candidates(slug: string, choice: Choice): Promise<Candidate[]> {
   const add = (source: string, path: string, url: string | null = null, types = ["Front"], note: string | null = "") =>
     out.push(candidate(source, path, url, types, note));
 
-  const rel = load(slug, `caa_release_${choice.release}`) as Caa | null;
-  for (const i of rel?.images ?? []) {
+  const caa = (name: string) => ((load(slug, name) as Caa | null)?.images ?? []).filter((i) => !i.image.endsWith(".pdf"));
+  for (const i of caa(`caa_release_${choice.release}`)) {
     const p = await get(i.image, `${d}/caa-release-${tail(i.image)}`);
     add("Cover Art Archive (release)", p, i.image, i.types, i.comment || "");
   }
@@ -133,7 +133,7 @@ async function candidates(slug: string, choice: Choice): Promise<Candidate[]> {
         });
         dump(j, { fetched: stamp(), data: r.ok ? ((await r.json()) as unknown) : null }, true);
       }
-      for (const i of (load(slug, `caa_release_${sib.id}`) as Caa | null)?.images ?? []) {
+      for (const i of caa(`caa_release_${sib.id}`)) {
         if (i.front) {
           const p = await get(i.image, `${d}/caa-sibling-${tail(i.image)}`);
           const note = `release ${sib.id.slice(0, 8)} ${py(sib.title)}`;
@@ -142,8 +142,7 @@ async function candidates(slug: string, choice: Choice): Promise<Candidate[]> {
       }
     }
   }
-  const rg = load(slug, `caa_rg_${choice.release_group}`) as Caa | null;
-  for (const i of rg?.images ?? []) {
+  for (const i of caa(`caa_rg_${choice.release_group}`)) {
     if (i.front && !out.some((c) => c.url === i.image)) {
       const p = await get(i.image, `${d}/caa-rg-${tail(i.image)}`);
       add("Cover Art Archive (release group)", p, i.image, i.types, i.comment || "");
@@ -208,7 +207,7 @@ export function masterCopy(src: string, dest: string): string {
   const ppm = `${dest}.ppm`;
   const icc = `${dest}.icc`;
   run(["ffmpeg", "-nostdin", "-v", "error", "-y", "-i", src, "-pix_fmt", "rgb24", "-frames:v", "1", ppm]);
-  const profile = capture(["exiftool", "-b", "-ICC_Profile", src]);
+  const profile = capture(["magick", src, "icc:-"]);
   const cmd = ["cjpeg", "-quality", String(MASTER_QUALITY), "-optimize", "-progressive", "-sample", "1x1", "-outfile", dest];
   if (profile.length) {
     writeFileSync(icc, profile);
@@ -235,9 +234,7 @@ function choose(slug: string, cid: string, why: string, keep = false, wait = fal
   const method = masterCopy(src, master);
   const small = `${d}/embed-${EMBED_PX}.jpg`;
   embed(src, small);
-  const p = `${CATALOGUE}/covers.json`;
-  const all = existsSync(p) ? readJson<Record<string, unknown>>(p) : {};
-  all[slug] = {
+  const entry = {
     chosen: c,
     why,
     master: relative(META, master),
@@ -247,7 +244,25 @@ function choose(slug: string, cid: string, why: string, keep = false, wait = fal
     embed_bytes: size(small),
     embed_size: dims(small),
   };
-  dump(p, all);
+  const p = `${CATALOGUE}/covers.json`;
+  const lock = `${p}.lock`;
+  for (;;) {
+    try {
+      closeSync(openSync(lock, "wx"));
+      break;
+    } catch {
+      if (Date.now() - (statSync(lock, { throwIfNoEntry: false })?.mtimeMs ?? Date.now()) > 30_000) rmSync(lock, { force: true });
+      Bun.sleepSync(50);
+    }
+  }
+  try {
+    const all = existsSync(p) ? readJson<Record<string, unknown>>(p) : {};
+    all[slug] = entry;
+    dump(`${p}.tmp`, all);
+    renameSync(`${p}.tmp`, p);
+  } finally {
+    rmSync(lock, { force: true });
+  }
   if (!keep) autoUpscale(slug, c, cands, wait);
   const kb = (n: number) => Math.floor(n / 1024);
   console.log([slug, c.width, "x", c.height, kb(c.bytes), "KB ->", kb(size(master)), "KB", method].join(" "));

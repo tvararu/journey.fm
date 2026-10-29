@@ -231,7 +231,8 @@ async function cover(a: Album): Promise<void> {
       }
     }
   }
-  const { out } = await runAsync(["bun", `${SCRIPTS}/covers.ts`, "choose", a.slug, c.id, why, "--wait"]);
+  const { code, out } = await runAsync(["bun", `${SCRIPTS}/covers.ts`, "choose", a.slug, c.id, why, "--wait"]);
+  if (code !== 0) throw new Error(`covers choose failed: ${out.slice(-400)}`);
   say(a, `cover: ${c.source} ${c.width}x${c.height}${c !== edition ? ` (same art as the ${edition.width} px edition front)` : ""}${out.includes("upscaling") ? ", upscaling to master" : ""}`);
 }
 
