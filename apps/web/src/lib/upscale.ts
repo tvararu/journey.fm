@@ -52,9 +52,9 @@ function seedvr2(image: string, model: string, size: [number, number]): Graph {
   };
 }
 
-async function upload(path: string): Promise<string> {
+async function upload(path: string, slug: string): Promise<string> {
   const form = new FormData();
-  form.append("image", Bun.file(path), basename(path));
+  form.append("image", Bun.file(path), `${slug}--${basename(path)}`);
   form.append("overwrite", "true");
   const res = await fetch(`${COMFY}/upload/image`, { body: form, method: "POST" });
   return ((await res.json()) as { name: string }).name;
@@ -77,7 +77,7 @@ async function waitFor(id: string): Promise<History> {
 export async function upscale(slug: string, c: CoverCandidate, which: Upscaler): Promise<CoverCandidate> {
   const u = UPSCALERS[which];
   const size = target(c.width, c.height);
-  const image = await upload(`${DATA}/${c.path}`);
+  const image = await upload(`${DATA}/${c.path}`, slug);
   const graph = u.kind === "esrgan" ? esrgan(image, u.model, size) : seedvr2(image, u.model, size);
   const queued = await fetch(`${COMFY}/prompt`, { body: JSON.stringify({ client_id: "journey.fm", prompt: graph }), method: "POST" });
   const { prompt_id: id } = (await queued.json()) as { prompt_id: string };
