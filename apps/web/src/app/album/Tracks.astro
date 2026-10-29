@@ -6,9 +6,10 @@ import ValueView from "./Value.astro";
 
 type Props = { rec: AlbumRecord };
 const { rec } = Astro.props;
-const LYRICS = new Set(["lyrics", "instrumental"]);
+const LYRICS = new Set(["lyrics", "instrumental", "acoustid"]);
 const keys = Object.keys(rec.tracks[0]?.fields ?? {}).filter((k) => !LYRICS.has(k));
 const hasLyrics = rec.tracks.some((t) => t.fields["lyrics"]);
+const hasAcoustid = rec.tracks.some((t) => t.ids["acoustid_agrees"] !== undefined);
 
 function filesValue(k: string, v: Value | undefined): Value | undefined {
   return (k === "disc" || k === "track") && typeof v === "string" ? (v.split("/")[0] ?? v) : v;
@@ -29,7 +30,7 @@ const counts = rec.tracks.reduce<Record<string, number>>((m, t) => {
 <h3>Tracks</h3>
 <div class="card">
   <table class="grid-table">
-    <thead><tr><th>File</th>{keys.map((k) => <th>{k}</th>)}{hasLyrics && <th>lyrics</th>}</tr></thead>
+    <thead><tr><th>File</th>{keys.map((k) => <th>{k}</th>)}{hasLyrics && <th>lyrics</th>}{hasAcoustid && <th>acoustid</th>}</tr></thead>
     <tbody>
       {rec.tracks.map((t) => (
         <tr>
@@ -69,6 +70,10 @@ const counts = rec.tracks.reduce<Record<string, number>>((m, t) => {
                 ) : kind}
               </td>
             );
+          })()}
+          {hasAcoustid && (() => {
+            const a = t.ids["acoustid_agrees"];
+            return <td class={a === false ? "chg" : a ? "" : "text-muted"}>{a === true ? "agrees" : a === false ? "differs" : "no match"}</td>;
           })()}
         </tr>
       ))}

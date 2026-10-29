@@ -210,7 +210,7 @@ function distance(a: string, b: string): number {
   return prev[b.length]!;
 }
 
-function pairTracks(fs: Inv[], mtracks: [unknown, J, number][]): (number | undefined)[] {
+function pairTracks(fs: Inv[], mtracks: [unknown, J, number][], ac: Record<string, J[] | null> = {}): (number | undefined)[] {
   const out: (number | undefined)[] = fs.map(() => undefined);
   const used = new Set<number>();
   const claim = (i: number, j: number) => {
@@ -222,6 +222,11 @@ function pairTracks(fs: Inv[], mtracks: [unknown, J, number][]): (number | undef
   fs.forEach((f, i) => {
     const rt = ids(f, "MUSICBRAINZ_RELEASETRACKID", "MUSICBRAINZ RELEASE TRACK ID");
     claim(i, mtracks.findIndex(([, t]) => rt.includes(t.id)));
+  });
+  fs.forEach((f, i) => {
+    const heard = (ac[f.relpath] ?? []).filter((m) => m.score >= 0.8).flatMap((m) => m.recordings as string[]);
+    const hits = mtracks.map(([, t], j) => (!used.has(j) && heard.includes(t.recording?.id) ? j : -1)).filter((j) => j >= 0);
+    if (hits.length === 1) claim(i, hits[0]!);
   });
   fs.forEach((f, i) => {
     const rec = ids(f, "MUSICBRAINZ_TRACKID", "MUSICBRAINZ TRACK ID");
@@ -353,11 +358,15 @@ function resolve(slug: string, choice: J) {
   album.links = siteLinks(album.ids, album.rym_links?.artists ?? [], rel, rg);
 
   const mtracks: [unknown, J, number][] = rel.media.flatMap((m: J) => (m.tracks ?? []).map((t: J) => [m.position, t, m["track-count"]]));
-  const pairs = pairTracks(fs, mtracks);
+  const acoustid: Record<string, J[] | null> = load(slug, "acoustid") ?? {};
+  const pairs = pairTracks(fs, mtracks, acoustid);
   const tracks = fs.map((f, i) => {
     const [disc, t, count] = pairs[i] === undefined ? [null, null, null] : mtracks[pairs[i]]!;
     const rec = t?.recording ?? {};
     const ly = lrclib[f.relpath]?.result;
+    const ac = (acoustid[f.relpath] ?? []).filter((m: J) => m.score >= 0.8);
+    const acHeard = ac.flatMap((m: J) => m.recordings as string[]);
+    const acTop = ac.find((m: J) => !rec.id || m.recordings.includes(rec.id)) ?? ac[0];
     return {
       file: f.relpath, duration: f.duration,
       fields: {
@@ -374,9 +383,11 @@ function resolve(slug: string, choice: J) {
           "LRCLIB synced": ly?.syncedLyrics ?? null, "LRCLIB plain": ly?.plainLyrics ?? null, files: tag(f, "LYRICS", "UNSYNCEDLYRICS"),
         }, ["LRCLIB synced", "files", "LRCLIB plain"]),
         instrumental: field({ LRCLIB: ly?.instrumental || null }, ["LRCLIB"]),
+        acoustid: field({ AcoustID: acTop?.id ?? null, files: tag(f, "ACOUSTID_ID") }, ["AcoustID", "files"]),
       },
       order: pairs[i] ?? 1e6 + i,
-      ids: { musicbrainz_track: t?.id ?? null, musicbrainz_recording: rec.id ?? null, lrclib: ly?.id ?? null, musicbrainz_artist: t ? t["artist-credit"].map((a: J) => a.artist.id) : [] },
+      ids: { musicbrainz_track: t?.id ?? null, musicbrainz_recording: rec.id ?? null, lrclib: ly?.id ?? null,
+        acoustid_agrees: f.relpath in acoustid ? (rec.id && acHeard.length ? acHeard.includes(rec.id) : null) : undefined, musicbrainz_artist: t ? t["artist-credit"].map((a: J) => a.artist.id) : [] },
     };
   });
   const ordered = tracks.sort((a, b) => a.order - b.order).map(({ order: _, ...t }) => t);

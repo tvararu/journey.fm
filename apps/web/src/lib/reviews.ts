@@ -15,6 +15,8 @@ export type Review = {
 
 export type ReviewStatus = "awaiting review" | "changes requested" | "updated since request" | "accepted" | "accepted, then changed";
 
+const UNREVIEWED = new Set(["acoustid"]);
+
 export function fingerprint(rec: AlbumRecord): string {
   const value = (f: unknown) => (f && typeof f === "object" && "value" in f ? f.value : f);
   const values = {
@@ -24,7 +26,9 @@ export function fingerprint(rec: AlbumRecord): string {
         .map(([k, f]) => [k, value(f)]),
     ),
     edition: rec.edition_choice.release,
-    tracks: rec.tracks.map((t) => Object.fromEntries(Object.entries(t.fields).map(([k, f]) => [k, f.value]))),
+    tracks: rec.tracks.map((t) =>
+      Object.fromEntries(Object.entries(t.fields).filter(([k]) => !UNREVIEWED.has(k)).map(([k, f]) => [k, f.value])),
+    ),
   };
   return new Bun.CryptoHasher("sha256").update(JSON.stringify(values)).digest("hex").slice(0, 16);
 }

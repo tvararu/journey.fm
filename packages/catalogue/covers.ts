@@ -50,10 +50,16 @@ function dims(path: string): [number, number] {
 
 async function get(url: string, dest: string): Promise<string> {
   if (!existsSync(dest)) {
-    await Bun.sleep(500);
-    const r = await fetch(url, { headers: { "User-Agent": UA }, signal: AbortSignal.timeout(60_000) });
-    if (!r.ok) throw new Error(`HTTP ${r.status} ${r.statusText} for ${url}`);
-    writeFileSync(dest, new Uint8Array(await r.arrayBuffer()));
+    for (let attempt = 0; ; attempt++) {
+      await Bun.sleep(500 + 3000 * attempt);
+      const r = await fetch(url, { headers: { "User-Agent": UA }, signal: AbortSignal.timeout(60_000) }).catch((e: Error) => e);
+      if (r instanceof Response && r.ok) {
+        writeFileSync(dest, new Uint8Array(await r.arrayBuffer()));
+        break;
+      }
+      const why = r instanceof Response ? `HTTP ${r.status} ${r.statusText}` : r.message;
+      if (attempt >= 3 || (r instanceof Response && r.status < 500 && r.status !== 429)) throw new Error(`${why} for ${url}`);
+    }
   }
   return dest;
 }

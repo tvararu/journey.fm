@@ -17,7 +17,11 @@ export async function fetchJson<T>(url: string, gap: number, headers: Record<str
   if (wait > 0) await Bun.sleep(wait);
   for (let attempt = 0; attempt < 4; attempt++) {
     last.set(host, Date.now());
-    const r = await fetch(url, { headers: { "User-Agent": UA, ...headers }, signal: AbortSignal.timeout(30_000) });
+    const r = await fetch(url, { headers: { "User-Agent": UA, ...headers }, signal: AbortSignal.timeout(30_000) }).catch(() => null);
+    if (!r) {
+      await Bun.sleep(3000 * (attempt + 1));
+      continue;
+    }
     if (r.ok) return (await r.json()) as T;
     if (r.status === 400 || r.status === 404) return null;
     if (!RETRY.has(r.status)) throw new Error(`HTTP ${r.status} ${r.statusText} for ${url}`);
