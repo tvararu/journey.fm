@@ -4,7 +4,7 @@ import { join, relative } from "node:path";
 type Row = { path: string; size: number; mtime: number; duration?: number; fingerprint?: string; error?: string };
 
 const ROOT = process.env["FINGERPRINT_ROOT"] ?? "/mnt/pool";
-const FPCALC = process.env["FPCALC"] ?? `${process.env["HOME"]}/.local/bin/fpcalc`;
+const FPCALC = process.env["FPCALC"] ?? "/usr/bin/fpcalc";
 const JOBS = Number(process.env["JOBS"] ?? 4);
 const [arg, ...dirs] = Bun.argv.slice(2);
 if (!arg) {
