@@ -1,9 +1,9 @@
-import { existsSync, mkdirSync, readFileSync } from "node:fs";
+import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 
 import { fetchJson, mb, REL_INC } from "./lib/fetch";
 import { CATALOGUE } from "./lib/paths";
-import { dump, py, truthy } from "./lib/py";
+import { py, truthy, updateJson } from "./lib/py";
 import { load, save } from "./lib/raw";
 
 type Relation = { url?: { resource: string } | null };
@@ -41,9 +41,9 @@ export async function enrich(slug: string, path: string, release: string, how: s
     dm && fetchJson(`https://api.discogs.com/masters/${dm}`, 2.6).then((d) => save(slug, `discogs_master_${dm}`, d)),
   ]);
   mkdirSync(dirname(CHOICES), { recursive: true });
-  const ch = (existsSync(CHOICES) ? JSON.parse(readFileSync(CHOICES, "utf8")) : {}) as Record<string, unknown>;
-  ch[slug] = { path, release, release_group: rgid, discogs_release: dr, discogs_master: dm, how };
-  dump(CHOICES, ch);
+  updateJson(CHOICES, (all) => {
+    all[slug] = { path, release, release_group: rgid, discogs_release: dr, discogs_master: dm, how };
+  });
   return [slug, rgid, "discogs", py(dr), py(dm), "urls", urls.length].join(" ");
 }
 

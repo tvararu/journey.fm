@@ -1,10 +1,10 @@
-import { closeSync, existsSync, mkdirSync, openSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { relative } from "node:path";
 
 import { fetchJson, UA } from "./lib/fetch";
 import { inventory } from "./lib/inventory";
 import { CATALOGUE, INV, META, RAW } from "./lib/paths";
-import { basename, dump, py, squash, stamp, truthy } from "./lib/py";
+import { basename, dump, py, squash, stamp, truthy, updateJson } from "./lib/py";
 import { load, save } from "./lib/raw";
 
 const EMBED_PX = 1200;
@@ -236,35 +236,18 @@ function choose(slug: string, cid: string, why: string, keep = false, wait = fal
   const method = masterCopy(src, master);
   const small = `${d}/embed-${EMBED_PX}.jpg`;
   embed(src, small);
-  const entry = {
-    chosen: c,
-    why,
-    master: relative(META, master),
-    master_bytes: size(master),
-    master_method: method,
-    embed: relative(META, small),
-    embed_bytes: size(small),
-    embed_size: dims(small),
-  };
-  const p = `${CATALOGUE}/covers.json`;
-  const lock = `${p}.lock`;
-  for (;;) {
-    try {
-      closeSync(openSync(lock, "wx"));
-      break;
-    } catch {
-      if (Date.now() - (statSync(lock, { throwIfNoEntry: false })?.mtimeMs ?? Date.now()) > 30_000) rmSync(lock, { force: true });
-      Bun.sleepSync(50);
-    }
-  }
-  try {
-    const all = existsSync(p) ? readJson<Record<string, unknown>>(p) : {};
-    all[slug] = entry;
-    dump(`${p}.tmp`, all);
-    renameSync(`${p}.tmp`, p);
-  } finally {
-    rmSync(lock, { force: true });
-  }
+  updateJson(`${CATALOGUE}/covers.json`, (all) => {
+    all[slug] = {
+      chosen: c,
+      why,
+      master: relative(META, master),
+      master_bytes: size(master),
+      master_method: method,
+      embed: relative(META, small),
+      embed_bytes: size(small),
+      embed_size: dims(small),
+    };
+  });
   if (!keep) autoUpscale(slug, c, cands, wait);
   const kb = (n: number) => Math.floor(n / 1024);
   console.log([slug, c.width, "x", c.height, kb(c.bytes), "KB ->", kb(size(master)), "KB", method].join(" "));

@@ -1,4 +1,4 @@
-import { writeFileSync } from "node:fs";
+import { closeSync, existsSync, openSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 
 export function py(v: unknown): string {
   if (v === null || v === undefined) return "None";
@@ -38,6 +38,27 @@ export function dumps(data: unknown, ascii = false): string {
 
 export function dump(path: string, data: unknown, ascii = false): void {
   writeFileSync(path, dumps(data, ascii));
+}
+
+export function updateJson<T>(path: string, change: (all: Record<string, T>) => void): void {
+  const lock = `${path}.lock`;
+  for (;;) {
+    try {
+      closeSync(openSync(lock, "wx"));
+      break;
+    } catch {
+      if (Date.now() - (statSync(lock, { throwIfNoEntry: false })?.mtimeMs ?? Date.now()) > 30_000) rmSync(lock, { force: true });
+      Bun.sleepSync(50);
+    }
+  }
+  try {
+    const all = (existsSync(path) ? JSON.parse(readFileSync(path, "utf8")) : {}) as Record<string, T>;
+    change(all);
+    dump(`${path}.${process.pid}.tmp`, all);
+    renameSync(`${path}.${process.pid}.tmp`, path);
+  } finally {
+    rmSync(lock, { force: true });
+  }
 }
 
 const ENTITIES: Record<string, string> = {
