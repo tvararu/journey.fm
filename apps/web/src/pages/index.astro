@@ -18,8 +18,8 @@ const initialQuery = Astro.url.searchParams.get("q") ?? "";
 const count = (s: string) => rows.filter((r) => r.state === s).length;
 const totalBytes = rows.reduce((s, r) => s + r.bytes, 0);
 ---
-<Layout title="Music library">
-  <h1 class="text-2xl font-bold">Music library</h1>
+<Layout title="journey.fm">
+  <h1 class="text-2xl font-bold">journey.fm</h1>
   <p class="mt-1 text-muted">
     {rows.length} albums in sol's Music ({size(totalBytes)}), scanned 29 Oct. {count("triage")} in triage,
     {count("awaiting review") + count("updated since request") + count("accepted, then changed")} to review,

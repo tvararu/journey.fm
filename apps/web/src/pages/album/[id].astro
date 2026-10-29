@@ -36,7 +36,7 @@ const here = Astro.url.pathname;
 const totalBytes = files.reduce((s, f) => s + f.size, 0) + extras.reduce((s, x) => s + x.size, 0);
 const minutes = Math.round(files.reduce((s, f) => s + (f.duration ?? 0), 0) / 60);
 ---
-<Layout title={a.album_dir}>
+<Layout title={`${a.album_dir} - journey.fm`}>
   <p><a id="back" href="/">← Library</a></p>
   <header class="mt-4">
     <h1>{a.album_dir}</h1>

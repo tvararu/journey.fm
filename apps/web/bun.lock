@@ -3,7 +3,7 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "music-catalogue",
+      "name": "journey-fm",
       "dependencies": {
         "@astrojs/node": "^11.1.9",
         "@tailwindcss/vite": "^4.3.3",

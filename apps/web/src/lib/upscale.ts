@@ -79,7 +79,7 @@ export async function upscale(slug: string, c: CoverCandidate, which: Upscaler):
   const size = target(c.width, c.height);
   const image = await upload(`${DATA}/${c.path}`);
   const graph = u.kind === "esrgan" ? esrgan(image, u.model, size) : seedvr2(image, u.model, size);
-  const queued = await fetch(`${COMFY}/prompt`, { body: JSON.stringify({ client_id: "catalogue", prompt: graph }), method: "POST" });
+  const queued = await fetch(`${COMFY}/prompt`, { body: JSON.stringify({ client_id: "journey.fm", prompt: graph }), method: "POST" });
   const { prompt_id: id } = (await queued.json()) as { prompt_id: string };
   const out = Object.values((await waitFor(id)).outputs ?? {}).flatMap((o) => o.images ?? [])[0];
   if (!out) throw new Error("ComfyUI returned no image");
