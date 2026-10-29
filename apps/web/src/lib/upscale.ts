@@ -4,8 +4,8 @@ import { COMFY, DATA } from "./paths";
 import type { CoverCandidate } from "./records";
 
 export const UPSCALERS = {
-  "seedvr2-3b": { label: "SeedVR2 3B", model: "seedvr2_3b_fp16.safetensors", kind: "seedvr2" },
   "ultrasharpv2": { label: "4x-UltraSharpV2", model: "4x-UltraSharpV2.safetensors", kind: "esrgan" },
+  "seedvr2-3b": { label: "SeedVR2 3B", model: "seedvr2_3b_fp16.safetensors", kind: "seedvr2" },
   "seedvr2-7b-sharp": { label: "SeedVR2 7B sharp", model: "seedvr2_7b_sharp_fp16.safetensors", kind: "seedvr2" },
 } as const;
 
