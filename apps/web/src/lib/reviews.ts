@@ -13,7 +13,9 @@ export type Review = {
   cover?: string;
 };
 
-export type ReviewStatus = "awaiting review" | "changes requested" | "updated since request" | "accepted" | "accepted, then changed";
+export type ReviewStatus = "awaiting agents" | "blocked" | "changes requested" | "accepted";
+export type Status = { state: ReviewStatus; by: string | null; message: string | null };
+type Flag = { at: string; by: string; verdict: string; message: string; fingerprint: string };
 
 const UNREVIEWED = new Set(["acoustid"]);
 
@@ -44,12 +46,15 @@ export async function reviews(): Promise<Map<string, Review[]>> {
   return out;
 }
 
-export function statusOf(rec: AlbumRecord, list: Review[] | undefined): ReviewStatus {
-  const last = list?.at(-1);
-  if (!last) return "awaiting review";
-  const same = last.fingerprint === fingerprint(rec);
-  if (last.verdict === "accept") return same ? "accepted" : "accepted, then changed";
-  return same ? "changes requested" : "updated since request";
+export function statusOf(rec: AlbumRecord, list: Review[] | undefined, flags: Flag[] = []): Status {
+  const events = [
+    ...(list ?? []).map((r) => ({ at: r.at, by: r.by, fingerprint: r.fingerprint, kind: r.verdict as string, message: r.message })),
+    ...flags.filter((v) => v.verdict === "flag").map((v) => ({ at: v.at, by: v.by, fingerprint: v.fingerprint, kind: "flag", message: v.message })),
+  ].sort((x, y) => x.at.localeCompare(y.at));
+  const last = events.at(-1);
+  if (!last || last.fingerprint !== fingerprint(rec)) return { by: null, message: null, state: "awaiting agents" };
+  const state = last.kind === "accept" ? "accepted" : last.kind === "flag" ? "blocked" : "changes requested";
+  return { by: last.by, message: last.message, state };
 }
 
 export async function addReview(r: Review): Promise<void> {

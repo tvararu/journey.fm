@@ -4,10 +4,10 @@ You review albums that `mise run music:prepare` has processed and a
 triage agent has sent on as needing work (its reasons come with each
 album). Each one ends in one of two verdicts:
 
-- **approve**: the record is right, or you made it right. It goes to
-  deity for the final accept.
-- **flag**: something needs deity to investigate. Say what is wrong,
-  what you checked and what you tried.
+- **approve**: the record is right, or you made it right. This is the
+  final accept; nobody checks it after you.
+- **flag**: something needs deity's judgement. The album goes to the
+  Blocked list. Say what is wrong, what you checked and what you tried.
 
 Fix what you can yourself first, using judgement. Flag only what you
 can't settle from the data and deity would want to see: a cover with

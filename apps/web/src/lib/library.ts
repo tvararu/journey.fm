@@ -1,12 +1,13 @@
 import { albumKeyTags, type LibraryRow, libraryRows, thumbnails } from "./inventory";
-import { type AlbumRecord, processed, redCopies } from "./records";
-import { type Review, type ReviewStatus, reviews, statusOf } from "./reviews";
-import { type AgentState, agentState, verdicts } from "./verdicts";
+import { processed, redCopies } from "./records";
+import { type ReviewStatus, reviews, statusOf } from "./reviews";
+import { verdicts } from "./verdicts";
 
 export type LibraryEntry = LibraryRow & {
   state: ReviewStatus | "triage";
   issues: string[];
-  agent: AgentState | null;
+  by: string | null;
+  message: string | null;
   dates: string[];
   thumb: string | undefined;
 };
@@ -24,11 +25,6 @@ function issuesFor(r: LibraryRow, keys: Map<string, Set<string>>, red: Record<st
   return out;
 }
 
-function stateFor(done: Map<string, AlbumRecord>, all: Map<string, Review[]>, path: string): LibraryEntry["state"] {
-  const rec = done.get(path);
-  return rec ? statusOf(rec, all.get(path)) : "triage";
-}
-
 export async function library(): Promise<LibraryEntry[]> {
   const [done, red, allReviews, allVerdicts] = await Promise.all([processed(), redCopies(), reviews(), verdicts()]);
   const keys = albumKeyTags();
@@ -38,10 +34,9 @@ export async function library(): Promise<LibraryEntry[]> {
     const rec = done.get(r.path);
     return {
       ...r,
-      agent: rec ? agentState(rec, allVerdicts.get(r.path)) : null,
       dates: [...(k.get("DATE") ?? [])].sort(),
       issues: issuesFor(r, k, red, !!rec),
-      state: stateFor(done, allReviews, r.path),
+      ...(rec ? statusOf(rec, allReviews.get(r.path), allVerdicts.get(r.path)) : { by: null, message: null, state: "triage" as const }),
       thumb: thumbs.get(r.id),
     };
   });

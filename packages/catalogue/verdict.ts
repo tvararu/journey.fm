@@ -2,7 +2,8 @@ import { readFileSync } from "node:fs";
 
 process.env["CATALOGUE_DATA"] ??= `${import.meta.dir}/../data`;
 const { processed } = await import("../web/src/lib/records");
-const { fingerprint } = await import("../web/src/lib/reviews");
+const { addReview, fingerprint } = await import("../web/src/lib/reviews");
+const { coverChoices } = await import("../web/src/lib/records");
 const { addVerdict } = await import("../web/src/lib/verdicts");
 const { DATA } = await import("../web/src/lib/paths");
 
@@ -17,5 +18,11 @@ const album = editions[slug]?.path;
 const rec = album ? (await processed()).get(album) : undefined;
 if (!(album && rec)) throw new Error(`no processed album for ${slug}; run music:resolve first`);
 const at = new Date().toLocaleString("sv-SE", { timeZone: "Europe/London" }).slice(0, 16);
-await addVerdict({ album, at, by: "claude", fingerprint: fingerprint(rec), message, verdict });
-console.log(`${verdict === "approve" ? "approved" : "flagged"} ${album}`);
+if (verdict === "approve") {
+  const cover = (await coverChoices())[slug]?.chosen.id ?? "";
+  await addReview({ album, at, by: "claude", cover, fingerprint: fingerprint(rec), message, verdict: "accept" });
+  console.log(`accepted ${album}`);
+} else {
+  await addVerdict({ album, at, by: "claude", fingerprint: fingerprint(rec), message, verdict });
+  console.log(`blocked ${album}`);
+}

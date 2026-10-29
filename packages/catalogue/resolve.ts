@@ -266,13 +266,23 @@ function pairTracks(fs: Inv[], mtracks: [unknown, J, number][], ac: Record<strin
     used.add(j);
   };
   const ids = (f: Inv, ...keys: string[]) => keys.map((k) => tag(f, k)).filter(Boolean);
+  const discOf = (f: Inv): number | null => {
+    const folder = /^(?:cd|disc|disk)\s*#?\s*(\d+)/i.exec(f.relpath.split("/").length > 1 ? f.relpath : "")?.[1];
+    const t = /^\d+/.exec(tag(f, "DISCNUMBER") ?? "")?.[0];
+    return folder ? Number(folder) : t && mtracks.some(([d]) => Number(d) > 1) ? Number(t) : null;
+  };
+  const sameDisc = (f: Inv, j: number) => {
+    const d = discOf(f);
+    return d == null || Number(mtracks[j]![0]) === d;
+  };
+  const lenOk = (t: J, f: Inv) => !t.length || Math.abs(t.length / 1000 - f.duration) <= 3;
   fs.forEach((f, i) => {
     const rt = ids(f, "MUSICBRAINZ_RELEASETRACKID", "MUSICBRAINZ RELEASE TRACK ID");
     claim(i, mtracks.findIndex(([, t]) => rt.includes(t.id)));
   });
   fs.forEach((f, i) => {
     const heard = (ac[f.relpath] ?? []).filter((m) => m.score >= 0.8).flatMap((m) => m.recordings as string[]);
-    const hits = mtracks.map(([, t], j) => (!used.has(j) && heard.includes(t.recording?.id) ? j : -1)).filter((j) => j >= 0);
+    const hits = mtracks.map(([, t], j) => (!used.has(j) && sameDisc(f, j) && heard.includes(t.recording?.id) ? j : -1)).filter((j) => j >= 0);
     if (hits.length === 1) claim(i, hits[0]!);
   });
   fs.forEach((f, i) => {
@@ -281,13 +291,12 @@ function pairTracks(fs: Inv[], mtracks: [unknown, J, number][], ac: Record<strin
   });
   fs.forEach((f, i) => {
     claim(i, mtracks.findIndex(([, t], j) =>
-      !used.has(j) && norm(t.title) === norm(tag(f, "TITLE")) && Math.abs((t.length ?? 0) / 1000 - f.duration) <= 3));
+      !used.has(j) && sameDisc(f, j) && norm(t.title) === norm(tag(f, "TITLE")) && lenOk(t, f)));
   });
-  const secs = (t: J) => (t.length ?? 0) / 1000;
   fs.forEach((f, i) => {
     const a = norm(tag(f, "TITLE"));
     claim(i, mtracks.findIndex(([, t], j) =>
-      !used.has(j) && a.length > 3 && distance(a, norm(t.title)) <= Math.max(2, a.length / 10) && Math.abs(secs(t) - f.duration) <= 3));
+      !used.has(j) && sameDisc(f, j) && a.length > 3 && distance(a, norm(t.title)) <= Math.max(2, a.length / 10) && lenOk(t, f)));
   });
   if (fs.length === mtracks.length) fs.forEach((_, i) => claim(i, i));
   return out;

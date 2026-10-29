@@ -1,6 +1,4 @@
 import { VERDICTS } from "./paths";
-import type { AlbumRecord } from "./records";
-import { fingerprint } from "./reviews";
 
 export type Verdict = {
   at: string;
@@ -11,7 +9,6 @@ export type Verdict = {
   fingerprint: string;
 };
 
-export type AgentState = { verdict: Verdict["verdict"]; message: string; stale: boolean };
 
 export async function verdicts(): Promise<Map<string, Verdict[]>> {
   const file = Bun.file(VERDICTS);
@@ -24,10 +21,6 @@ export async function verdicts(): Promise<Map<string, Verdict[]>> {
   return out;
 }
 
-export function agentState(rec: AlbumRecord, list: Verdict[] | undefined): AgentState | null {
-  const last = list?.at(-1);
-  return last ? { message: last.message, stale: last.fingerprint !== fingerprint(rec), verdict: last.verdict } : null;
-}
 
 export async function addVerdict(v: Verdict): Promise<void> {
   const file = Bun.file(VERDICTS);

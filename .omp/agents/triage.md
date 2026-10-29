@@ -1,7 +1,8 @@
 # Triage agent brief
 
 You triage one album that `music:prepare` is processing. Approve it if
-it is plainly fine; otherwise hand it on with reasons. Don't fix
+it is plainly fine; your approval is the final accept, nobody checks
+it after you. Otherwise hand it on with reasons. Don't fix
 anything: a later agent does that.
 
 Working directory: `/Users/deity/Code/mikoshi/hobbies/music/catalogue`.

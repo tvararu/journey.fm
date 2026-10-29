@@ -4,36 +4,29 @@ import { format, size } from "@/lib/format";
 import { library } from "@/lib/library";
 
 const rows = await library();
-const FILTERS = ["all", "triage", "ready", "investigate", "review", "changes", "accepted", "issues"];
-const GROUP: Record<string, string> = {
-  "accepted, then changed": "review",
-  "awaiting review": "review",
-  "changes requested": "changes",
-  "updated since request": "review",
-};
-const BADGE: Record<string, string> = { accepted: "badge-processed", triage: "" };
+const FILTERS = ["all", "triage", "blocked", "agents", "changes", "accepted", "claude", "deity", "issues"];
+const GROUP: Record<string, string> = { "awaiting agents": "agents", "changes requested": "changes" };
+const BADGE: Record<string, string> = { accepted: "badge-processed", blocked: "badge-issue", triage: "" };
 const LABELS: Record<string, string> = {
-  changes: "changes requested", investigate: "to investigate", issues: "with issues", ready: "ready for you", review: "to review",
+  agents: "awaiting agents", changes: "changes requested", claude: "accepted by claude", deity: "accepted by deity", issues: "with issues",
 };
-const bucket = (r: (typeof rows)[number]): string => {
-  const g = GROUP[r.state] ?? r.state;
-  if (g !== "review" || !r.agent || r.agent.stale) return g;
-  return r.agent.verdict === "approve" ? "ready" : "investigate";
-};
+const bucket = (r: (typeof rows)[number]): string => GROUP[r.state] ?? r.state;
 const initialFilter = FILTERS.find((f) => f === Astro.url.searchParams.get("f")) ?? "all";
 const initialQuery = Astro.url.searchParams.get("q") ?? "";
 const count = (s: string) => rows.filter((r) => r.state === s).length;
 const tally = (f: string): number =>
-  f === "all" ? rows.length : f === "issues" ? rows.filter((r) => r.issues.length).length : rows.filter((r) => bucket(r) === f).length;
+  f === "all" ? rows.length
+  : f === "issues" ? rows.filter((r) => r.issues.length).length
+  : f === "claude" || f === "deity" ? rows.filter((r) => r.state === "accepted" && r.by === f).length
+  : rows.filter((r) => bucket(r) === f).length;
 const totalBytes = rows.reduce((s, r) => s + r.bytes, 0);
 ---
 <Layout title="journey.fm">
   <h1 class="text-2xl font-bold">journey.fm</h1>
   <p class="mt-1 text-muted">
     {rows.length} albums in sol's Music ({size(totalBytes)}), scanned 29 Oct. {count("triage")} in triage,
-    {count("awaiting review") + count("updated since request") + count("accepted, then changed")} to review,
-    {rows.filter((r) => bucket(r) === "ready").length} of them ready for you, {rows.filter((r) => bucket(r) === "investigate").length} to investigate,
-    {count("changes requested")} with changes requested, {count("accepted")} accepted. Nothing written yet.
+    {count("blocked")} blocked, {count("awaiting agents")} awaiting agents, {count("changes requested")} with changes requested,
+    {count("accepted")} accepted ({tally("claude")} by claude, {tally("deity")} by deity). Nothing written yet.
   </p>
   <div class="my-4 flex flex-wrap items-center gap-2">
     <input
@@ -64,7 +57,8 @@ const totalBytes = rows.reduce((s, r) => s + r.bytes, 0);
           <tr
             data-state={bucket(r)}
             data-issues={r.issues.length}
-            data-q={`${r.path} ${r.issues.join(" ")} ${r.agent?.message ?? ""}`.toLowerCase()}
+            data-by={r.state === "accepted" ? (r.by ?? "") : ""}
+            data-q={`${r.path} ${r.issues.join(" ")} ${r.state === "blocked" ? (r.message ?? "") : ""}`.toLowerCase()}
           >
             <td>
               {r.thumb ? (
@@ -79,11 +73,7 @@ const totalBytes = rows.reduce((s, r) => s + r.bytes, 0);
             </td>
             <td>
               <span class={`badge whitespace-nowrap ${BADGE[r.state] ?? "chg border-transparent"}`}>{r.state}</span>
-              {r.agent && (bucket(r) === "ready" || bucket(r) === "investigate") && (
-                <span class={`badge ml-1 whitespace-nowrap border-transparent ${r.agent.verdict === "approve" ? "new" : "badge-issue"}`}>
-                  {r.agent.verdict === "approve" ? "agent approved" : "agent flagged"}
-                </span>
-              )}
+              {r.state === "accepted" && r.by && <span class="src">by {r.by}</span>}
             </td>
             <td class="whitespace-nowrap">{r.dates.join(", ")}</td>
             <td class="whitespace-nowrap">{format(r.codec, r.bits, r.sr)}</td>
@@ -92,7 +82,7 @@ const totalBytes = rows.reduce((s, r) => s + r.bytes, 0);
             <td class="whitespace-nowrap">{Math.floor(r.dur / 60)} min</td>
             <td>
               {r.issues.map((i) => <span class="badge badge-issue">{i}</span>)}
-              {bucket(r) === "investigate" && <p class="mt-1 max-w-md text-xs text-chg-fg">{r.agent.message}</p>}
+              {r.state === "blocked" && <p class="mt-1 max-w-md text-xs text-chg-fg">{r.message}</p>}
             </td>
           </tr>
         ))}
@@ -132,6 +122,7 @@ const totalBytes = rows.reduce((s, r) => s + r.bytes, 0);
     if (s && !r.dataset["q"]?.includes(s)) return false;
     if (filter === "all") return true;
     if (filter === "issues") return Number(r.dataset["issues"]) > 0;
+    if (filter === "claude" || filter === "deity") return r.dataset["by"] === filter;
     return r.dataset["state"] === filter;
   }
 
