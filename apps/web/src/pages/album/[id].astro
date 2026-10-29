@@ -2,15 +2,16 @@
 import AlbumFields from "@/app/album/AlbumFields.astro";
 import Cover from "@/app/album/Cover.astro";
 import FileDetails from "@/app/album/FileDetails.astro";
+import Notes from "@/app/album/Notes.astro";
 import Tracks from "@/app/album/Tracks.astro";
 import Layout from "@/app/Layout.astro";
 import { album } from "@/lib/inventory";
-import { coverCandidates, coverChoices, processed, redCopies } from "@/lib/records";
+import { coverCandidates, coverChoices, notesFor, processed, redCopies } from "@/lib/records";
 
 const data = album(Number(Astro.params["id"]));
 if (!data) return new Response("not found", { status: 404 });
 const { album: a, files, tags, pictures, extras } = data;
-const [done, covers, red] = await Promise.all([processed(), coverChoices(), redCopies()]);
+const [done, covers, red, notes] = await Promise.all([processed(), coverChoices(), redCopies(), notesFor(a.path)]);
 const rec = done.get(a.path);
 const cover = rec ? covers[rec.slug] : undefined;
 const candidates = rec && cover ? await coverCandidates(rec.slug) : [];
@@ -35,6 +36,7 @@ const img = cover ? `/data/${cover.master}` : fallback ? `/blob/${fallback}` : n
       )}
     </div>
   </div>
+  <Notes notes={notes} />
   {rec && <AlbumFields rec={rec} tags={tags} />}
   {rec && <Tracks rec={rec} />}
   {cover && <Cover choice={cover} candidates={candidates} />}

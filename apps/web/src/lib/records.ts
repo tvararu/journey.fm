@@ -1,6 +1,6 @@
 import { readdirSync } from "node:fs";
 
-import { CATALOGUE, DATA, INVENTORY } from "./paths";
+import { CATALOGUE, DATA, INVENTORY, NOTES } from "./paths";
 
 export type Value = string | number | string[] | null;
 
@@ -80,4 +80,16 @@ export function coverCandidates(slug: string): Promise<CoverCandidate[]> {
 
 export function redCopies(): Promise<Record<string, string[]>> {
   return readJson(`${INVENTORY}/music-red.json`, {});
+}
+
+export type Note = { at: string; album: string; by: string; text: string };
+
+export async function notesFor(album: string): Promise<Note[]> {
+  const file = Bun.file(NOTES);
+  if (!(await file.exists())) return [];
+  const lines = (await file.text()).split("\n").filter(Boolean);
+  return lines
+    .map((l) => JSON.parse(l) as Note)
+    .filter((n) => n.album === album)
+    .reverse();
 }

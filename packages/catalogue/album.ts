@@ -45,6 +45,15 @@ const tags = db
   .all(a.id);
 
 console.log(`${a.path}  (album ${a.id}, ${files.length} files)  http://localhost:8787/album/${a.id}\n`);
+const notesFile = Bun.file(`${import.meta.dir}/../notes.jsonl`);
+const notes = (await notesFile.exists() ? (await notesFile.text()).split("\n").filter(Boolean) : [])
+  .map((l) => JSON.parse(l) as { at: string; album: string; by: string; text: string })
+  .filter((n) => n.album === a.path);
+if (notes.length) {
+  console.log("Notes:");
+  for (const n of notes) console.log(`  ${n.at} ${n.by}: ${n.text}`);
+  console.log("");
+}
 const rec = records.find((r) => r.path === a.path);
 if (rec) {
   console.log(`Processed as ${rec.slug}:`);
