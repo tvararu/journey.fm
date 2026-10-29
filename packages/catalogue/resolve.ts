@@ -1,5 +1,5 @@
 import { Database } from "bun:sqlite";
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 
 type J = any;
 type Cands = Record<string, unknown>;
@@ -59,8 +59,11 @@ function rymDate(s: string | null | undefined): string | null {
   return [y, ...(mo ? [String(MONTHS[mo]).padStart(2, "0")] : []), ...(d ? [String(Number(d)).padStart(2, "0")] : [])].join("-");
 }
 
+const rymName = (slug: string) =>
+  (existsSync(`${META}/raw/${slug}`) ? readdirSync(`${META}/raw/${slug}`) : []).filter((n) => /^rym-\d{4}-\d{2}-\d{2}\.json$/.test(n)).sort().at(-1)?.slice(0, -5) ?? "rym-none";
+
 function rymLinks(slug: string): J {
-  const p = `${META}/raw/${slug}/rym-2026-10-29.html`;
+  const p = `${META}/raw/${slug}/${rymName(slug)}.html`;
   if (!existsSync(p)) return null;
   const h = readFileSync(p, "utf8");
   const row = (name: string) =>
@@ -207,7 +210,7 @@ function resolve(slug: string, choice: J) {
   const fs = inventory(path).sort(trackOrder);
   const rel = load(slug, `mb_release_${rid}`);
   const rg = load(slug, `mb_rg_${choice.release_group}`);
-  const rym = load(slug, "rym-2026-10-29");
+  const rym = load(slug, rymName(slug));
   const report = load(slug, "edition-report") ?? {};
   const rt = report.red ?? {};
   const has = Object.keys(rt).length > 0;
