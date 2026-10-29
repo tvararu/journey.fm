@@ -69,15 +69,19 @@ function fingerprints(): void {
   run(["rsync", "-a", "sol:/mnt/pool/music-meta/fingerprints/", `${META}/fingerprints/`]);
 }
 
-async function rym(): Promise<void> {
+function openRymTab(): string {
   const tab = JSON.parse(run([ORCA, "tab", "create", "--url", "https://rateyourmusic.com/", "--json"])) as { result?: { browserPageId?: string } };
   const page = tab.result?.browserPageId;
   if (!page) throw new Error("could not open an Orca tab for RYM");
-  const env = { ORCA_PAGE: page };
+  return page;
+}
+
+async function rym(): Promise<void> {
+  const env = { ORCA_PAGE: openRymTab() };
   try {
     await rymEach(env);
   } finally {
-    run([ORCA, "tab", "close", "--page", page, "--json"]);
+    run([ORCA, "tab", "close", "--page", env.ORCA_PAGE, "--json"]);
   }
 }
 
@@ -99,6 +103,10 @@ const rymReady = new Map<string, { done: Promise<void>; finish: () => void }>(al
 
 async function rymEach(env: Record<string, string>): Promise<void> {
   for (const a of albums) {
+    if (!run([ORCA, "tab", "list", "--json"]).includes(env["ORCA_PAGE"]!)) {
+      console.log("RYM: the RYM tab was closed; opening a new one");
+      env["ORCA_PAGE"] = openRymTab();
+    }
     await rymOne(a, env);
     rymReady.get(a.slug)!.finish();
   }
