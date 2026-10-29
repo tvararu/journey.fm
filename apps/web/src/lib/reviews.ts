@@ -20,7 +20,7 @@ export function fingerprint(rec: AlbumRecord): string {
   const values = {
     album: Object.fromEntries(
       Object.entries(rec.album)
-        .filter(([k]) => !["ratings", "links", "catalogued_at"].includes(k))
+        .filter(([k]) => !["ratings", "links"].includes(k))
         .map(([k, f]) => [k, value(f)]),
     ),
     edition: rec.edition_choice.release,

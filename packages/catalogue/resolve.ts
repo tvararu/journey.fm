@@ -150,6 +150,8 @@ function trackOrder(a: Inv, b: Inv): number {
 }
 
 const credit = (ac: J[] | null | undefined) => (ac ?? []).map((a) => a.name + (a.joinphrase ?? "")).join("");
+const sortCredit = (ac: J[] | null | undefined) => (ac ?? []).map((a) => a.artist["sort-name"] + (a.joinphrase ?? "")).join("");
+const artists = (ac: J[] | null | undefined) => (ac ?? []).map((a) => a.artist.name as string);
 
 function siteLinks(ids: J, rymArtists: J[], rel: J, rg: J) {
   const out: [string, string][] = [
@@ -267,6 +269,11 @@ function resolve(slug: string, choice: J) {
     language: field({ RYM: and(rym, () => rym.language), MusicBrainz: rel["text-representation"]?.language, files: tag(f0, "LANGUAGE") },
       ["RYM", "MusicBrainz", "files"]),
     recorded: field({ RYM: and(rym, () => rym.recorded) }, ["RYM"]),
+    album_artist_sort: field({ MusicBrainz: sortCredit(rel["artist-credit"]), files: tag(f0, "ALBUMARTISTSORT", "SORT_ALBUM_ARTIST") }, ["MusicBrainz", "files"]),
+    release_status: field({ MusicBrainz: rel.status?.toLowerCase() ?? null, files: tag(f0, "RELEASESTATUS", "MUSICBRAINZ ALBUM STATUS") }, ["MusicBrainz", "files"]),
+    script: field({ MusicBrainz: rel["text-representation"]?.script ?? null, files: tag(f0, "SCRIPT") }, ["MusicBrainz", "files"]),
+    asin: field({ MusicBrainz: rel.asin ?? null, files: tag(f0, "ASIN") }, ["MusicBrainz", "files"]),
+    total_discs: field({ MusicBrainz: String(rel.media.length), files: tag(f0, "TOTALDISCS", "DISCTOTAL") }, ["MusicBrainz", "files"]),
   };
   album.ratings = ratings(slug, choice, rym, rg, dr);
   const front = (caa?.images ?? []).find((i: J) => i.front);
@@ -292,22 +299,19 @@ function resolve(slug: string, choice: J) {
     rym_path: and(rym, () => rym.url.replace(/^https:\/\/rateyourmusic.com\/release\/|\/$/g, "")),
     rym_artist_id: links && links.artists.map((a: J) => a.id),
     rym_id: and(rym, () => (rym.catalog_id ?? "").match(/(\d+)$/)?.[1] ?? null),
+    rym_genre_id: links && links.primary.map((g: J) => g.id),
+    rym_secondary_genre_id: links && links.secondary.map((g: J) => g.id),
+    rym_scene_id: links && links.scenes.map((g: J) => g.id),
     red_group: rt.group ?? null, red_torrent: rt.torrent ?? null,
     discogs_release: choice.discogs_release ?? null, discogs_master: choice.discogs_master ?? null,
     wikidata: wd ? wd.url.resource.split("/").at(-1) : null,
   };
 
-  const used = [`mb_release_${rid}`, `mb_rg_${choice.release_group}`, "rym-2026-10-29", "edition-report"];
-  if (has) used.push(`red_group_${rt.group}`, `red_torrent_${rt.torrent}`);
-  if (existsSync(`${META}/raw/${slug}/lrclib.json`)) used.push("lrclib");
-  if (choice.discogs_release) used.push(`discogs_release_${choice.discogs_release}`);
-  const dates = used.map((n) => fetched(slug, n)).filter((d): d is string => !!d).sort();
-  album.catalogued_at = dates[0] ?? null;
   album.links = siteLinks(album.ids, album.rym_links?.artists ?? [], rel, rg);
 
-  const mtracks: [unknown, J][] = rel.media.flatMap((m: J) => (m.tracks ?? []).map((t: J) => [m.position, t]));
+  const mtracks: [unknown, J, number][] = rel.media.flatMap((m: J) => (m.tracks ?? []).map((t: J) => [m.position, t, m["track-count"]]));
   const tracks = fs.map((f, i) => {
-    const [disc, t] = i < mtracks.length && mtracks.length === fs.length ? mtracks[i]! : [null, null];
+    const [disc, t, count] = i < mtracks.length && mtracks.length === fs.length ? mtracks[i]! : [null, null, null];
     const rec = t?.recording ?? {};
     const ly = lrclib[f.relpath]?.result;
     return {
@@ -318,13 +322,16 @@ function resolve(slug: string, choice: J) {
         title: field({ MusicBrainz: t?.title ?? null, files: tag(f, "TITLE") }, ["MusicBrainz", "files"]),
         artist: field({ MusicBrainz: t ? credit(t["artist-credit"]) : null, files: tag(f, "ARTIST") }, ["MusicBrainz", "files"]),
         length: field({ MusicBrainz: t?.length ? round1(t.length / 1000) : null, files: round1(f.duration) }, ["files", "MusicBrainz"]),
+        artist_sort: field({ MusicBrainz: t ? sortCredit(t["artist-credit"]) : null, files: tag(f, "ARTISTSORT", "SORT_ARTIST") }, ["MusicBrainz", "files"]),
+        artists: field({ MusicBrainz: t ? artists(t["artist-credit"]) : null, files: f.tags.filter(([k]) => k.toUpperCase() === "ARTISTS").map(([, v]) => v) }, ["MusicBrainz", "files"]),
+        total_tracks: field({ MusicBrainz: count ? String(count) : null, files: tag(f, "TOTALTRACKS", "TRACKTOTAL") }, ["MusicBrainz", "files"]),
         isrc: field({ MusicBrainz: rec.isrcs?.length ? rec.isrcs : null, files: tag(f, "ISRC") }, ["MusicBrainz", "files"]),
         lyrics: field({
           "LRCLIB synced": ly?.syncedLyrics ?? null, "LRCLIB plain": ly?.plainLyrics ?? null, files: tag(f, "LYRICS", "UNSYNCEDLYRICS"),
         }, ["LRCLIB synced", "files", "LRCLIB plain"]),
         instrumental: field({ LRCLIB: ly?.instrumental || null }, ["LRCLIB"]),
       },
-      ids: { musicbrainz_track: t?.id ?? null, musicbrainz_recording: rec.id ?? null, lrclib: ly?.id ?? null },
+      ids: { musicbrainz_track: t?.id ?? null, musicbrainz_recording: rec.id ?? null, lrclib: ly?.id ?? null, musicbrainz_artist: t ? t["artist-credit"].map((a: J) => a.artist.id) : [] },
     };
   });
   return { slug, path, state: "processed", resolved: timestamp(), edition_choice: choice, album, tracks };

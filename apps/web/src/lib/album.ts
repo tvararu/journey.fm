@@ -3,6 +3,8 @@ import type { Field, Value } from "./records";
 
 export const FIELD_TAGS: Record<string, string[]> = {
   album_artist: ["ALBUMARTIST", "ALBUM_ARTIST"],
+  album_artist_sort: ["ALBUMARTISTSORT"],
+  asin: ["ASIN"],
   barcode: ["BARCODE"],
   catalogue_number: ["CATALOGNUMBER"],
   country: ["RELEASECOUNTRY"],
@@ -12,12 +14,17 @@ export const FIELD_TAGS: Record<string, string[]> = {
   language: ["LANGUAGE"],
   media: ["MEDIA"],
   original_date: ["ORIGINALDATE"],
+  release_status: ["RELEASESTATUS"],
   release_type: ["RELEASETYPE"],
+  script: ["SCRIPT"],
   title: ["ALBUM"],
+  total_discs: ["TOTALDISCS", "DISCTOTAL"],
 };
 
 export const FIELD_NAMES: Record<string, string> = {
   album_artist: "Album artist",
+  album_artist_sort: "Album artist sort",
+  asin: "ASIN",
   barcode: "Barcode",
   catalogue_number: "Catalogue number",
   country: "Country",
@@ -33,9 +40,12 @@ export const FIELD_NAMES: Record<string, string> = {
   original_date: "Original date",
   rating: "Rating",
   recorded: "Recorded",
+  release_status: "Release status",
   release_type: "Release type",
   scene: "Scene",
+  script: "Script",
   title: "Title",
+  total_discs: "Total discs",
 };
 
 export const CHIP_FIELDS = new Set(["descriptors", "genre", "genre_secondary", "scene"]);
