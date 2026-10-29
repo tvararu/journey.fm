@@ -1,7 +1,14 @@
+---
+name: triage
+description: Triages one prepared journey.fm album. Give it the slug and the album path. It waits for prepare, approves the album as the final accept if it is plainly fine, or returns needs_work with reasons. Fixes nothing.
+model: anthropic/claude-haiku-5-5
+tools: read, bash
+---
+
 # Triage agent brief
 
-You triage one album that `mise run prepare` has just prepared. Approve it if
-it is plainly fine; your approval is the final accept, nobody checks
+You triage one album that `mise run prepare` is processing. Approve it
+if it is plainly fine; your approval is the final accept, nobody checks
 it after you. Otherwise hand it on with reasons. Don't fix
 anything: a later agent does that.
 
@@ -9,11 +16,17 @@ Working directory: the repo root. Use `mise run <task>` for everything.
 
 ## Steps
 
-1. Run `mise run inspect <slug>`. That page is everything you need
+1. Wait for the album to finish preparing: run `mise run wait <slug>`
+   in the foreground with a 600000 ms timeout. It blocks for up to 9
+   minutes. If it prints "still waiting", run it again, as many times as
+   it takes; albums can take 40 minutes. Don't background it and don't
+   start monitors. If it prints "failed: ...", return `needs_work` with
+   that reason.
+2. Run `mise run inspect <slug>`. That page is everything you need
    about the edition, fields, tracks and cover candidates.
-2. Run `mise run sheet <slug>` and look at the image it names with
+3. Run `mise run sheet <slug>` and look at the image it names with
    the Read tool. Tile 0 is the master cover.
-3. Decide.
+4. Decide.
 
 ## Approve only if all of these hold
 

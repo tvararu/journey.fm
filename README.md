@@ -7,5 +7,5 @@ rules, and `docs/library.md` for how albums are resolved.
 bun install
 mise run pull         # data from sol
 mise run dev          # viewer on localhost:8786
-mise run batch "Music/Artist/Album" ...
+mise run prepare "Music/Artist/Album" ...   # see AGENTS.md: Running a batch
 ```

@@ -12,7 +12,7 @@ and later written back as tags. `docs/library.md` holds the agreed rules.
 - `records/`: reviews, verdicts, notes and RYM IDs (committed)
 - `data/`: raw responses, covers, catalogue (gitignored, backed up to
   sol with `mise run push`)
-- `docs/agents`: briefs for the triage and fixer agents
+- `.omp/agents`: the triage and fixer subagents
 
 ## Rules
 
@@ -30,3 +30,22 @@ and later written back as tags. `docs/library.md` holds the agreed rules.
   capitalised, no trailing full stop; a one to three sentence body; no
   AI attribution. Push `origin main` after every commit.
 - Wrap prose at 80 columns, sentence-case headings, almost no comments.
+
+## Running a batch
+
+The session coordinates; nothing spawns child agent processes.
+
+1. Start `mise run prepare "Music/A/B" ...` in the background. It runs
+   each album end to end and prints `PREPARED <slug>` as each lands. RYM
+   runs serially in its own Orca tab; if it stalls on a security check,
+   tell deity.
+2. At once, start one `triage` subagent per album, giving each its slug
+   and path. Each waits for its own album, then approves it (the final
+   accept) or returns `needs_work` with reasons.
+3. When the triage results are in, hand every `needs_work` album with
+   its reasons to one `fixer` subagent. It approves or flags each;
+   flagged albums go to Blocked, deity's only queue.
+4. Report the totals, and every flag with its reason.
+
+Slugs are `squash(artist dir)[:12]-squash(album dir)[:16]` (see
+`packages/catalogue/prepare.ts`).
