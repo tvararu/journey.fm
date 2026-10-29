@@ -92,7 +92,7 @@ const totalBytes = rows.reduce((s, r) => s + r.bytes, 0);
             <td class="whitespace-nowrap">{Math.floor(r.dur / 60)} min</td>
             <td>
               {r.issues.map((i) => <span class="badge badge-issue">{i}</span>)}
-              {r.agent?.verdict === "flag" && !r.agent.stale && <p class="mt-1 max-w-md text-xs text-chg-fg">{r.agent.message}</p>}
+              {bucket(r) === "investigate" && <p class="mt-1 max-w-md text-xs text-chg-fg">{r.agent.message}</p>}
             </td>
           </tr>
         ))}
