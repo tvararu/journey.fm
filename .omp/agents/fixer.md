@@ -49,7 +49,9 @@ from "### Next: the catalogue" onward.
    - **Fields.** Title, artist, dates, label, catalogue number, country,
      genres. Placeholders like "none" or "[no label]" are dropped by the
      resolver; anything else odd, note it.
-   - **Cover.** Look at the master (`data/catalogue/covers/<slug>/
+   - **Cover.** deity prefers the files' own artwork, or a clean digital
+     (iTunes/Deezer) copy, over CAA scans when they show the same art:
+     scans often have colour casts or faded edges. Look at the master (`data/catalogue/covers/<slug>/
      cover.jpg`) with the Read tool. It should be the front of this
      edition, clean, square-ish, no tray card, booklet spread, sticker
      or glare. Better candidates are listed in

@@ -21,12 +21,19 @@ async function thumb(path: string): Promise<Uint8Array> {
   });
   return new Uint8Array(await new Response(p.stdout).arrayBuffer());
 }
-const diff = (a: Uint8Array, b: Uint8Array) => {
+function diff(a: Uint8Array, b: Uint8Array): number {
   if (a.length !== b.length || !a.length) return Infinity;
+  const z = (v: Uint8Array) => {
+    const m = v.reduce((x, y) => x + y, 0) / v.length;
+    const sd = Math.sqrt(v.reduce((x, y) => x + (y - m) ** 2, 0) / v.length) || 1;
+    return [...v].map((x) => (x - m) / sd);
+  };
+  const x = z(a);
+  const y = z(b);
   let s = 0;
-  for (let i = 0; i < a.length; i++) s += Math.abs(a[i]! - b[i]!);
-  return s / a.length;
-};
+  for (let i = 0; i < x.length; i++) s += Math.abs(x[i]! - y[i]!);
+  return s / x.length;
+}
 
 const shown = cands
   .map((c, i) => ({ c, i }))
@@ -39,7 +46,7 @@ if (master) tiles.push({ label: `MASTER ${master.chosen.source} ${master.chosen.
 const legend: string[] = master ? [`tile 0: MASTER = candidate ${cands.findIndex((c) => c.id === master.chosen.id)} (${master.chosen.source} ${master.chosen.width}x${master.chosen.height})`] : [];
 for (const { c, i } of shown) {
   const d = ref ? diff(ref, await thumb(`${META}/${c.path}`)) : NaN;
-  const art = Number.isFinite(d) ? (d <= 15 ? `same art (${d.toFixed(0)})` : `different (${d.toFixed(0)})`) : "";
+  const art = Number.isFinite(d) ? (d <= 0.35 ? `same art (${d.toFixed(2)})` : `different (${d.toFixed(2)})`) : "";
   tiles.push({ label: `#${i} ${c.source.replace("Cover Art Archive", "CAA")} ${c.width}x${c.height} ${art}`, path: `${META}/${c.path}` });
   legend.push(`tile ${tiles.length - 1}: candidate ${i}  ${c.source} ${c.width}x${c.height} ${c.types.join("+") || "-"}  ${art}  id ${c.id}`);
 }

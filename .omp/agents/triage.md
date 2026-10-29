@@ -38,7 +38,9 @@ Use `mise run music:<task>` for everything.
 - **Cover:** the master is the album's front, clean, with no border,
   spine strip, sticker, glare or tray card. If the master is an upscale
   and the sheet shows a larger candidate marked "same art", that is
-  `needs_work`.
+  `needs_work`, unless the master comes from the files' own image (the
+  cover `why` says so): deity prefers that art to scans, which often have
+  colour casts.
 - **Lyrics:** nothing obviously wrong, such as an instrumental track
   with words, or two tracks with the same text. Missing lyrics are fine.
 

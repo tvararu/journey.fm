@@ -174,7 +174,7 @@ async function edition(a: Album): Promise<boolean> {
   return true;
 }
 
-const SAME_ART = 15;
+const SAME_ART = 0.35;
 
 async function thumb(path: string): Promise<Uint8Array> {
   const p = Bun.spawn(["ffmpeg", "-nostdin", "-v", "error", "-i", `${META}/${path}`, "-vf", "scale=24:24:flags=area,format=gray", "-frames:v", "1", "-f", "rawvideo", "-"], { stdout: "pipe", stderr: "ignore" });
@@ -182,10 +182,17 @@ async function thumb(path: string): Promise<Uint8Array> {
 }
 
 function difference(a: Uint8Array, b: Uint8Array): number {
-  if (a.length !== b.length || !a.length) return 255;
-  let sum = 0;
-  for (let i = 0; i < a.length; i++) sum += Math.abs(a[i]! - b[i]!);
-  return sum / a.length;
+  if (a.length !== b.length || !a.length) return Infinity;
+  const z = (v: Uint8Array) => {
+    const m = v.reduce((x, y) => x + y, 0) / v.length;
+    const sd = Math.sqrt(v.reduce((x, y) => x + (y - m) ** 2, 0) / v.length) || 1;
+    return [...v].map((x) => (x - m) / sd);
+  };
+  const x = z(a);
+  const y = z(b);
+  let s = 0;
+  for (let i = 0; i < x.length; i++) s += Math.abs(x[i]! - y[i]!);
+  return s / x.length;
 }
 
 async function cover(a: Album): Promise<void> {
@@ -208,7 +215,7 @@ async function cover(a: Album): Promise<void> {
     for (const x of own) {
       const d = difference(mine, await thumb(x.path));
       if (d <= SAME_ART) {
-        why = `auto-picked: the files' own ${x.source} image ${x.width}x${x.height}, the same art as the ${edition.source} front (difference ${d.toFixed(1)}); deity prefers the art already in the files over scans`;
+        why = `auto-picked: the files' own ${x.source} image ${x.width}x${x.height}, the same art as the ${edition.source} front (difference ${d.toFixed(2)}); deity prefers the art already in the files over scans`;
         c = x;
         break;
       }
