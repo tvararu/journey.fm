@@ -87,6 +87,8 @@ export function evidence(rel: Release, fs: InvFile[], torrent: Torrent | null): 
 const labels = (r: { "label-info"?: LabelInfo[] }): string =>
   (r["label-info"] ?? []).map((l) => `${py(l.label?.name)} ${py(l["catalog-number"])}`).join(", ");
 
+const squash = (s: string | null | undefined) => (s ?? "").toLowerCase().normalize("NFKD").replace(/[^a-z0-9]+/g, "");
+
 async function main(slug: string, path: string) {
   const fs = files(path);
   const redMap = JSON.parse(readFileSync(`${INV}/music-red.json`, "utf8")) as Record<string, string[]>;
@@ -102,7 +104,12 @@ async function main(slug: string, path: string) {
   let group: Group | null = null;
   if (redDirs.length) {
     const browse = await red<{ results?: { groupId: number }[] }>({ action: "browse", artistname: artist, groupname: album });
-    const res = browse?.results ?? [];
+    let res = browse?.results ?? [];
+    if (!res.length) {
+      const words = `${artist ?? ""} ${album ?? ""}`.replace(/[^\p{L}\p{N}]+/gu, " ").trim();
+      const loose = await red<{ results?: { groupId: number; groupName: string }[] }>({ action: "browse", searchstr: words });
+      res = (loose?.results ?? []).filter((g) => squash(unescapeHtml(g.groupName)) === squash(album));
+    }
     for (const g of res) {
       const full = (await red<Group>({ action: "torrentgroup", id: g.groupId }))!;
       const hit = full.torrents.find((t) => redDirs.includes(unescapeHtml(t.filePath || "")));
@@ -147,15 +154,26 @@ async function main(slug: string, path: string) {
   const cands: [string, string][] = discid.map(([rid]) => ["discid", rid]);
   const tagged = t0["MUSICBRAINZ_ALBUMID"] || t0["MUSICBRAINZ ALBUM ID"];
   if (tagged) cands.push(["file tag", tagged]);
-  const rgid = t0["MUSICBRAINZ_RELEASEGROUPID"] || t0["MUSICBRAINZ RELEASE GROUP ID"];
-  if (torrent && torrent.media === "WEB" && rgid) {
-    const year = torrent.remasterYear || 0;
+  let rgids = [t0["MUSICBRAINZ_RELEASEGROUPID"] || t0["MUSICBRAINZ RELEASE GROUP ID"]].filter((x): x is string => !!x);
+  if (!rgids.length && !cands.length && artist && album) {
+    const quote = (x: string) => `"${x.replace(/["\\]/g, " ")}"`;
+    const q = { query: `artist:${quote(artist)} AND releasegroup:${quote(album)}`, limit: 5 };
+    const found = save(slug, "mb_rg_search", await mb<{ "release-groups"?: { id: string; score: number }[] }>("release-group", q));
+    rgids = (found?.["release-groups"] ?? []).filter((g) => g.score >= 90).slice(0, 2).map((g) => g.id);
+    report["rg_search"] = rgids;
+  }
+  for (const rgid of rgids) {
+    if (cands.some(([how]) => how !== "file tag") && !(torrent && torrent.media === "WEB")) break;
+    const year = torrent?.remasterYear || 0;
     const q = { "release-group": rgid, inc: "labels+media", limit: 100 };
     const b = save(slug, `mb_rg_releases_${rgid}`, await mb<{ releases?: Release[] }>("release", q));
     for (const r of b?.releases ?? []) {
       const digital = (r.media ?? []).some((m) => m.format === "Digital Media");
-      if (digital && Math.abs(Number((r.date || "0").slice(0, 4) || 0) - year) <= 1) {
-        cands.push(["web, same year", r.id]);
+      const near = Math.abs(Number((r.date || "0").slice(0, 4) || 0) - year) <= 1;
+      if (torrent?.media === "WEB") {
+        if (digital && near) cands.push(["web, same year", r.id]);
+      } else {
+        cands.push(["release group", r.id]);
       }
     }
   }
