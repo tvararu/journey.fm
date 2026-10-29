@@ -6,7 +6,7 @@ and later written back as tags. `docs/library.md` holds the agreed rules.
 
 ## Layout
 
-- `apps/web`: the catalogue viewer (Astro on Bun, port 8787)
+- `apps/web`: the catalogue viewer (Astro on Bun, port 8786)
 - `packages/catalogue`: the pipeline and reviewer tools
 - `tools/tagging`: scripts that run on sol, plus the RYM grabbers
 - `records/`: reviews, verdicts, notes and RYM IDs (committed)

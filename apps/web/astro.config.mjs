@@ -6,7 +6,7 @@ export default defineConfig({
   adapter: node({ mode: "standalone" }),
   compressHTML: true,
   output: "server",
-  server: { host: "127.0.0.1", port: Number(process.env.PORT) || 8787 },
+  server: { host: "127.0.0.1", port: Number(process.env.PORT) || 8786 },
   vite: {
     plugins: [tailwindcss()],
     resolve: { alias: { "@": `${import.meta.dirname}/src` } },

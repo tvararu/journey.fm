@@ -6,6 +6,6 @@ rules, and `docs/library.md` for how albums are resolved.
 ```sh
 bun install
 mise run pull         # data from sol
-mise run dev          # viewer on localhost:8787
+mise run dev          # viewer on localhost:8786
 mise run batch "Music/Artist/Album" ...
 ```

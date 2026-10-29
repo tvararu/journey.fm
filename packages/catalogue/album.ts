@@ -47,7 +47,7 @@ const tags = db
   )
   .all(a.id);
 
-console.log(`${a.path}  (album ${a.id}, ${files.length} files)  http://localhost:8787/album/${a.id}\n`);
+console.log(`${a.path}  (album ${a.id}, ${files.length} files)  http://localhost:8786/album/${a.id}\n`);
 const notesFile = Bun.file(`${RECORDS}/notes.jsonl`);
 const notes = (await notesFile.exists() ? (await notesFile.text()).split("\n").filter(Boolean) : [])
   .map((l) => JSON.parse(l) as { at: string; album: string; by: string; text: string })

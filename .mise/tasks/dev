@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#MISE description="Start the catalogue viewer (Astro dev server, localhost:8787, runs in the background)"
+#MISE description="Start the catalogue viewer (Astro dev server, localhost:8786, runs in the background)"
 set -euo pipefail
 cd "$MISE_PROJECT_ROOT/apps/web"
 [ -d "$MISE_PROJECT_ROOT/node_modules" ] || (cd "$MISE_PROJECT_ROOT" && bun install)
