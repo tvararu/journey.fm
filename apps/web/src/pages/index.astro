@@ -79,9 +79,9 @@ const totalBytes = rows.reduce((s, r) => s + r.bytes, 0);
             </td>
             <td>
               <span class={`badge whitespace-nowrap ${BADGE[r.state] ?? "chg border-transparent"}`}>{r.state}</span>
-              {r.agent && (bucket(r) === "ready" || bucket(r) === "investigate" || r.agent.stale) && (
-                <span class={`badge ml-1 whitespace-nowrap border-transparent ${r.agent.stale ? "text-muted" : r.agent.verdict === "approve" ? "new" : "badge-issue"}`}>
-                  {r.agent.stale ? "agent verdict stale" : r.agent.verdict === "approve" ? "agent approved" : "agent flagged"}
+              {r.agent && (bucket(r) === "ready" || bucket(r) === "investigate") && (
+                <span class={`badge ml-1 whitespace-nowrap border-transparent ${r.agent.verdict === "approve" ? "new" : "badge-issue"}`}>
+                  {r.agent.verdict === "approve" ? "agent approved" : "agent flagged"}
                 </span>
               )}
             </td>

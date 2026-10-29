@@ -47,9 +47,9 @@ const minutes = Math.round(files.reduce((s, f) => s + (f.duration ?? 0), 0) / 60
     <p class="text-muted">{a.artist_dir}</p>
     <p class="mt-2">
       <span class={`badge ${BADGE[state] ?? "chg border-transparent"}`}>{state}</span>
-      {agent && (
-        <span class={`badge ml-1 border-transparent ${agent.stale ? "text-muted" : agent.verdict === "approve" ? "new" : "badge-issue"}`}>
-          {agent.stale ? "agent verdict stale" : agent.verdict === "approve" ? "agent approved" : "agent flagged"}
+      {agent && !agent.stale && (
+        <span class={`badge ml-1 border-transparent ${agent.verdict === "approve" ? "new" : "badge-issue"}`}>
+          {agent.verdict === "approve" ? "agent approved" : "agent flagged"}
         </span>
       )}
     </p>
