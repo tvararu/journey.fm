@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
 
 import { timestamp } from "./resolve";
 
@@ -52,8 +52,12 @@ for (const slug of slugs.length ? slugs : all) {
   const out: Record<string, Found> = existsSync(partial) ? JSON.parse(readFileSync(partial, "utf8")) : {};
   mkdirSync(`${META}/raw/${slug}`, { recursive: true });
   let failed = 0;
+  const rymFile = existsSync(`${META}/raw/${slug}`) ? readdirSync(`${META}/raw/${slug}`).filter((n) => /^rym-.*\.json$/.test(n)).sort().at(-1) : undefined;
+  const rym = rymFile ? (JSON.parse(readFileSync(`${META}/raw/${slug}/${rymFile}`, "utf8")) as { data?: { descriptors?: string[] }; descriptors?: string[] }) : null;
+  const instrumental = (rym?.data?.descriptors ?? rym?.descriptors ?? []).includes("instrumental");
   for (const t of rec.tracks) {
     const f = t.fields;
+    if (!out[t.file] && instrumental) out[t.file] = { candidates: [], match: "RYM instrumental", result: { id: 0, instrumental: true } };
     if (!out[t.file]) {
       try {
         out[t.file] = await lookup(f["artist"]!.value, f["title"]!.value, rec.album.title.value, t.duration);

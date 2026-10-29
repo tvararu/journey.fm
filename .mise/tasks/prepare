@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+#MISE description="Run the automatic pipeline on albums: music:prepare \"Music/Artist/Album\" ..."
+set -euo pipefail
+cd "$MISE_PROJECT_ROOT/hobbies/music/catalogue"
+exec bun scripts/prepare.ts "$@"

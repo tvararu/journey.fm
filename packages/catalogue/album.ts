@@ -20,7 +20,8 @@ for (const name of readdirSync(`${DATA}/catalogue`)) {
 
 const db = new Database(`${DATA}/inventory/inventory.sqlite`, { readonly: true });
 type Row = { id: number; path: string };
-const bySlug = records.find((r) => r.slug === query);
+const editions = (await Bun.file(`${DATA}/catalogue/editions.json`).json()) as Record<string, { path: string }>;
+const bySlug = records.find((r) => r.slug === query) ?? (editions[query] ? { path: editions[query].path } : undefined);
 const rows = /^\d+$/.test(query)
   ? db.query<Row, [number]>("select id, path from albums where id = ?").all(Number(query))
   : db.query<Row, [string]>("select id, path from albums where path like ? order by path").all(`%${bySlug?.path ?? query}%`);
