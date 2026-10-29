@@ -83,18 +83,47 @@ async function rym(): Promise<void> {
   }
 }
 
+async function solved(env: Record<string, string>): Promise<boolean> {
+  console.log("RYM: security check in the RYM tab; waiting up to 15 min for it to be solved");
+  for (let i = 0; i < 60; i++) {
+    await Bun.sleep(15_000);
+    const r = await runAsync(["orca", "eval", "--page", env["ORCA_PAGE"]!, "--expression", "document.title", "--json"]);
+    if (!r.out.includes("Security check")) return true;
+  }
+  return false;
+}
+
 async function rymEach(env: Record<string, string>): Promise<void> {
   for (const a of albums) {
-    const found = await runAsync(["bun", `${MUSIC}/tagging/rym-find.ts`, a.artist, a.title], HERE, env);
-    const url = (JSON.parse(found.out.trim().split("\n").at(-1) || "{}") as { url?: string | null }).url;
-    if (!url) {
-      say(a, `RYM: no exact match for "${a.artist} - ${a.title}"; grab it by hand`);
-      continue;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const found = await runAsync(["bun", `${MUSIC}/tagging/rym-find.ts`, a.artist, a.title], HERE, env);
+      const r = JSON.parse(found.out.trim().split("\n").at(-1) || "{}") as { url?: string | null; how?: string | null; challenge?: boolean };
+      if (r.challenge) {
+        if (await solved(env)) continue;
+        say(a, "RYM: security check not solved; grab it by hand");
+        break;
+      }
+      if (!r.url) {
+        say(a, `RYM: no match for "${a.artist} - ${a.title}"; grab it by hand`);
+        break;
+      }
+      const grab = await runAsync(["bash", `${MUSIC}/tagging/rym-album.sh`, a.slug, r.url], HERE, env);
+      if (grab.out.includes("CHALLENGE")) {
+        if (await solved(env)) continue;
+        say(a, "RYM: security check not solved; grab it by hand");
+        break;
+      }
+      say(a, `RYM: ${r.url}${r.how && r.how !== "exact" ? ` (${r.how})` : ""}${grab.out.includes("NOT LOGGED IN") ? ", NOT LOGGED IN" : ""}`);
+      break;
     }
-    const grab = await runAsync(["bash", `${MUSIC}/tagging/rym-album.sh`, a.slug, url], HERE, env);
-    const flags = grab.out.match(/CHALLENGE|NOT LOGGED IN/g);
-    say(a, flags ? `RYM: ${flags.join(", ")} at ${url}` : `RYM: ${url}`);
   }
+}
+
+async function pool<T>(items: T[], n: number, fn: (x: T) => Promise<void>): Promise<void> {
+  const queue = [...items];
+  await Promise.all(Array.from({ length: Math.min(n, queue.length) }, async () => {
+    for (let x = queue.shift(); x !== undefined; x = queue.shift()) await fn(x);
+  }));
 }
 
 function acoustidHits(slug: string, rid: string): [number, number] {
@@ -199,9 +228,18 @@ const started = Date.now();
 fingerprints();
 const rymDone = rym();
 const ok: Album[] = [];
-await Promise.all(albums.map(async (a) => {
+const editions = albums.map(async (a) => {
   try {
-    if (!(await edition(a))) return;
+    return (await edition(a)) ? a : null;
+  } catch (e) {
+    say(a, `failed: ${(e as Error).message}`);
+    return null;
+  }
+});
+await pool(editions, 6, async (pending) => {
+  const a = await pending;
+  if (!a) return;
+  try {
     const r = await runAsync(["bun", "scripts/covers.ts", PREVIEWS, a.slug]);
     if (r.code !== 0) say(a, `covers failed: ${r.out.slice(-400)}`);
     else await cover(a);
@@ -209,15 +247,19 @@ await Promise.all(albums.map(async (a) => {
   } catch (e) {
     say(a, `failed: ${(e as Error).message}`);
   }
-}));
+});
 run(["bun", "scripts/resolve.ts"]);
-await Promise.all(ok.map(async (a) => {
-  const ly = await runAsync(["bun", "scripts/lyrics.ts", a.slug]);
+await pool(ok, 3, async (a) => {
+  let ly = await runAsync(["bun", "scripts/lyrics.ts", a.slug]);
+  for (let retry = 1; retry <= 3 && ly.code !== 0; retry++) {
+    await Bun.sleep(20_000 * retry);
+    ly = await runAsync(["bun", "scripts/lyrics.ts", a.slug]);
+  }
   const lines = ly.out.split("\n").filter((l) => l.startsWith(`${a.slug} `));
   const count = (k: string) => lines.filter((l) => l.includes(`-> ${k}`)).length;
   say(a, `lyrics: ${count("synced")} synced, ${count("plain")} plain, ${count("instrumental")} instrumental, ${count("missing")} missing${
     count("failed") ? `, ${count("failed")} failed (rerun music:lyrics)` : ""}`);
-}));
+});
 await rymDone;
 await upscalesDone(started);
 run(["bun", "scripts/resolve.ts"]);
