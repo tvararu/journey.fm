@@ -1,7 +1,7 @@
 ---
 name: triage
 description: Triages one prepared journey.fm album. Give it the slug and the album path. It waits for prepare, approves the album as the final accept if it is plainly fine, or returns needs_work with reasons. Fixes nothing.
-model: anthropic/claude-haiku-5-5
+model: "@smol"
 tools: read, bash
 ---
 

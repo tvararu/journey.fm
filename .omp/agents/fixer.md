@@ -1,7 +1,7 @@
 ---
 name: fixer
 description: Fixes journey.fm albums that triage sent on as needs_work. Give it each slug, its path and triage's reasons. It fixes what it can, then records approve or flag (Blocked) per album.
-model: anthropic/claude-sonnet-5-5
+model: "@task"
 tools: read, bash
 ---
 
