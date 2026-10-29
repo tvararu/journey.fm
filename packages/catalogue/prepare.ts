@@ -124,7 +124,8 @@ async function rymOne(a: Album, env: Record<string, string>): Promise<void> {
         say(a, "RYM: security check not solved; grab it by hand");
         break;
       }
-      say(a, `RYM: ${r.url}${r.how && r.how !== "exact" ? ` (${r.how})` : ""}${grab.out.includes("NOT LOGGED IN") ? ", NOT LOGGED IN" : ""}`);
+      const owned = /collection now: ([^"]*)/.exec(grab.out)?.[1] ?? (grab.out.includes('"catalog_state":"catalog_o"') ? "already in collection" : "collection not marked");
+      say(a, `RYM: ${r.url}${r.how && r.how !== "exact" ? ` (${r.how})` : ""}${grab.out.includes("NOT LOGGED IN") ? ", NOT LOGGED IN" : ""}; ${owned}`);
       break;
     }
   }
