@@ -14,6 +14,16 @@ and later written back as tags. `docs/library.md` holds the agreed rules.
   sol with `mise run push`)
 - `.omp/agents`: the triage and fixer subagents
 
+## Where things run
+
+- sol keeps the FLACs and does inventory and fingerprinting over ssh;
+  its `/mnt/pool/music-meta` is the backup of `data/`.
+- t1 does the cataloguing: pipeline, data, ComfyUI upscales and RYM in
+  Orca. The viewer runs from `apps/web/dist` as the systemd user unit
+  `journey-web` on 127.0.0.1:8786 (rebuild and restart to update), and
+  is published as the Tailscale Service `svc:journey`
+  (`journey.example`).
+
 ## Rules
 
 - Bun + TypeScript + mise only. No Python.
