@@ -316,10 +316,13 @@ function resolve(slug: string, choice: J) {
   const rgTypes: unknown[] = rg ? [rg["primary-type"], ...(rg["secondary-types"] ?? [])] : [];
   const uniq = <T>(xs: T[]) => [...new Set(xs)];
   const labels: Record<string, string[] | null> = {
-    RED: splitLabels(rt.label), MusicBrainz: uniq(li.filter((l) => l.label).map((l) => l.label.name)),
-    Discogs: and(dr, () => uniq((dr.labels ?? []).map((l: J) => l.name))), files: tagall(fs, "LABEL"),
+    RED: splitLabels(rt.label), MusicBrainz: uniq(li.filter((l) => l.label && l.label.name !== "[no label]").map((l) => l.label.name)),
+    Discogs: and(dr, () => uniq((dr.labels ?? []).map((l: J) => l.name))), files: tagall(fs, "LABEL").filter((l) => l !== "[no label]"),
   };
-  const label = field(labels, ["RED", "MusicBrainz", "Discogs", "files"]);
+  const keys = (src: string) => new Set((labels[src] ?? []).map((l) => labelKey(plain(l) as string)));
+  const meets = (x: string, y: string) => [...keys(x)].some((k) => keys(y).has(k));
+  const filesSide = keys("files").size > 0 && !meets("RED", "files") && meets("MusicBrainz", "files");
+  const label = field(labels, filesSide ? ["MusicBrainz", "Discogs", "files", "RED"] : ["RED", "MusicBrainz", "Discogs", "files"]);
   const chosenLabels = new Set(((label.value ?? []) as string[]).map(labelKey));
   const sameLabel = (src: string) => (labels[src] ?? []).some((l) => chosenLabels.has(labelKey(plain(l) as string)));
   const album: J = {

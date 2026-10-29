@@ -9,7 +9,16 @@ ends in one of two verdicts:
   what you checked and what you tried.
 
 Fix what you can yourself first, using judgement. Flag only what you
-can't settle from the data.
+can't settle from the data and deity would want to see: a cover with
+no clean candidate (borders, spine, glare, wrong art), AcoustID
+disagreeing with a pairing, audio that doesn't match any release, or a
+step that keeps failing.
+
+Never flag a disagreement between sources about which edition or label
+the album is when the audio is the same: default to what the files say
+(their MusicBrainz release ID, label and catalogue number) and note it in
+the approval. The resolver already prefers the files' label when RED
+disagrees with them.
 
 Working directory: `hobbies/music/catalogue`. Use `mise run music:<task>`
 for everything; they load the secrets. Agreed rules: `../library.md`
@@ -23,8 +32,8 @@ from "### Next: the catalogue" onward.
 2. Check, and fix where you can:
    - **Edition.** Was the pick right? The `why` in `editions.json` says
      how it was chosen. A tie between releases with identical audio is
-     normal: keep the pick unless RED's year, label or catalogue number
-     points at another candidate. To switch, run `music:enrich <slug>
+     normal: keep the pick, preferring the release the files are tagged
+     with, then an official release over a bootleg. To switch, run `music:enrich <slug>
      <path> <release> "<why>"`, then `music:covers <slug>`, `music:covers
      choose ...`, `music:resolve`, `music:lyrics <slug>` and
      `music:resolve` again.
@@ -35,8 +44,8 @@ from "### Next: the catalogue" onward.
      the verdict. AcoustID disagreeing on a track is a flag unless you
      can explain it.
    - **Fields.** Title, artist, dates, label, catalogue number, country,
-     genres. A label conflict between RED and MusicBrainz is a flag
-     unless one source is plainly wrong.
+     genres. Placeholders like "none" or "[no label]" are dropped by the
+     resolver; anything else odd, note it.
    - **Cover.** Look at the master (`data/catalogue/covers/<slug>/
      cover.jpg`) with the Read tool. It should be the front of this
      edition, clean, square-ish, no tray card, booklet spread, sticker
