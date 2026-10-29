@@ -1,4 +1,6 @@
 ---
+import { frontLabels, fronts as frontsOf, groups as coverGroups, upscaledBy } from "@/lib/covers";
+import { thumbUrl } from "@/lib/library";
 import type { CoverCandidate, CoverChoice } from "@/lib/records";
 import { UPSCALERS } from "@/lib/upscale";
 
@@ -11,119 +13,100 @@ type Props = {
   back: string;
 };
 const { cover, candidates, fallback, slug, album, back } = Astro.props;
-const fronts = candidates.filter((c) => c.types.includes("Front"));
+const fronts = frontsOf(candidates);
 const others = candidates.length - fronts.length;
+const labels = frontLabels(candidates);
+const groups = coverGroups(candidates);
 const kb = (n: number) => `${Math.floor(n / 1024)} KB`;
-const SHORT: Record<string, string> = {
-  "Cover Art Archive (release)": "CAA release",
-  "Cover Art Archive (release group)": "CAA release group",
-  "Cover Art Archive (same catalogue number)": "CAA same cat. no.",
-  "files (embedded)": "embedded in files",
-  "files (folder)": "folder image",
-};
-const stem = (p: string) => (p.split("/").at(-1) ?? p).replace(/\.[^.]+$/, "");
-const upscaledBy = (c: CoverCandidate) => /^Upscaled \((.+)\)$/.exec(c.source)?.[1];
-const originals = fronts.filter((c) => !upscaledBy(c));
-const parentOf = (c: CoverCandidate) => {
-  const which = upscaledBy(c);
-  const base = which ? stem(c.path).replace(`upscaled-${which}-`, "") : "";
-  return originals.find((o) => stem(o.path) === base);
-};
-const groups = [
-  ...originals.map((o) => ({ kids: fronts.filter((c) => parentOf(c) === o), lead: o as CoverCandidate | undefined })),
-  ...fronts.filter((c) => upscaledBy(c) && !parentOf(c)).map((c) => ({ kids: [c], lead: undefined })),
-];
-const number = new Map(originals.map((o, i) => [o.id, i + 1]));
-const upLabel = (c: CoverCandidate) => {
-  const which = upscaledBy(c);
-  return which && which in UPSCALERS ? UPSCALERS[which as keyof typeof UPSCALERS].label : which;
-};
+const facts = cover
+  ? [
+      ["file", "cover.jpg"],
+      ["size", `${cover.chosen.width}×${cover.chosen.height} · ${kb(cover.master_bytes)}`],
+      ["from", cover.chosen.source],
+      ["encode", cover.master_method],
+      ["embedded", `${cover.embed_size[0]}×${cover.embed_size[1]} · ${kb(cover.embed_bytes)}`],
+    ]
+  : [];
 ---
-<h2 id="cover">Cover</h2>
-<div class="flex flex-wrap items-start gap-6">
-  {cover ? (
-    <>
-      <figure>
-        <a href={`/data/${cover.master}`}><img class="size-72 bg-faint object-cover" src={`/data/${cover.master}`} alt="" /></a>
-        <figcaption class="mt-2 text-xs text-muted">
-          cover.jpg<br />
-          {cover.chosen.width}x{cover.chosen.height}, {kb(cover.master_bytes)}<br />
-          {cover.master_method}<br />
-          from {cover.chosen.source}, {kb(cover.chosen.bytes)}
-        </figcaption>
-      </figure>
-      <figure>
-        <a href={`/data/${cover.embed}`}><img class="size-72 bg-faint object-cover" src={`/data/${cover.embed}`} alt="" /></a>
-        <figcaption class="mt-2 text-xs text-muted">
-          embedded<br />
-          {cover.embed_size[0]}x{cover.embed_size[1]}, {kb(cover.embed_bytes)}
-        </figcaption>
-      </figure>
-    </>
-  ) : fallback ? (
-    <img class="size-72 bg-faint object-cover" src={fallback} alt="" />
-  ) : (
-    <div class="size-72 bg-faint" />
-  )}
-  {fronts.length > 0 && (
-    <div class="flex flex-wrap gap-4">
-      {groups.map((g) => (
-        <div class={`flex gap-3 ${g.kids.length ? "rounded border border-rule p-2" : ""}`}>
-          {[...(g.lead ? [g.lead] : []), ...g.kids].map((c) => {
-            const parent = parentOf(c);
-            const n = number.get(c.id);
-            return (
-              <figure class="w-36">
-                <div class="relative outline-offset-4 has-checked:outline-2 has-checked:outline-new-fg">
-                  <a href={`/data/${c.path}`}><img class="size-36 bg-faint object-cover" loading="lazy" src={`/data/${c.path}`} alt="" /></a>
-                  <span class="absolute top-1.5 left-1.5 rounded bg-black/60 px-1.5 text-xs text-white">{n ? `#${n}` : parent ? `#${number.get(parent.id)} ↑` : "↑"}</span>
-                  {slug && (
-                    <label
-                      title="Use as master"
-                      class="absolute top-1.5 right-1.5 flex size-6 cursor-pointer items-center justify-center rounded-full border border-white/60 bg-black/55 text-xs text-white/70 backdrop-blur-sm hover:bg-black/75 hover:text-white has-checked:w-auto has-checked:border-transparent has-checked:bg-new-fg has-checked:px-2 has-checked:font-bold has-checked:text-bg [&_.on]:hidden has-checked:[&_.on]:inline"
-                    >
-                      <input type="radio" name="cover" form="review" value={c.id} checked={c.id === cover?.chosen.id} class="sr-only" />
-                      <svg viewBox="0 0 24 24" class="size-3 shrink-0" fill="currentColor" aria-hidden="true"><path d="M12 2.5l2.9 6.1 6.6.8-4.9 4.6 1.3 6.6L12 17.3l-5.9 3.3 1.3-6.6-4.9-4.6 6.6-.8z" /></svg><span class="on ml-1 leading-none">master</span>
-                    </label>
-                  )}
-                </div>
-                {slug && !upscaledBy(c) && (
-                  <form method="post" action="/api/upscale" class="upscale mt-2 flex gap-1 text-xs">
-                    <input type="hidden" name="slug" value={slug} />
-                    <input type="hidden" name="album" value={album} />
-                    <input type="hidden" name="back" value={back} />
-                    <input type="hidden" name="candidate" value={c.id} />
-                    <select name="upscaler" class="min-w-0 flex-1 border border-rule bg-bg">
-                      {Object.entries(UPSCALERS).map(([k, u]) => <option value={k}>{u.label}</option>)}
-                    </select>
-                    <button class="border border-rule bg-bg px-2">Upscale</button>
-                  </form>
-                )}
-                <figcaption class="mt-1 text-xs text-muted">
-                  {upscaledBy(c) ? (
-                    <>{parent ? `#${number.get(parent.id)} ` : ""}upscaled with {upLabel(c)}<br />{c.width}x{c.height}, {kb(c.bytes)}</>
-                  ) : (
-                    <>{SHORT[c.source] ?? c.source}<br />{c.width}x{c.height}, {kb(c.bytes)}{c.note && <><br />{c.note}</>}</>
-                  )}
-                </figcaption>
-              </figure>
-            );
-          })}
+<div class="flex flex-wrap items-start gap-7">
+  <div class="flex min-w-0 flex-col gap-3 lg:flex-[0_0_300px] max-lg:w-full">
+    {cover ? (
+      <>
+        <a href={`/data/${cover.master}`} class="relative block aspect-square w-full max-w-[300px] bg-dark max-lg:mx-auto">
+          <img class="size-full object-cover" src={thumbUrl(cover.master)} alt="" />
+          <span class="absolute top-2 left-2 bg-fg px-1.5 py-px font-extrabold text-bg">MASTER</span>
+        </a>
+        <div class="flex flex-col gap-[3px]">
+          {facts.map(([k, v]) => <div class="leader"><span class="shrink-0 text-muted">{k}</span><i></i><span>{v}</span></div>)}
         </div>
-      ))}
+        <div class="flex items-center gap-3 pt-1">
+          <a href={`/data/${cover.embed}`} class="block size-[72px] shrink-0 bg-dark"><img class="size-full object-cover" src={thumbUrl(cover.embed)} alt="" /></a>
+          <span class="flex min-w-0 flex-col gap-0.5">
+            <b class="font-bold">embedded copy</b>
+            <span class="text-muted">{cover.embed_size[0]}×{cover.embed_size[1]} · {kb(cover.embed_bytes)}</span>
+          </span>
+        </div>
+      </>
+    ) : (
+      <>
+        {fallback ? <img class="aspect-square w-full max-w-[300px] bg-dark object-cover max-lg:mx-auto" src={fallback} alt="" /> : <div class="aspect-square w-full max-w-[300px] bg-dark"></div>}
+        <span class="text-muted">no master yet</span>
+      </>
+    )}
+  </div>
+  {fronts.length > 0 && (
+    <div class="flex min-w-0 flex-col gap-3 lg:flex-[1_1_360px] max-lg:w-full">
+      <div class="rule-head"><span>──</span><b class="font-extrabold text-fg">front candidates · {fronts.length}</b><span class="max-lg:hidden">pick by eye: edition held, clean scan, then size</span><i class="h-px flex-1 bg-faint"></i></div>
+      <div class="grid grid-cols-3 gap-x-3 gap-y-4 max-lg:grid-cols-2">
+        {groups.flatMap((g) => [...(g.lead ? [g.lead] : []), ...g.kids]).map((c) => {
+          const label = labels.get(c.id) ?? c.id;
+          return (
+            <div class="group/c flex min-w-0 flex-col gap-1.5">
+              <a href={`/data/${c.path}`} class="flex aspect-square w-full items-center justify-center overflow-hidden border-2 border-transparent bg-dark group-has-checked/c:border-active">
+                <img class="size-full object-contain" loading="lazy" src={thumbUrl(c.path)} alt="" />
+              </a>
+              <span class="flex flex-col gap-px text-[11px]">
+                <b class="text-xs font-bold">{label}</b>
+                <span class="text-muted">{c.width}×{c.height} · {kb(c.bytes)}</span>
+                {c.note && <span class="text-muted">{c.note}</span>}
+              </span>
+              {slug && (
+                <span class="flex flex-wrap gap-1">
+                  <label class="btn-2 h-[22px] cursor-pointer text-[11px] max-lg:h-11 has-checked:border-transparent has-checked:bg-fg has-checked:font-extrabold has-checked:text-bg">
+                    <input type="radio" name="cover" form="review" value={c.id} data-label={`${label} · ${c.width}×${c.height}`} checked={c.id === cover?.chosen.id} class="peer sr-only" />
+                    <span class="peer-checked:hidden">○ use as master</span><span class="hidden peer-checked:inline">● master</span>
+                  </label>
+                  {!upscaledBy(c) && (
+                    <details class="relative">
+                      <summary class="btn-2 h-[22px] cursor-pointer list-none text-[11px] max-lg:h-11">upscale ▾</summary>
+                      <form method="post" action="/api/upscale" class="upscale box absolute top-full left-0 z-10 mt-1 w-max bg-bg">
+                        <input type="hidden" name="slug" value={slug} />
+                        <input type="hidden" name="album" value={album} />
+                        <input type="hidden" name="back" value={back} />
+                        <input type="hidden" name="candidate" value={c.id} />
+                        {Object.entries(UPSCALERS).map(([k, u]) => <button name="upscaler" value={k} class="btn-2 h-[22px] text-[11px] max-lg:h-11">{u.label}</button>)}
+                      </form>
+                    </details>
+                  )}
+                </span>
+              )}
+            </div>
+          );
+        })}
+      </div>
+      {others > 0 && <span class="text-[11px] text-muted">{others} more images archived</span>}
     </div>
   )}
 </div>
-{others > 0 && <p class="mt-2 text-xs text-muted">{others} more images archived</p>}
 
 <script>
   for (const form of document.querySelectorAll<HTMLFormElement>("form.upscale")) {
     form.addEventListener("submit", () => {
-      const button = form.querySelector("button");
-      if (button) {
-        button.disabled = true;
-        button.textContent = "Upscaling…";
-      }
+      const summary = form.parentElement?.querySelector("summary");
+      if (summary) summary.textContent = "upscaling…";
+      setTimeout(() => {
+        for (const b of form.querySelectorAll("button")) b.disabled = true;
+      });
     });
   }
 </script>

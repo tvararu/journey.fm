@@ -1,0 +1,18 @@
+---
+type Props = {
+  label: string;
+  key?: string;
+  note?: string;
+  active?: boolean;
+  tag?: "main" | "nav" | "aside" | "section";
+  class?: string;
+  "aria-label"?: string;
+};
+const { label, key, note, active, tag: Tag = "section", class: extra, "aria-label": aria } = Astro.props;
+---
+<Tag class:list={["pane", extra]} data-active={active || undefined} aria-label={aria}>
+  <div class="pane-label">{key && <sup>{key}</sup>}<span>{label}</span></div>
+  {note && <div class="pane-note">{note}</div>}
+  <slot />
+  <slot name="status" />
+</Tag>

@@ -1,4 +1,12 @@
 import { VERDICTS } from "./paths";
+import type { AlbumRecord } from "./records";
+import { fingerprint, statusOf, type Review } from "./reviews";
+
+export type Question = {
+  field: string;
+  pick: { value: string; from: string };
+  other: { value: string; from: string };
+};
 
 export type Verdict = {
   at: string;
@@ -7,7 +15,15 @@ export type Verdict = {
   verdict: "approve" | "flag";
   message: string;
   fingerprint: string;
+  question?: Question;
 };
+
+export function openQuestion(rec: AlbumRecord, rs: Review[], vs: Verdict[]): Question | null {
+  if (statusOf(rec, rs, vs).state !== "blocked") return null;
+  const fp = fingerprint(rec);
+  const flag = vs.findLast((v) => v.verdict === "flag" && v.fingerprint === fp);
+  return flag?.question ?? null;
+}
 
 
 export async function verdicts(): Promise<Map<string, Verdict[]>> {

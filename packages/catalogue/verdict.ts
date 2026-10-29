@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import { parseArgs } from "node:util";
 
 process.env["JOURNEY_ROOT"] ??= `${import.meta.dir}/../..`;
 const { processed } = await import("../../apps/web/src/lib/records");
@@ -7,12 +8,37 @@ const { coverChoices } = await import("../../apps/web/src/lib/records");
 const { addVerdict } = await import("../../apps/web/src/lib/verdicts");
 const { DATA } = await import("../../apps/web/src/lib/paths");
 
-const [slug, verdict, ...rest] = Bun.argv.slice(2);
+const usage =
+  'usage: verdict <slug> approve "<message>" | verdict <slug> flag "<message>" [--question <field> --pick <value> --pick-from <sources> --other <value> --other-from <sources>]';
+const { positionals, values } = parseArgs({
+  allowPositionals: true,
+  options: {
+    question: { type: "string" },
+    pick: { type: "string" },
+    "pick-from": { type: "string" },
+    other: { type: "string" },
+    "other-from": { type: "string" },
+  },
+});
+const [slug, verdict, ...rest] = positionals;
 const message = rest.join(" ").trim();
-if (!(slug && (verdict === "approve" || verdict === "flag") && message)) {
-  console.error('usage: verdict <slug> approve|flag "<message>"');
+const given = Object.values(values).filter((v) => v !== undefined).length;
+if (
+  !(slug && (verdict === "approve" || verdict === "flag") && message) ||
+  (verdict === "approve" && given > 0) ||
+  (verdict === "flag" && given > 0 && given < 5)
+) {
+  console.error(usage);
   process.exit(1);
 }
+const question =
+  given === 5
+    ? {
+        field: values.question as string,
+        pick: { value: values.pick as string, from: values["pick-from"] as string },
+        other: { value: values.other as string, from: values["other-from"] as string },
+      }
+    : undefined;
 const editions = JSON.parse(readFileSync(`${DATA}/catalogue/editions.json`, "utf8")) as Record<string, { path: string }>;
 const album = editions[slug]?.path;
 const rec = album ? (await processed()).get(album) : undefined;
@@ -23,6 +49,6 @@ if (verdict === "approve") {
   await addReview({ album, at, by: "claude", cover, fingerprint: fingerprint(rec), message, verdict: "accept" });
   console.log(`accepted ${album}`);
 } else {
-  await addVerdict({ album, at, by: "claude", fingerprint: fingerprint(rec), message, verdict });
+  await addVerdict({ album, at, by: "claude", fingerprint: fingerprint(rec), message, verdict, ...(question && { question }) });
   console.log(`blocked ${album}`);
 }

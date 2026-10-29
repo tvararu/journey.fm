@@ -9,6 +9,10 @@ function db(): Database {
   return conn;
 }
 
+export function scannedAt(): string | null {
+  return db().query<{ value: string }, []>("select value from meta where key = 'scanned_at'").get()?.value ?? null;
+}
+
 export type AlbumRow = {
   id: number;
   path: string;

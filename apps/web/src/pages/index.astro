@@ -1,161 +1,123 @@
 ---
 import Layout from "@/app/Layout.astro";
-import { format, size } from "@/lib/format";
-import { library } from "@/lib/library";
+import Pane from "@/app/Pane.astro";
+import StatusLine from "@/app/StatusLine.astro";
+import { size } from "@/lib/format";
+import { library, libraryStats } from "@/lib/library";
+import type { Item } from "@/lib/state";
 
 const rows = await library();
-const FILTERS = ["all", "triage", "blocked", "agents", "changes", "accepted", "issues"];
-const GROUP: Record<string, string> = { "awaiting agents": "agents", "changes requested": "changes" };
-const BADGE: Record<string, string> = { accepted: "badge-processed", blocked: "badge-issue", triage: "" };
-const LABELS: Record<string, string> = {
-  agents: "awaiting agents", changes: "changes requested", issues: "with issues",
-};
-const bucket = (r: (typeof rows)[number]): string => GROUP[r.state] ?? r.state;
-const initialFilter = FILTERS.find((f) => f === Astro.url.searchParams.get("f")) ?? "all";
-const initialQuery = Astro.url.searchParams.get("q") ?? "";
-const count = (s: string) => rows.filter((r) => r.state === s).length;
-const tally = (f: string): number =>
-  f === "all" ? rows.length
-  : f === "issues" ? rows.filter((r) => r.issues.length).length
-  : rows.filter((r) => bucket(r) === f).length;
-const totalBytes = rows.reduce((s, r) => s + r.bytes, 0);
+const stats = libraryStats(rows);
+const items: Item[] = rows.map((r) => ({
+  id: r.id,
+  path: r.path,
+  title: r.title,
+  artist: r.artist,
+  artistDir: r.artist_dir,
+  state: r.state,
+  by: r.by,
+  at: r.at,
+  year: r.year,
+  dateTag: r.dates.join(", "),
+  codec: r.codec,
+  audio: r.audio,
+  bytes: r.bytes,
+  n: r.n,
+  dur: r.dur,
+  issues: r.issues,
+  genre: r.genre,
+  label: r.label,
+  original: r.original,
+  edition: r.edition,
+  cover: r.cover,
+  entries: r.entries,
+  word: r.word,
+}));
+const pct = stats.albums ? Math.round((stats.accepted / stats.albums) * 100) : 0;
+const total = `${stats.albums} albums · ${size(stats.bytes)}`;
 ---
-<Layout title="journey.fm">
-  <h1 class="text-2xl font-bold">journey.fm</h1>
-  <p class="mt-1 text-muted">
-    {rows.length} albums in sol's Music ({size(totalBytes)}), scanned 29 Oct. {count("triage")} in triage,
-    {count("blocked")} blocked, {count("awaiting agents")} awaiting agents, {count("changes requested")} with changes requested,
-    {count("accepted")} accepted. Nothing written yet.
-  </p>
-  <div class="my-4 flex flex-wrap items-center gap-2">
-    <input
-      id="q"
-      autofocus
-      value={initialQuery}
-      class="min-w-64 border border-rule bg-bg px-3 py-1.5"
-      placeholder="Filter by artist, album or issue"
-    />
-    {FILTERS.map((f) => (
-      <button
-        data-f={f}
-        aria-pressed={f === initialFilter ? "true" : "false"}
-        class="border border-rule bg-bg px-3 py-1 capitalize aria-pressed:border-accent aria-pressed:bg-accent aria-pressed:text-bg"
-      >
-        {LABELS[f] ?? f} <span class="opacity-70">{tally(f)}</span>
-      </button>
-    ))}
-    <span id="n" class="text-muted"></span>
-  </div>
-  <div class="card">
-    <table class="grid-table">
-      <thead>
-        <tr><th></th><th>Album</th><th>State</th><th>Date tag</th><th>Audio</th><th>Size</th><th>Tracks</th><th>Length</th><th>Issues</th></tr>
-      </thead>
-      <tbody id="rows">
-        {rows.map((r) => (
-          <tr
-            data-state={bucket(r)}
-            data-issues={r.issues.length}
-            data-q={`${r.path} ${r.issues.join(" ")} ${r.state === "blocked" ? (r.message ?? "") : ""}`.toLowerCase()}
-          >
-            <td>
-              {r.thumb ? (
-                <img class="size-10 bg-faint object-cover" loading="lazy" src={`/blob/${r.thumb}`} alt="" />
-              ) : (
-                <div class="size-10 bg-faint" />
-              )}
-            </td>
-            <td>
-              <a href={`/album/${r.id}`}>{r.album_dir}</a>
-              <span class="src">{r.artist_dir}</span>
-            </td>
-            <td>
-              <span class={`badge whitespace-nowrap ${BADGE[r.state] ?? "chg border-transparent"}`}>{r.state}</span>
-              {r.state === "accepted" && r.by && <span class="src">by {r.by}</span>}
-            </td>
-            <td class="whitespace-nowrap">{r.dates.join(", ")}</td>
-            <td class="whitespace-nowrap">{format(r.codec, r.bits, r.sr)}</td>
-            <td class="whitespace-nowrap">{size(r.bytes)}</td>
-            <td>{r.n}</td>
-            <td class="whitespace-nowrap">{Math.floor(r.dur / 60)} min</td>
-            <td>
-              {r.issues.map((i) => <span class="badge badge-issue">{i}</span>)}
-              {r.state === "blocked" && <p class="mt-1 max-w-md text-xs text-chg-fg">{r.message}</p>}
-            </td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
+<Layout title="journey.fm" page="library" stats={stats}>
+  <script type="application/json" id="items" set:html={JSON.stringify(items).replaceAll("<", "\\u003c")} />
+  <span id="total-note" hidden>{total}</span>
+
+  <Pane label="filter" key="f" note="all" tag="nav" aria-label="Filter" class="max-lg:hidden lg:w-[260px] lg:shrink-0">
+    <div id="facets" class="flex min-h-0 flex-1 flex-col overflow-auto px-1.5 pt-3 pb-3.5"></div>
+  </Pane>
+
+  <Pane label="library" key="l" note={total} tag="main" aria-label="Library" active class="min-w-0 lg:flex-[1_1_560px]">
+    <div class="flex min-h-0 flex-1 flex-col gap-1.5 px-2.5 pt-3.5 pb-2.5 lg:gap-4 lg:overflow-auto lg:px-[18px] lg:pt-5 lg:pb-[18px]">
+      <div class="flex flex-wrap items-end justify-between gap-4 max-lg:order-4 max-lg:gap-0">
+        <div class="flex min-w-0 flex-col gap-2 max-lg:hidden">
+          <span class="eyebrow text-muted">CATALOGUE · SOL:/MNT/POOL/MUSIC</span>
+          <h1 class="page-title">Library</h1>
+          <span class="text-fg2">
+            {stats.albums} albums · {stats.artists} artists · {stats.tracks.toLocaleString("en-GB")} tracks · {Math.round(stats.seconds / 3600)} h · {size(stats.bytes)}
+          </span>
+        </div>
+        <div class="flex w-full items-center justify-between gap-3.5 lg:w-auto">
+          <button type="button" data-act="sort" class="h-[22px] px-0.5 text-muted max-lg:h-11">sort · <span id="sort-label" class="text-fg">recent activity</span> ▾</button>
+          <span role="group" aria-label="View" class="flex items-center max-lg:flex-row-reverse">
+            <button type="button" data-act="view" data-v="grid" aria-pressed="true" class="seg max-lg:h-11">grid</button>
+            <button type="button" data-act="view" data-v="list" aria-pressed="false" class="seg max-lg:h-11">list</button>
+          </span>
+        </div>
+      </div>
+
+      <div class="flex flex-col gap-2 max-lg:order-3">
+        <div class="flex items-center gap-3 whitespace-nowrap max-lg:gap-2.5 max-lg:text-[11px]">
+          <span class="font-extrabold">accepted</span>
+          <span class="meter min-w-[60px] flex-1 max-lg:h-[5px]"><i style={`width:${(stats.accepted / Math.max(1, stats.albums)) * 100}%`}></i></span>
+          <span class="max-lg:hidden"><b class="font-extrabold">{stats.accepted}</b><span class="text-muted"> / {stats.albums} · {pct}%</span></span>
+          <span class="text-muted lg:hidden">{pct}% · nothing written</span>
+        </div>
+        <div class="flex flex-wrap gap-[18px] text-[11px] text-muted max-lg:hidden">
+          <span><span class="text-fg">✓</span> {stats.accepted} accepted</span>
+          <span><span class="text-danger">■</span> {stats.blocked} blocked</span>
+          <span>◌ {stats.withAgents} with agents</span>
+          <span>· {stats.triage} triage</span>
+          <span class="flex-1"></span>
+          <span>nothing written to the FLACs yet</span>
+        </div>
+      </div>
+
+      <div class="flex flex-wrap items-center gap-2.5 max-lg:order-1">
+        <label for="q" class="text-muted max-lg:sr-only"><span class="max-lg:hidden">/</span><span class="lg:hidden">Filter</span></label>
+        <input
+          id="q"
+          type="text"
+          data-search
+          autocomplete="off"
+          placeholder="filter by artist, album or issue"
+          class="h-[26px] min-w-[200px] flex-1 border border-ctl bg-f4 px-2 outline-none max-lg:h-11 max-lg:px-2.5"
+        />
+        <span id="chips" class="flex flex-wrap gap-2.5 max-lg:hidden"></span>
+        <span id="shown" class="whitespace-nowrap text-muted max-lg:hidden"></span>
+      </div>
+
+      <div id="phone-chips" class="-mx-2.5 flex shrink-0 gap-0.5 overflow-x-auto px-1.5 whitespace-nowrap [scrollbar-width:none] max-lg:order-2 lg:hidden"></div>
+
+      <div class="flex flex-col gap-4 max-lg:order-5">
+        <div id="grid" class="grid grid-cols-2 gap-x-3 gap-y-[18px] lg:grid-cols-5"></div>
+        <div id="list" class="flex min-w-0 flex-col" hidden>
+          <div class="hidden h-[26px] grid-cols-[32px_minmax(0,2.4fr)_84px_132px_44px_64px_64px_72px_minmax(0,1.4fr)_56px] items-center gap-3 border-b border-faint px-2 text-[11px] whitespace-nowrap text-muted lg:grid">
+            <span></span><span>album</span><span>date tag</span><span>state</span><span class="text-right">tracks</span><span class="text-right">length</span><span class="text-right">size</span><span>audio</span><span>issues</span><span class="text-right">when</span>
+          </div>
+          <div id="list-rows" class="flex flex-col"></div>
+        </div>
+        <div id="empty" class="flex flex-col items-center gap-1 py-12 text-center text-muted" hidden></div>
+        <button type="button" id="more" data-act="more" class="btn-2 self-start" hidden></button>
+      </div>
+    </div>
+    <StatusLine slot="status" mode="LIBRARY" count={`${stats.albums} albums`} context="recent activity · everything" keys="↵ open · / filter · g grid · l list" />
+  </Pane>
+
+  <div id="info-wrap" class="flex max-lg:hidden lg:w-[360px] lg:shrink-0">
+    <Pane label="info" key="i" note=" " tag="aside" aria-label="Info" class="flex-1">
+      <div id="info" class="flex min-h-0 flex-1 flex-col gap-3.5 overflow-auto px-3.5 pt-4 pb-3.5"></div>
+    </Pane>
   </div>
 </Layout>
 
 <script>
-  const q = document.querySelector<HTMLInputElement>("#q");
-  const n = document.querySelector("#n");
-  const rows = [...document.querySelectorAll<HTMLTableRowElement>("#rows tr")];
-  const buttons = [...document.querySelectorAll<HTMLButtonElement>("[data-f]")];
-  let filter = buttons.find((b) => b.getAttribute("aria-pressed") === "true")?.dataset["f"] ?? "all";
-
-  function remember(push: boolean) {
-    const url = new URL(location.href);
-    const s = q?.value ?? "";
-    if (filter === "all") url.searchParams.delete("f");
-    else url.searchParams.set("f", filter);
-    if (s) url.searchParams.set("q", s);
-    else url.searchParams.delete("q");
-    try {
-      sessionStorage.setItem("list", url.pathname + url.search);
-    } catch {}
-    if (url.href === location.href) return;
-    if (push) history.pushState(null, "", url);
-    else history.replaceState(null, "", url);
-  }
-
-  function select(f: string) {
-    filter = f;
-    for (const x of buttons) x.setAttribute("aria-pressed", String(x.dataset["f"] === f));
-  }
-
-  function matches(r: HTMLTableRowElement, s: string): boolean {
-    if (s && !r.dataset["q"]?.includes(s)) return false;
-    if (filter === "all") return true;
-    if (filter === "issues") return Number(r.dataset["issues"]) > 0;
-    return r.dataset["state"] === filter;
-  }
-
-  function run() {
-    const s = q?.value.toLowerCase() ?? "";
-    let shown = 0;
-    for (const r of rows) {
-      r.hidden = !matches(r, s);
-      if (!r.hidden) shown++;
-    }
-    if (n) n.textContent = `${shown} shown`;
-    const order = rows.filter((r) => !r.hidden).map((r) => r.querySelector("a")?.getAttribute("href")).filter(Boolean);
-    try {
-      sessionStorage.setItem("listItems", JSON.stringify(order));
-    } catch {}
-  }
-
-  q?.addEventListener("input", () => {
-    run();
-    remember(false);
-  });
-  for (const b of buttons) {
-    b.addEventListener("click", () => {
-      select(b.dataset["f"] ?? "all");
-      run();
-      remember(true);
-    });
-  }
-  addEventListener("popstate", () => {
-    const params = new URLSearchParams(location.search);
-    if (q) q.value = params.get("q") ?? "";
-    select(params.get("f") ?? "all");
-    run();
-  });
-  run();
-  try {
-    sessionStorage.setItem("list", location.pathname + location.search);
-  } catch {}
+  import "@/app/library";
 </script>

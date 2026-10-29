@@ -1,116 +1,197 @@
 ---
 import Conversation from "@/app/album/Conversation.astro";
 import Cover from "@/app/album/Cover.astro";
+import Header from "@/app/album/Header.astro";
 import InFiles from "@/app/album/InFiles.astro";
 import Proposed from "@/app/album/Proposed.astro";
+import QueueRail from "@/app/album/QueueRail.astro";
 import Sources from "@/app/album/Sources.astro";
+import Tracks from "@/app/album/Tracks.astro";
 import Layout from "@/app/Layout.astro";
-import { quality, size } from "@/lib/format";
-import { album } from "@/lib/inventory";
+import Pane from "@/app/Pane.astro";
+import StatusLine from "@/app/StatusLine.astro";
+import { change, FIELD_TAGS, valuesFor } from "@/lib/album";
+import { checks as buildChecks } from "@/lib/checks";
+import { fronts, frontLabels } from "@/lib/covers";
+import { day } from "@/lib/format";
+import { album, scannedAt } from "@/lib/inventory";
+import { library, libraryStats } from "@/lib/library";
 import { rawFiles } from "@/lib/raw";
-import { coverCandidates, coverChoices, notesFor, processed, redCopies } from "@/lib/records";
-import { reviews, statusOf } from "@/lib/reviews";
-import { verdicts } from "@/lib/verdicts";
+import { coverCandidates, coverChoices, notes as allNotes, processed, redCopies, type Field, type Value } from "@/lib/records";
+import { reviews } from "@/lib/reviews";
+import { openQuestion, verdicts } from "@/lib/verdicts";
 
-const data = album(Number(Astro.params["id"]));
+const id = Number(Astro.params["id"]);
+const data = album(id);
 if (!data) return new Response("not found", { status: 404 });
 const { album: a, files, tags, pictures, extras } = data;
-const [done, covers, red, notes, allReviews, allVerdicts] = await Promise.all([
+const [done, covers, red, noteMap, allReviews, allVerdicts, rows] = await Promise.all([
   processed(),
   coverChoices(),
   redCopies(),
-  notesFor(a.path),
+  allNotes(),
   reviews(),
   verdicts(),
+  library(),
 ]);
+const row = rows.find((r) => r.id === id);
+if (!row) return new Response("not found", { status: 404 });
 const rec = done.get(a.path);
-const cover = rec ? covers[rec.slug] : undefined;
+const choice = rec ? covers[rec.slug] : undefined;
 const candidates = rec ? await coverCandidates(rec.slug) : [];
 const raw = rec ? await rawFiles(rec) : [];
+const albumNotes = noteMap.get(a.path) ?? [];
 const albumReviews = allReviews.get(a.path) ?? [];
 const albumVerdicts = allVerdicts.get(a.path) ?? [];
-const st = rec ? statusOf(rec, albumReviews, albumVerdicts) : null;
-const status = st?.state ?? null;
-const state = status ?? "triage";
-const BADGE: Record<string, string> = { accepted: "badge-processed", blocked: "badge-issue", triage: "" };
+const redNames = red[a.path] ?? [];
+const state = row.state;
+const checks = rec ? buildChecks(rec, choice, candidates, redNames) : null;
+const question = rec ? openQuestion(rec, albumReviews, albumVerdicts) : null;
+const labels = frontLabels(candidates);
+const master = choice ? `${labels.get(choice.chosen.id) ?? choice.chosen.source} · ${choice.chosen.width}×${choice.chosen.height}` : "none";
 const embedded = pictures.find((p) => p.type === 3)?.sha256;
 const folder = extras.find((x) => /\.(jpe?g|png)$/i.test(x.relpath))?.sha256;
 const fallback = embedded ?? folder;
 const here = Astro.url.pathname;
-const totalBytes = files.reduce((s, f) => s + f.size, 0) + extras.reduce((s, x) => s + x.size, 0);
-const minutes = Math.round(files.reduce((s, f) => s + (f.duration ?? 0), 0) / 60);
+const stats = libraryStats(rows);
+const scanned = scannedAt();
+
+const changes = rec
+  ? (() => {
+      const fields = Object.entries(rec.album).filter(([k]) => !["ids", "rym_links", "cover", "ratings", "links"].includes(k)) as [string, Field][];
+      const had = (k: string): Value => (FIELD_TAGS[k] ? valuesFor(tags, FIELD_TAGS[k]!) : null);
+      return fields.filter(([k, f]) => change(had(k), f.value) !== "").length + Object.keys(rec.album.ratings).length + 1;
+    })()
+  : 0;
+
+type Tab = { key: string; label: string; count: string | number; note: string; phone?: "only" | "hidden" };
+const tabs: Tab[] = rec
+  ? [
+      { key: "tracks", label: "tracks", count: rec.tracks.length, note: "click a track for credits and file" },
+      { key: "tags", label: "tags", count: changes, note: "what gets written · ~ changed · + new" },
+      { key: "cover", label: "cover", count: fronts(candidates).length, note: "master is sent with your verdict" },
+      { key: "sources", label: "sources", count: raw.length, note: "picked source outlined", phone: "hidden" },
+      { key: "files", label: "files", count: files.length, note: `as scanned ${scanned ? day(scanned) : ""}`, phone: "hidden" },
+      { key: "log", label: "log", count: row.entries, note: "", phone: "only" },
+    ]
+  : [{ key: "files", label: "files", count: files.length, note: `as scanned ${scanned ? day(scanned) : ""}` }];
+const first = tabs[0]!.key;
+const TAB_KEY: Record<string, string> = { tracks: "t", tags: "g", cover: "c", sources: "s", files: "f", log: "l" };
+const keys = state === "accepted" ? "r changes · n p · t g c s f" : state === "triage" ? "n p · f" : "↵ accept, next · r changes · n p · t g c s f";
 ---
-<Layout title={`${a.album_dir} - journey.fm`}>
-  <p><a id="back" href="/">← Library</a></p>
-  <header class="mt-4">
-    <h1>{a.album_dir}</h1>
-    <p class="text-muted">{a.artist_dir}</p>
-    <p class="mt-2">
-      <span class={`badge ${BADGE[state] ?? "chg border-transparent"}`}>{state}</span>
-      {state === "accepted" && st?.by && <span class="src ml-1">by {st.by}</span>}
-    </p>
-    {state === "blocked" && <p class="mt-2 max-w-3xl border-l-2 border-chg-fg pl-3 text-chg-fg">{st?.message}</p>}
-    <dl class="mt-3 grid grid-cols-[auto_1fr] gap-x-4 text-sm">
-      <dt class="text-muted">Audio</dt><dd>{quality(files)}</dd>
-      <dt class="text-muted">Size</dt><dd>{size(totalBytes)} · {files.length} tracks · {minutes} min</dd>
-      <dt class="text-muted">On sol</dt><dd class="break-all">{a.path}</dd>
-      {rec && Object.keys(rec.album.ratings).length > 0 && (
-        <>
-          <dt class="text-muted">Ratings</dt>
-          <dd>{Object.entries(rec.album.ratings).map(([s, r]) => `${s} ${r.value.toFixed(2)} (${r.count.toLocaleString("en-GB")})`).join(" · ")}</dd>
-        </>
-      )}
-      {rec && rec.album.links.length > 0 && (
-        <>
-          <dt class="text-muted">Links</dt>
-          <dd class="flex flex-wrap gap-x-3">{rec.album.links.map((l) => <a href={l.url}>{l.label}</a>)}</dd>
-        </>
-      )}
-      <dt class="text-muted">RED</dt><dd class="break-all">{(red[a.path] ?? []).join(", ") || "none"}</dd>
-    </dl>
-  </header>
-
-  <Cover cover={cover} candidates={candidates} fallback={fallback ? `/blob/${fallback}` : null} slug={rec?.slug} album={a.path} back={here} />
-  {rec && <Proposed rec={rec} tags={tags} />}
-  <Conversation notes={notes} reviews={albumReviews} verdicts={albumVerdicts} album={a.path} back={here} status={status} />
-
-  {rec && (
-    <details>
-      <summary>Sources</summary>
-      <Sources rec={rec} raw={raw} />
-    </details>
-  )}
-  <details>
-    <summary>Files on disk</summary>
-    <InFiles files={files} tags={tags} pictures={pictures} extras={extras} />
-  </details>
+<Layout title={`${row.title} - journey.fm`} page="album" stats={stats}>
+  <Fragment slot="phone-top">
+    <a id="phone-back" href="/" class="font-extrabold">❮ library</a>
+    <span id="phone-pos" class="text-muted">{state}</span>
+  </Fragment>
+  <div
+    id="album"
+    class="contents"
+    data-tab={first}
+    data-first={first}
+    data-id={id}
+    data-state={state}
+    data-title={row.title}
+    data-artist={row.artist}
+  >
+    <QueueRail />
+    <Pane label="album" key="a" tag="main" active note={`#${id} · ${a.path}`} class="min-w-0 lg:flex-[1_1_560px]">
+      <div class="flex min-h-0 flex-1 flex-col lg:overflow-auto">
+        <Header
+          row={row}
+          rec={rec}
+          choice={choice}
+          candidates={candidates}
+          files={files}
+          red={redNames}
+          checks={checks}
+          fullCover={fallback ? `/blob/${fallback}` : null}
+        />
+        <div
+          role="tablist"
+          aria-label="Album sections"
+          class="sticky top-0 z-[2] flex h-[34px] shrink-0 items-center gap-0.5 border-b border-f18 bg-bg px-5 max-lg:top-10 max-lg:grid max-lg:h-11 max-lg:grid-cols-4 max-lg:gap-0 max-lg:px-0"
+        >
+          {tabs.map((t) => (
+            <button
+              type="button"
+              role="tab"
+              data-tab-btn={t.key}
+              aria-selected={t.key === first ? "true" : "false"}
+              class:list={[
+                "flex h-[26px] items-center gap-1 px-2 text-muted aria-selected:bg-f18 aria-selected:font-bold aria-selected:text-fg max-lg:h-11 max-lg:justify-center",
+                t.phone === "hidden" && "max-lg:hidden",
+                t.phone === "only" && "lg:hidden",
+              ]}
+            >
+              <sup class="text-[8px] leading-none">{TAB_KEY[t.key]}</sup>
+              <span>{t.label}</span>
+              <span class="font-normal text-muted">{t.count}{t.key === "tags" && <span class="max-lg:hidden"> changes</span>}</span>
+            </button>
+          ))}
+          <span class="flex-1 max-lg:hidden"></span>
+          {tabs.map((t) => t.note && <span data-note={t.key} class="whitespace-nowrap text-muted max-lg:hidden">{t.note}</span>)}
+        </div>
+        {rec && (
+          <>
+            <div data-panel="tracks" class="px-5 py-3 max-lg:px-3.5"><Tracks rec={rec} files={files} /></div>
+            <div data-panel="tags" class="px-5 py-3 max-lg:px-3.5"><Proposed rec={rec} tags={tags} /></div>
+            <div data-panel="cover" class="px-5 py-3 max-lg:px-3.5">
+              <Cover cover={choice} candidates={candidates} fallback={row.cover} slug={rec.slug} album={a.path} back={here} />
+            </div>
+            <div data-panel="sources" class="px-5 py-3 max-lg:px-3.5"><Sources rec={rec} raw={raw} /></div>
+          </>
+        )}
+        <div data-panel="files" class="px-5 py-3 max-lg:px-3.5">
+          <InFiles files={files} tags={tags} pictures={pictures} extras={extras} />
+        </div>
+        <div class="h-[60px] shrink-0 lg:hidden"></div>
+      </div>
+      <StatusLine slot="status" mode="ALBUM" count={state} context={`${row.artist} · ${row.title}`} keys={keys} />
+    </Pane>
+    <Conversation
+      notes={albumNotes}
+      reviews={albumReviews}
+      verdicts={albumVerdicts}
+      album={a.path}
+      back={here}
+      reviewable={!!rec}
+      checks={checks}
+      question={question}
+      master={master}
+    />
+  </div>
 </Layout>
 
-<script>
-  const back = document.querySelector<HTMLAnchorElement>("#back");
-  let list: string | null = null;
-  try {
-    list = sessionStorage.getItem("list");
-  } catch {}
-  const field = document.querySelector<HTMLInputElement>("input[name=list]");
-  if (field && list?.startsWith("/")) field.value = list;
-  if (back && list?.startsWith("/")) back.href = list;
-  try {
-    const items = JSON.parse(sessionStorage.getItem("listItems") ?? "[]") as string[];
-    const next = items[items.indexOf(location.pathname) + 1];
-    const nextField = document.querySelector<HTMLInputElement>("input[name=next]");
-    const nextButton = document.querySelector<HTMLButtonElement>("#accept-next");
-    if (items.includes(location.pathname) && next && nextField && nextButton) {
-      nextField.value = next;
-      nextButton.hidden = false;
-    }
-  } catch {}
-  const from = document.referrer ? new URL(document.referrer) : null;
-  if (back && from?.origin === location.origin && from.pathname === "/") {
-    back.href = from.pathname + from.search;
-    back.addEventListener("click", (e) => {
-      e.preventDefault();
-      history.back();
-    });
+<style is:global>
+  #album [data-panel],
+  #album [data-note] {
+    display: none;
   }
+  #album[data-tab="tracks"] [data-panel="tracks"],
+  #album[data-tab="tags"] [data-panel="tags"],
+  #album[data-tab="cover"] [data-panel="cover"],
+  #album[data-tab="sources"] [data-panel="sources"],
+  #album[data-tab="files"] [data-panel="files"] {
+    display: block;
+  }
+  #album[data-tab="tracks"] [data-note="tracks"],
+  #album[data-tab="tags"] [data-note="tags"],
+  #album[data-tab="cover"] [data-note="cover"],
+  #album[data-tab="sources"] [data-note="sources"],
+  #album[data-tab="files"] [data-note="files"] {
+    display: block;
+  }
+  @media (max-width: 1023px) {
+    #album [data-note] {
+      display: none !important;
+    }
+    #album:not([data-tab="log"]) #review-pane {
+      display: none;
+    }
+  }
+</style>
+
+<script>
+  import "@/app/album";
 </script>

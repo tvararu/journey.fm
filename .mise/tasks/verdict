@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#MISE description="Record the review agent's verdict on a processed album: verdict <slug> approve|flag \"<message>\""
+#MISE description="Record the review agent's verdict: verdict <slug> approve \"<message>\" | verdict <slug> flag \"<message>\" [--question <field> --pick <value> --pick-from <sources> --other <value> --other-from <sources>]"
 set -euo pipefail
 cd "$MISE_PROJECT_ROOT/packages/catalogue"
 exec bun verdict.ts "$@"

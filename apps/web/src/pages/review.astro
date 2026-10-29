@@ -1,0 +1,263 @@
+---
+import Layout from "@/app/Layout.astro";
+import Pane from "@/app/Pane.astro";
+import StatusLine from "@/app/StatusLine.astro";
+import { checkLine, checks } from "@/lib/checks";
+import { mins, stamp, when } from "@/lib/format";
+import { library, libraryStats, type LibraryEntry } from "@/lib/library";
+import { coverCandidates, coverChoices, notes, processed, redCopies } from "@/lib/records";
+import { reviews } from "@/lib/reviews";
+import { openQuestion, verdicts } from "@/lib/verdicts";
+
+const rows = await library();
+const stats = libraryStats(rows);
+const [recs, rs, vs, ns, choices, red] = await Promise.all([
+  processed(),
+  reviews(),
+  verdicts(),
+  notes(),
+  coverChoices(),
+  redCopies(),
+]);
+
+const byAt = (a: LibraryEntry, b: LibraryEntry) => (b.at ?? "").localeCompare(a.at ?? "");
+const blocked = rows.filter((r) => r.state === "blocked").sort((a, b) => (a.at ?? "").localeCompare(b.at ?? ""));
+const accepted = rows.filter((r) => r.state === "accepted").sort(byAt);
+const claude = accepted.filter((r) => r.by === "claude");
+const deity = accepted.filter((r) => r.by !== "claude");
+const changes = rows.filter((r) => r.state === "changes requested").length;
+
+type Kind = "accept" | "approve" | "flag" | "request_changes" | "note";
+type Ev = { at: string; by: string; kind: Kind; text: string; id: number; title: string; artist: string };
+const byPath = new Map(rows.map((r) => [r.path, r]));
+const events: Ev[] = [];
+const push = (path: string, at: string, by: string, kind: Kind, text: string) => {
+  const r = byPath.get(path);
+  if (r) events.push({ at, by, kind, text, id: r.id, title: r.title, artist: r.artist });
+};
+for (const [p, l] of ns) for (const n of l) push(p, n.at, n.by, "note", n.text);
+for (const [p, l] of rs) for (const r of l) push(p, r.at, r.by, r.verdict, r.message);
+for (const [p, l] of vs) for (const v of l) push(p, v.at, v.by, v.verdict, v.message);
+events.sort((a, b) => b.at.localeCompare(a.at));
+const latest = events[0]?.at ?? null;
+const feed = events.slice(0, 200);
+const group = (k: Kind) => (k === "flag" ? "flags" : k === "note" ? "notes" : "verdicts");
+const tabs = [
+  { key: "all", n: events.length },
+  { key: "flags", n: events.filter((e) => e.kind === "flag").length },
+  { key: "verdicts", n: events.filter((e) => group(e.kind) === "verdicts").length },
+  { key: "notes", n: events.filter((e) => e.kind === "note").length },
+];
+const VERBS: Record<Kind, string> = {
+  accept: "✓ accepted",
+  approve: "○ approved",
+  flag: "■ flagged",
+  request_changes: "↺ requested changes",
+  note: "· note",
+};
+
+const yearOf = (v: string | null) => (/^(\d{4})/.exec(v ?? "") ? Number(/^(\d{4})/.exec(v ?? "")![1]) : null);
+
+const cards = await Promise.all(
+  blocked.map(async (r) => {
+    const rec = recs.get(r.path);
+    const question = rec ? openQuestion(rec, rs.get(r.path) ?? [], vs.get(r.path) ?? []) : null;
+    const line = rec ? checkLine(checks(rec, choices[rec.slug], await coverCandidates(rec.slug), red[r.path] ?? [])) : "";
+    const ey = yearOf(r.edition);
+    const meta = `${r.year ?? "—"}${ey && ey !== r.year ? ` · ${ey} edition` : ""} · ${r.n} tracks · ${mins(r.dur)}`;
+    return { r, question, line, meta };
+  }),
+);
+
+const item = (r: LibraryEntry) => ({ id: r.id, title: r.title, artist: r.artist, cover: r.cover, state: r.state });
+const queues = { blocked: blocked.map(item), claude: claude.map(item) };
+const SHOWN = 7;
+const pct = (n: number) => `${(n / Math.max(1, stats.albums)) * 100}%`;
+const dash = (c: string) => `repeating-linear-gradient(90deg,${c} 0 4px,transparent 4px 7px)`;
+const hero = latest ? stamp(latest).toUpperCase() : "—";
+const firstBlocked = blocked[0];
+const firstClaude = claude[0];
+---
+<Layout title="journey.fm · review" page="review" stats={stats}>
+  <Pane label="review" key="r" note={latest ? stamp(latest) : undefined} active tag="main" class="lg:flex-[1_1_560px] min-w-0">
+    <div class="flex min-h-0 flex-1 flex-col gap-7 px-5 py-[22px] lg:overflow-auto">
+      <section aria-label="Summary" class="flex flex-col gap-3.5">
+        <div class="flex flex-wrap items-end justify-between gap-5">
+          <div class="flex min-w-0 flex-col gap-2">
+            <span class="eyebrow text-muted">REVIEW · AS AT {hero}</span>
+            <h1 class="page-title">{stats.blocked > 0 ? `${stats.blocked} need you` : "nothing needs you"}</h1>
+            <span class="text-fg2">{stats.blocked} flagged for a decision · {changes} with changes requested · {stats.accepted} accepted, {claude.length} by claude</span>
+          </div>
+          <div class="flex items-center gap-2 max-lg:flex-wrap">
+            {firstBlocked && (
+              <a id="start" data-queue="blocked" href={`/album/${firstBlocked.id}#log`} class="btn whitespace-nowrap">START WITH THE FLAGS ↵</a>
+            )}
+            {firstClaude && (
+              <a data-queue="claude" href={`/album/${firstClaude.id}`} class="btn-2 whitespace-nowrap">spot-check claude's {claude.length}</a>
+            )}
+          </div>
+        </div>
+        <div class="flex flex-col gap-2">
+          <div class="meter flex" style={`background:${dash("var(--faint)")}`}>
+            <span class="block" style={`width:${pct(stats.accepted)};background:${dash("var(--fg)")}`}></span>
+            {stats.blocked > 0 && <span class="block" style={`width:max(7px,${pct(stats.blocked)});background:${dash("var(--danger)")}`}></span>}
+            <span class="block" style={`width:${pct(stats.withAgents)};background:var(--f18)`}></span>
+          </div>
+          <div class="flex flex-wrap gap-x-[18px] gap-y-1 text-[11px] text-muted">
+            <span><span class="text-fg">✓</span> {stats.accepted} accepted</span>
+            <span><span class="text-danger">■</span> {stats.blocked} blocked</span>
+            <span>◌ {stats.withAgents} with agents</span>
+            <span>· {stats.triage} triage</span>
+            <span class="flex-1"></span>
+            <span>accepted means ready to write; nothing is written until all {stats.albums} are</span>
+          </div>
+        </div>
+      </section>
+
+      <section aria-label="Needs a decision" class="flex flex-col gap-4">
+        <div class="rule-head">
+          <span>──</span><b class="text-[14px] font-extrabold text-fg">needs a decision</b>
+          <span>{blocked.length} flagged by claude · oldest first</span><i class="h-px flex-1 bg-faint"></i>
+        </div>
+        {cards.length === 0 && (
+          <div class="flex flex-col gap-1 py-2">
+            <b class="font-extrabold">nothing blocked</b>
+            <span class="text-muted">claude flags an album here when it cannot decide; it is the only queue that needs you</span>
+          </div>
+        )}
+        <div class="grid grid-cols-1 gap-x-3.5 gap-y-4 pt-1.5 lg:grid-cols-3">
+          {cards.map(({ r, question, line, meta }) => (
+            <article data-pick class="box min-w-0 gap-3 px-3 pt-[18px] pb-3">
+              <span class="absolute -top-[9px] left-2 flex gap-1.5 bg-bg px-1 leading-4 whitespace-nowrap">
+                <span class="badge-blocked">■ BLOCKED</span>
+                <span class="text-muted">claude · {r.at ? when(r.at) : "—"}</span>
+              </span>
+              <div class="flex min-w-0 gap-3">
+                {r.cover ? (
+                  <img src={r.cover} alt="" loading="lazy" class="size-16 shrink-0 object-cover" />
+                ) : (
+                  <span class="size-16 shrink-0 bg-dark"></span>
+                )}
+                <div class="flex min-w-0 flex-col gap-[3px]">
+                  <span class="text-[14px] leading-[1.2] font-extrabold">{r.title}</span>
+                  <span class="text-fg2">{r.artist}</span>
+                  <span class="text-[11px] text-muted">{meta}</span>
+                </div>
+              </div>
+              {question && (
+                <div class="flex flex-col gap-1">
+                  <span class="flex gap-1.5 text-[11px] text-muted"><span>question ·</span><b class="font-extrabold text-fg">{question.field}</b></span>
+                  <div class="grid grid-cols-[minmax(0,1fr)_auto] items-baseline gap-x-2.5 gap-y-0.5">
+                    <span class="font-bold">{question.pick.value}</span>
+                    <span class="text-right text-[11px] text-muted">{question.pick.from}</span>
+                    <span class="font-bold">{question.other.value}</span>
+                    <span class="text-right text-[11px] text-muted">{question.other.from}</span>
+                  </div>
+                </div>
+              )}
+              {r.message && <p class="m-0 line-clamp-6 leading-[1.55] whitespace-pre-line text-fg2">{r.message}</p>}
+              {line && <span class="text-[11px] leading-normal text-muted">{line}</span>}
+              <span class="flex-1"></span>
+              <div class="flex flex-wrap gap-1.5">
+                <a data-queue="blocked" href={`/album/${r.id}#log`} class="btn">DECIDE ↵</a>
+                <form method="post" action="/api/review" class="contents">
+                  <input type="hidden" name="album" value={r.path} />
+                  <input type="hidden" name="back" value="/review" />
+                  <input type="hidden" name="list" value="/review" />
+                  {question ? (
+                    <input type="hidden" name="decision" value="pick" />
+                  ) : (
+                    <>
+                      <input type="hidden" name="verdict" value="accept" />
+                      <input type="hidden" name="message" value="Kept claude's pick." />
+                    </>
+                  )}
+                  <button type="submit" class="btn-2">keep claude's pick</button>
+                </form>
+              </div>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      <section aria-label="Accepted by claude" class="flex flex-col gap-3.5">
+        <div class="rule-head">
+          <span>──</span><b class="text-[14px] font-extrabold text-fg">accepted by claude</b>
+          <span>{claude.length} · newest first</span><i class="h-px flex-1 bg-faint"></i>
+          {firstClaude && <a data-queue="claude" href={`/album/${firstClaude.id}`} class="font-bold text-fg">spot-check all ❯</a>}
+        </div>
+        <div class="grid grid-cols-4 gap-3 lg:grid-cols-8">
+          {claude.map((r, i) => (
+            <a data-pick data-queue="claude" data-more={i >= SHOWN ? "" : undefined} href={`/album/${r.id}`} class:list={["flex min-w-0 flex-col gap-1.5", i >= SHOWN && "hidden"]}>
+              {r.cover ? <img src={r.cover} alt="" loading="lazy" class="aspect-square w-full object-cover" /> : <span class="aspect-square w-full bg-dark"></span>}
+              <span class="flex min-w-0 flex-col gap-px px-0.5">
+                <span class="truncate font-bold">{r.title}</span>
+                <span class="truncate text-[11px] text-muted">{r.artist}</span>
+                <span class="text-[11px] text-muted">✓ {r.at ? when(r.at) : "—"}</span>
+              </span>
+            </a>
+          ))}
+          {claude.length > SHOWN && (
+            <button type="button" id="show-all" class="flex aspect-square flex-col items-center justify-center gap-1 border border-dashed border-ctl">
+              <span class="text-[22px] font-extrabold">+{claude.length - SHOWN}</span>
+              <span class="text-[11px] text-muted">show all</span>
+            </button>
+          )}
+        </div>
+      </section>
+
+      <section aria-label="Accepted by deity" class="flex flex-col gap-3">
+        <div class="rule-head">
+          <span>──</span><b class="text-[14px] font-extrabold text-fg">accepted by deity</b>
+          <span>newest first</span><i class="h-px flex-1 bg-faint"></i>
+          <a href="/?st=accepted" class="font-bold text-fg">library ❯</a>
+        </div>
+        <div class="grid grid-cols-1 gap-x-7 gap-y-0.5 lg:grid-cols-2">
+          {deity.slice(0, 10).map((r) => (
+            <a data-pick href={`/album/${r.id}`} class="grid min-h-9 grid-cols-[28px_minmax(0,1fr)_auto] items-center gap-2.5 border-b border-f8">
+              {r.cover ? <img src={r.cover} alt="" loading="lazy" class="size-7 object-cover" /> : <span class="size-7 bg-dark"></span>}
+              <span class="truncate"><b class="font-bold">{r.title}</b><span class="text-muted"> · {r.artist}</span></span>
+              <span class="whitespace-nowrap text-muted">✓ deity · {r.at ? when(r.at) : "—"}</span>
+            </a>
+          ))}
+          {deity.length === 0 && <span class="text-muted">nothing accepted by deity yet</span>}
+        </div>
+      </section>
+    </div>
+    <StatusLine
+      slot="status"
+      mode="REVIEW"
+      count={`${stats.blocked} need you`}
+      context={`${stats.withAgents} with agents · ${stats.accepted} accepted · ${stats.triage} in triage`}
+      keys="↵ start · j k move · o open"
+    />
+  </Pane>
+
+  <Pane label="activity" key="a" note="notes · reviews · verdicts" tag="aside" class="max-lg:h-[520px] lg:w-[340px] lg:flex-none">
+    <div id="tabs" class="flex shrink-0 gap-0.5 px-3.5 pt-4 pb-2 text-[11px]">
+      {tabs.map((t) => (
+        <button type="button" data-tab={t.key} aria-pressed={t.key === "all" ? "true" : "false"} class="seg">{t.key} {t.n}</button>
+      ))}
+    </div>
+    <ol id="feed" class="m-0 flex min-h-0 flex-1 list-none flex-col overflow-auto px-3.5 pt-1 pb-3.5">
+      {feed.map((e) => (
+        <li data-kind={group(e.kind)} class="grid grid-cols-[38px_minmax(0,1fr)] gap-2 border-b border-f8 py-[7px]">
+          <span class="text-muted">{when(e.at)}</span>
+          <span class="flex min-w-0 flex-col gap-0.5">
+            <span class="flex gap-1.5 whitespace-nowrap">
+              <b class="font-extrabold">{e.by}</b>
+              <span class:list={[e.kind === "flag" && "text-danger", e.kind === "note" && "text-muted"]}>{VERBS[e.kind]}</span>
+            </span>
+            <a href={`/album/${e.id}`} class="truncate text-fg2">{e.artist} · {e.title}</a>
+            {e.text && <span class="line-clamp-2 text-[11px] text-muted">{e.text}</span>}
+          </span>
+        </li>
+      ))}
+    </ol>
+  </Pane>
+
+  <script type="application/json" id="queues" set:html={JSON.stringify(queues).replaceAll("<", "\\u003c")} />
+  <script>
+    import "@/app/review";
+  </script>
+</Layout>

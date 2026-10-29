@@ -1,0 +1,11 @@
+---
+type Props = { mode: string; count: string; context: string; keys: string };
+const { mode, count, context, keys } = Astro.props;
+---
+<div class="status max-lg:hidden">
+  <span class="status-mode">{mode}</span>
+  <span class="status-text">{count}</span>
+  <span class="flex items-center text-muted">❯</span>
+  <span class="status-text min-w-0 truncate text-muted">{context}</span>
+  <span class="status-keys">{keys}</span>
+</div>

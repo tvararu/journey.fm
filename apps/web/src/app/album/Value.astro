@@ -2,24 +2,27 @@
 import { show } from "@/lib/format";
 import type { RymLink, Value } from "@/lib/records";
 
-type Props = { value: Value | undefined; chips?: boolean; links?: Map<string, RymLink> };
-const { value, chips = false, links } = Astro.props;
+type Props = { value: Value | undefined; chips?: boolean; chip?: "chip" | "chip-2" | "chip-scene"; links?: Map<string, RymLink> };
+const { value, chips = false, chip = "chip-2", links } = Astro.props;
 const list = Array.isArray(value) ? value : [value];
 const url = typeof value === "string" && value.startsWith("https://") ? value : null;
+const none = show(value) === "-";
 ---
-{chips && value ? (
-  <div>
+{chips && !none ? (
+  <div class="flex flex-wrap">
     {list.map((v) => {
       const link = links?.get(String(v));
       return link ? (
-        <a class="chip" href={link.url} title={`RYM genre ${link.id}`}>{v}</a>
+        <a class={chip} href={link.url} title={`RYM genre ${link.id}`}>{v}</a>
       ) : (
-        <span class="chip">{v}</span>
+        <span class={chip}>{v}</span>
       );
     })}
   </div>
 ) : url ? (
-  <a href={url}>{url.replace(/\/$/, "").split("/").at(-1)}</a>
+  <a class="hover:underline" href={url}>{url.replace(/\/$/, "").split("/").at(-1)}</a>
+) : none ? (
+  <span class="text-muted">—</span>
 ) : (
-  <span class={show(value) === "-" ? "text-faint" : ""}>{show(value)}</span>
+  <span>{show(value)}</span>
 )}

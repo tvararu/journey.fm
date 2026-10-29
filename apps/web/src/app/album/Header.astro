@@ -1,0 +1,153 @@
+---
+import { checkLine, type Check } from "@/lib/checks";
+import { frontLabels } from "@/lib/covers";
+import { GLYPH, type State } from "@/lib/state";
+import { minsec, redTail, size, stamp } from "@/lib/format";
+import type { LibraryEntry } from "@/lib/library";
+import { thumbUrl } from "@/lib/library";
+import type { AlbumRecord, CoverCandidate, CoverChoice, Value } from "@/lib/records";
+
+type FileLite = { size: number; duration: number | null };
+type Props = {
+  row: LibraryEntry;
+  rec: AlbumRecord | undefined;
+  choice: CoverChoice | undefined;
+  candidates: CoverCandidate[];
+  files: FileLite[];
+  red: string[];
+  checks: Check[] | null;
+  fullCover: string | null;
+};
+const { row, rec, choice, candidates, files, red, checks, fullCover } = Astro.props;
+const state: State = row.state;
+const a = rec?.album;
+const text = (v: Value | undefined): string => (Array.isArray(v) ? v.join(", ") : v === null || v === undefined ? "" : String(v));
+const f = (k: string) => text(a?.[k]?.value);
+const list = (k: string): string[] => {
+  const v = a?.[k]?.value;
+  return Array.isArray(v) ? v : typeof v === "string" && v ? [v] : [];
+};
+const yearOf = (s: string) => (/^\d{4}/.exec(s)?.[0] ?? "");
+const origYear = yearOf(f("original_date")) || (row.year ? String(row.year) : "");
+const edYear = yearOf(f("date"));
+const yearPart = edYear && origYear && edYear !== origYear ? `${edYear} REISSUE` : origYear;
+const medias = f("media").split(", ").filter(Boolean);
+const mediaPart = medias.length > 1 && new Set(medias).size === 1 ? `${medias.length} × ${medias[0]}` : [...new Set(medias)].join(" + ");
+const eyebrow = rec ? [f("release_type") || "album", mediaPart, yearPart].filter(Boolean).join(" · ").toUpperCase() : "FOLDER · NOT CATALOGUED";
+const title = row.title;
+const tsize = title.length <= 24 ? "text-[26px] lg:text-[48px]" : title.length <= 40 ? "text-[26px] lg:text-[40px]" : "text-[26px] lg:text-[32px]";
+const secs = files.reduce((s, x) => s + (x.duration ?? 0), 0);
+const bytes = files.reduce((s, x) => s + x.size, 0);
+const kbps = secs ? Math.round((bytes * 8) / secs / 1000) : 0;
+const meta1 = rec
+  ? [list("label").join(", "), list("catalogue_number").join(", "), f("country"), f("date") && `edition ${f("date")}`, f("barcode") && `barcode ${f("barcode")}`]
+      .filter(Boolean)
+      .join(" · ")
+  : "";
+const meta2 = `${row.codec.toUpperCase()} ${row.audio} · ${kbps} kbps · ${size(bytes)} · ${red[0] ? `RED copy: ${redTail(red[0])}` : "no RED copy"}`;
+const genres = list("genre");
+const second = list("genre_secondary");
+const scenes = list("scene");
+const ratings = Object.entries(a?.ratings ?? {})
+  .map(([s, r]) => `${s} ${r.value.toFixed(2)} (${r.count.toLocaleString("en-GB")})`)
+  .join(" · ");
+const links = a?.links ?? [];
+const labels = frontLabels(candidates);
+const master = choice ? (labels.get(choice.chosen.id) ?? choice.chosen.source) : "none";
+const cover = choice ? thumbUrl(choice.master) : row.cover;
+const full = choice ? `/data/${choice.master}` : fullCover;
+const line = checks ? checkLine(checks) : "";
+const reviewable = state === "blocked" || state === "awaiting agents" || state === "changes requested";
+---
+<section aria-label="Album" class="flex flex-wrap items-end gap-6 px-5 pt-[26px] pb-[18px] max-lg:flex-col max-lg:items-stretch max-lg:gap-4 max-lg:px-3.5 max-lg:pt-5">
+  {cover && (
+    <a href={full ?? cover} class="block size-[244px] shrink-0 bg-dark max-lg:mx-auto lg:size-[208px]">
+      <img src={cover} alt="Cover" class="size-full object-cover" />
+    </a>
+  )}
+  <div class="flex min-w-0 flex-[1_1_420px] flex-col gap-2.5">
+    <span class="eyebrow">{eyebrow}</span>
+    <h1 class={`${tsize} leading-[1.02] font-extrabold tracking-[-0.025em] text-balance`}>{title}</h1>
+    <div class="flex flex-wrap items-baseline gap-1.5 text-[13px]">
+      <a href={`/artists/${encodeURIComponent(row.artist_dir)}`} class="font-extrabold hover:underline">{row.artist}</a>
+      <span class="text-fg2">{origYear && `· ${origYear} `}· {row.n} tracks, {minsec(secs)}</span>
+    </div>
+    <div class="flex flex-col gap-0.5 text-muted">
+      {meta1 && <span>{meta1}</span>}
+      <span>{meta2}</span>
+    </div>
+    {(genres.length > 0 || second.length > 0 || scenes.length > 0 || ratings) && (
+      <div class="flex flex-wrap items-center gap-1.5 text-[11px]">
+        {genres.map((g) => <span class="chip">{g}</span>)}
+        {second.map((g) => <span class="chip-2">{g}</span>)}
+        {scenes.map((g) => <span class="chip-scene">scene · {g}</span>)}
+        {ratings && <span class="ml-2 text-muted max-lg:ml-0 max-lg:w-full">{ratings}</span>}
+      </div>
+    )}
+    {line && <p class="text-[11px] text-fg2 lg:hidden">{line}</p>}
+  </div>
+</section>
+
+<div class="flex flex-wrap items-center gap-2 border-t border-f8 px-5 py-3 max-lg:px-3.5">
+  {state === "blocked" && (
+    <>
+      <button id="accept-next" form="review" name="verdict" value="accept_next" class="btn hidden px-4 data-[show]:lg:inline-flex lg:h-[30px]">ACCEPT, NEXT ↵</button>
+      <button form="review" name="verdict" value="accept" class="btn-2 lg:h-[30px] max-lg:hidden">accept</button>
+      <button type="button" data-request-changes class="btn-2 lg:h-[30px] max-lg:hidden">request changes</button>
+      <span class="badge-blocked flex h-6 items-center whitespace-nowrap lg:ml-2.5">■ BLOCKED</span>
+      <span class="whitespace-nowrap text-muted">claude · {row.at ? stamp(row.at) : ""}</span>
+    </>
+  )}
+  {(state === "awaiting agents" || state === "changes requested") && (
+    <>
+      <button form="review" name="verdict" value="accept" class="btn-2 lg:h-[30px] max-lg:hidden">accept</button>
+      <button type="button" data-request-changes class="btn-2 lg:h-[30px] max-lg:hidden">request changes</button>
+      <span class="badge-open flex h-6 items-center whitespace-nowrap lg:ml-2.5">{GLYPH[state]} {state.toUpperCase()}</span>
+      <span class="whitespace-nowrap text-muted">
+        {state === "awaiting agents" ? `prepared ${row.at ? stamp(row.at) : ""}` : `${row.by ?? ""} · ${row.at ? stamp(row.at) : ""}`}
+      </span>
+    </>
+  )}
+  {state === "accepted" && (
+    <>
+      <span class="badge-accepted flex h-6 items-center whitespace-nowrap">✓ ACCEPTED</span>
+      <span class="whitespace-nowrap text-fg2">by {row.by} · {row.at ? stamp(row.at) : ""} · master {master}</span>
+      <button type="button" data-request-changes class="btn-2 lg:h-[30px] ml-1.5 max-lg:hidden">request changes</button>
+    </>
+  )}
+  {state === "triage" && (
+    <>
+      <span class="badge-open flex h-6 items-center whitespace-nowrap">· TRIAGE</span>
+      <span class="whitespace-nowrap text-muted">not catalogued yet</span>
+    </>
+  )}
+  <span class="flex-1"></span>
+  {(links.length > 0 || red.length > 0) && (
+    <div class="relative flex items-center gap-3 whitespace-nowrap text-muted max-lg:hidden">
+      {links.slice(0, 3).map((l) => <a href={l.url} class="hover:underline">{l.label} ↗</a>)}
+      {(links.length > 3 || red.length > 0) && (
+        <details class="relative">
+          <summary class="cursor-pointer list-none">+{Math.max(0, links.length - 3) || red.length}</summary>
+          <div class="box absolute top-full right-0 z-10 mt-1 w-72 bg-bg">
+            {links.slice(3).map((l) => <a href={l.url} class="hover:underline">{l.label} ↗</a>)}
+            {red.map((r) => <span class="truncate text-muted">{r}</span>)}
+          </div>
+        </details>
+      )}
+    </div>
+  )}
+</div>
+
+{reviewable && (
+  <div class="fixed inset-x-0 bottom-[62px] z-20 flex h-[60px] gap-2 bg-gap px-2.5 pb-2 lg:hidden">
+    <button type="button" data-request-changes class="btn-2">request changes</button>
+    <button id="accept-phone" form="review" name="verdict" value="accept" class="btn flex-1 justify-center">ACCEPT</button>
+  </div>
+)}
+{state === "accepted" && (
+  <div class="fixed inset-x-0 bottom-[62px] z-20 flex h-[60px] items-center gap-2 bg-gap px-2.5 pb-2 lg:hidden">
+    <span class="flex-1 text-muted">accepted · ready to write</span>
+    <button type="button" data-request-changes class="btn-2">request changes</button>
+    <a id="next-phone" class="btn hidden data-[show]:inline-flex">NEXT ❯</a>
+  </div>
+)}

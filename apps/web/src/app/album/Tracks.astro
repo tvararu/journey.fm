@@ -1,112 +1,145 @@
 ---
 import { change } from "@/lib/album";
-import { clock } from "@/lib/format";
-import type { AlbumRecord, Field, Value } from "@/lib/records";
-import ValueView from "./Value.astro";
+import { lyricsKind } from "@/lib/checks";
+import { clock, mmss } from "@/lib/format";
+import type { FileRow } from "@/lib/inventory";
+import type { AlbumRecord, Value } from "@/lib/records";
 
-type Props = { rec: AlbumRecord };
-const { rec } = Astro.props;
+type Props = { rec: AlbumRecord; files: FileRow[] };
+const { rec, files } = Astro.props;
 const CREDITS = ["composer", "lyricist", "writer", "arranger", "conductor", "performer", "producer", "engineer", "mixer", "remixer"];
-const LYRICS = new Set(["lyrics", "instrumental", "acoustid", ...CREDITS]);
-const keys = Object.keys(rec.tracks[0]?.fields ?? {}).filter((k) => !LYRICS.has(k));
-const hasLyrics = rec.tracks.some((t) => t.fields["lyrics"]);
-const hasCredits = rec.tracks.some((t) => CREDITS.some((k) => t.fields[k]));
-const hasAcoustid = rec.tracks.some((t) => t.ids["acoustid_agrees"] !== undefined);
+const COLS = "grid-cols-[44px_minmax(0,1fr)_64px_56px_150px_72px_52px] max-lg:grid-cols-[32px_minmax(0,1fr)_48px]";
+const str = (v: Value | undefined) => (Array.isArray(v) ? v.join(", ") : v === null || v === undefined ? "" : String(v));
+const first = (v: Value | undefined) => str(v).split("/")[0] ?? "";
+const byFile = new Map(files.map((f) => [f.relpath, f]));
+const mediaList = str(rec.album["media"]?.value).split(", ").filter(Boolean);
 
-function filesValue(k: string, v: Value | undefined): Value | undefined {
-  return (k === "disc" || k === "track") && typeof v === "string" ? (v.split("/")[0] ?? v) : v;
-}
+const rows = rec.tracks.map((t, i) => {
+  const f = t.fields;
+  const lyrics = lyricsKind(f);
+  const text = f["lyrics"]?.value;
+  const roles = CREDITS.filter((k) => f[k] && !(Array.isArray(f[k]!.value) && f[k]!.value.length === 0));
+  const credits = roles.reduce((m, k) => m + (Array.isArray(f[k]!.value) ? f[k]!.value.length : 1), 0);
+  const mb = f["length"]?.candidates["MusicBrainz"];
+  const len = typeof f["length"]?.value === "number" ? f["length"].value : t.duration;
+  const off = typeof mb === "number" && Math.abs(mb - len) > 2;
+  const was = f["title"]?.candidates["files"];
+  const writer = f["writer"]?.value ?? f["composer"]?.value;
+  const a = t.ids["acoustid_agrees"];
+  return {
+    ac: a === true ? "✓ agrees" : a === false ? "✗ differs" : "· no match",
+    acBad: a === false,
+    acNone: a !== true && a !== false,
+    credits,
+    disc: first(f["disc"]?.value) || "1",
+    file: byFile.get(t.file),
+    i,
+    isrc: str(f["isrc"]?.value),
+    len,
+    lyrics,
+    mb: off ? (mb as number) : null,
+    note: change(was, f["title"]?.value ?? null) === "chg" ? `~ was ${str(was)}` : writer ? `written by ${str(writer)}` : "",
+    roles,
+    t,
+    text: typeof text === "string" ? text : null,
+    title: str(f["title"]?.value) || t.file,
+    track: first(f["track"]?.value),
+    filesTrack: first(f["track"]?.candidates["files"]),
+  };
+});
 
-function lyricsKind(fs: Record<string, Field>): string {
-  if (fs["instrumental"]?.value) return "instrumental";
-  const src = fs["lyrics"]?.source;
-  return src === "LRCLIB synced" ? "synced" : src === "LRCLIB plain" ? "plain" : src === "files" ? "from files" : "missing";
-}
-
-const counts = rec.tracks.reduce<Record<string, number>>((m, t) => {
-  const k = lyricsKind(t.fields);
-  m[k] = (m[k] ?? 0) + 1;
+const discs = [...new Set(rows.map((r) => r.disc))];
+const head = discs.map((d, k) => {
+  const rs = rows.filter((r) => r.disc === d);
+  const tracks = rs.map((r) => r.track);
+  const sides = tracks.every((v) => /^[A-Z]+\d*$/.test(v)) ? `${tracks[0]?.match(/^[A-Z]+/)?.[0]}–${tracks.at(-1)?.match(/^[A-Z]+/)?.[0]}` : null;
+  const media = mediaList.length > 1 ? mediaList[k] : mediaList[0];
+  const changed = rs.some((r) => r.filesTrack !== r.track);
+  return {
+    d,
+    note: [media, sides && `sides ${sides}`, `${rs.length} tracks`, mmss(rs.reduce((s, r) => s + r.len, 0))].filter(Boolean).join(" · "),
+    change: changed ? `~ ${rs[0]?.filesTrack}–${rs.at(-1)?.filesTrack} → ${tracks[0]}–${tracks.at(-1)}` : "",
+  };
+});
+const heads = discs.length > 1 || mediaList.length > 0;
+const counts = rows.reduce<Record<string, number>>((m, r) => {
+  m[r.lyrics] = (m[r.lyrics] ?? 0) + 1;
   return m;
 }, {});
+const pad = (s: string) => s.padEnd(10);
 ---
-<h3>Tracks</h3>
-<div class="card">
-  <table class="grid-table">
-    <thead><tr><th>File</th>{keys.map((k) => <th>{k}</th>)}{hasLyrics && <th>lyrics</th>}{hasCredits && <th>credits</th>}{hasAcoustid && <th>acoustid</th>}</tr></thead>
-    <tbody>
-      {rec.tracks.map((t) => (
-        <tr>
-          <td class="whitespace-nowrap">{t.file}</td>
-          {keys.map((k) => {
-            const f = t.fields[k];
-            if (!f) return <td />;
-            if (k === "length") {
-              const mb = f.candidates["MusicBrainz"];
-              const off = typeof mb === "number" && typeof f.value === "number" && Math.abs(mb - f.value) > 2;
-              return (
-                <td class={`whitespace-nowrap ${off ? "chg" : ""}`}>
-                  {typeof f.value === "number" ? clock(f.value) : "-"}
-                  {off && typeof mb === "number" && <span class="src">MB {clock(mb)}</span>}
-                </td>
-              );
-            }
-            const now = f.candidates["files"];
-            const cls = change(filesValue(k, now), f.value);
-            return (
-              <td class={cls}>
-                <ValueView value={f.value} />
-                {cls === "chg" && <span class="src">was {String(now)}</span>}
-              </td>
-            );
-          })}
-          {hasLyrics && (() => {
-            const kind = lyricsKind(t.fields);
-            const text = t.fields["lyrics"]?.value;
-            return (
-              <td class={`whitespace-nowrap ${kind === "missing" ? "text-muted" : kind === "instrumental" ? "" : "new"}`}>
-                {typeof text === "string" ? (
-                  <details>
-                    <summary class="cursor-pointer">{kind}</summary>
-                    <pre class="mt-2 max-h-96 overflow-auto text-xs whitespace-pre-wrap">{text}</pre>
-                  </details>
-                ) : kind}
-              </td>
-            );
-          })()}
-          {hasCredits && (() => {
-            const roles = CREDITS.filter((k) => t.fields[k]);
-            const changed = roles.some((k) => change(t.fields[k]!.candidates["files"], t.fields[k]!.value) === "chg");
-            const n = roles.reduce((m, k) => m + (Array.isArray(t.fields[k]!.value) ? (t.fields[k]!.value as unknown[]).length : 0), 0);
-            return (
-              <td class={`whitespace-nowrap ${n ? (changed ? "chg" : "") : "text-muted"}`}>
-                {roles.length ? (
-                  <details>
-                    <summary class="cursor-pointer">{n} credits</summary>
-                    <dl class="mt-2 grid grid-cols-[auto_1fr] gap-x-3 text-xs whitespace-normal">
-                      {roles.map((k) => (
-                        <>
-                          <dt class="text-muted">{k}</dt>
-                          <dd>
-                            <ValueView value={t.fields[k]!.value} />
-                            {change(t.fields[k]!.candidates["files"], t.fields[k]!.value) === "chg" && <span class="src">files: {String(t.fields[k]!.candidates["files"] ?? "none")}</span>}
-                          </dd>
-                        </>
-                      ))}
-                    </dl>
-                  </details>
-                ) : "none"}
-              </td>
-            );
-          })()}
-          {hasAcoustid && (() => {
-            const a = t.ids["acoustid_agrees"];
-            return <td class={a === false ? "chg" : a ? "" : "text-muted"}>{a === true ? "agrees" : a === false ? "differs" : "no match"}</td>;
-          })()}
-        </tr>
-      ))}
-    </tbody>
-  </table>
-  {hasLyrics && (
-    <p class="mt-2 text-xs text-muted">Lyrics: {Object.entries(counts).map(([k, n]) => `${n} ${k}`).join(", ")}</p>
-  )}
+<div class="flex flex-col">
+  <div class={`grid ${COLS} h-7 items-center gap-3 px-2.5 text-[11px] whitespace-nowrap text-muted`}>
+    <span>#</span><span>title</span><span class="max-lg:hidden">lyrics</span><span class="max-lg:hidden">credits</span><span class="max-lg:hidden">isrc</span><span class="max-lg:hidden">acoustid</span><span class="text-right">length</span>
+  </div>
+  {rows.map((r, n) => {
+    const h = head.find((x) => x.d === r.disc)!;
+    const starts = r.disc !== rows[n - 1]?.disc;
+    return (
+      <>
+        {heads && starts && (
+          <div class={`rule-head px-2.5 pb-1.5 ${n === 0 ? "pt-1.5" : "pt-4"}`}>
+            <span>──</span><b class="font-extrabold text-fg">disc {h.d}</b><span class="min-w-0 truncate">{h.note}</span><i class="h-px flex-1 bg-faint"></i><span class="max-lg:hidden">{h.change}</span>
+          </div>
+        )}
+        <button
+          type="button"
+          data-track-toggle
+          aria-controls={`trk-${n + 1}`}
+          aria-expanded="false"
+          class={`group/row grid ${COLS} min-h-10 w-full cursor-pointer items-center gap-3 border-b border-f8 px-2.5 py-1 text-left aria-expanded:bg-sel`}
+        >
+          <span class="font-bold">{r.track}</span>
+          <span class="flex min-w-0 flex-col">
+            <span class="truncate font-bold">{r.title}</span>
+            {r.note && <span class="truncate text-[11px] text-muted group-aria-expanded/row:text-sel-muted">{r.note}</span>}
+          </span>
+          <span class={`max-lg:hidden ${r.lyrics === "synced" ? "font-bold" : "text-muted"}`}>{r.lyrics}</span>
+          <span class={`max-lg:hidden ${r.credits ? "text-fg2" : "text-muted"}`}>{r.credits}</span>
+          <span class="truncate text-[11px] whitespace-nowrap text-muted max-lg:hidden">{r.isrc}</span>
+          <span class={`whitespace-nowrap max-lg:hidden ${r.acBad ? "text-danger" : r.acNone ? "text-muted" : ""}`}>{r.ac}</span>
+          <span class="text-right">
+            <span class={r.mb !== null ? "text-danger" : ""}>{mmss(r.len)}</span>
+            {r.mb !== null && <span class="block text-[11px] text-danger">MB {mmss(r.mb)}</span>}
+          </span>
+        </button>
+        <div
+          id={`trk-${n + 1}`}
+          hidden
+          class="gap-6 border-b border-f8 bg-f4 py-3 pr-2.5 pl-[66px] [&:not([hidden])]:grid grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)] max-lg:grid-cols-1 max-lg:pl-2.5"
+        >
+          <div class="flex min-w-0 flex-col gap-1">
+            <span class="text-[11px] text-muted">credits · MusicBrainz relationships</span>
+            <span class="leading-[1.6] whitespace-pre-wrap text-fg2">{r.roles.length ? r.roles.map((k) => {
+              const f = r.t.fields[k]!;
+              const now = f.candidates["files"];
+              const line = `${pad(k)}${str(f.value)}`;
+              return change(now, f.value) === "chg" ? `${line}  (files: ${str(now) || "none"})\n` : `${line}\n`;
+            }).join("") : "none recorded"}</span>
+          </div>
+          <div class="flex min-w-0 flex-col gap-1">
+            <span class="text-[11px] text-muted">file · lyrics · ids</span>
+            <span class="leading-[1.6] [overflow-wrap:anywhere] whitespace-pre-wrap text-fg2">{[
+              r.t.file,
+              r.file ? `${(r.file.size / 1e6).toFixed(1)} MB · ${clock(r.file.duration)}` : "",
+              r.file?.audio_md5 ? `md5 ${r.file.audio_md5}` : "",
+              r.text ? `lyrics ${r.t.fields["lyrics"]?.source ?? ""} · ${r.text.length} chars · ${r.text.split("\n")[0]!.replace(/^(\[[^\]]*\]\s*)+/, "")}` : `lyrics ${r.lyrics}`,
+            ].filter(Boolean).join("\n")}</span>
+            {r.text && (
+              <details>
+                <summary class="cursor-pointer text-muted">show lyrics</summary>
+                <pre class="mt-2 max-h-96 overflow-auto text-[11px] whitespace-pre-wrap">{r.text}</pre>
+              </details>
+            )}
+            <span class="leading-[1.6] [overflow-wrap:anywhere] whitespace-pre-wrap text-[11px] text-muted">{[
+              r.t.ids["musicbrainz_recording"] && `recording ${r.t.ids["musicbrainz_recording"]}`,
+              r.t.ids["musicbrainz_track"] && `track ${r.t.ids["musicbrainz_track"]}`,
+              r.t.ids["lrclib"] && `lrclib ${r.t.ids["lrclib"]}`,
+            ].filter(Boolean).join("\n")}</span>
+          </div>
+        </div>
+      </>
+    );
+  })}
+  <p class="px-2.5 pt-3.5 text-[11px] text-muted">Lyrics: {Object.entries(counts).map(([k, n]) => `${n} ${k}`).join(", ")}</p>
 </div>

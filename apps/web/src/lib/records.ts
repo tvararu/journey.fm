@@ -35,6 +35,7 @@ export type AlbumRecord = {
     file: string;
     duration: number;
     fields: Record<string, Field>;
+    ids: Record<string, string | number | boolean | string[] | null>;
   }[];
 };
 
@@ -91,15 +92,16 @@ export function redCopies(): Promise<Record<string, string[]>> {
 
 export type Note = { at: string; album: string; by: string; text: string };
 
-export async function notesFor(album: string): Promise<Note[]> {
+export async function notes(): Promise<Map<string, Note[]>> {
   const file = Bun.file(NOTES);
-  if (!(await file.exists())) return [];
-  const lines = (await file.text()).split("\n").filter(Boolean);
-  return lines
-    .map((l) => JSON.parse(l) as Note)
-    .filter((n) => n.album === album);
+  const out = new Map<string, Note[]>();
+  if (!(await file.exists())) return out;
+  for (const line of (await file.text()).split("\n").filter(Boolean)) {
+    const n = JSON.parse(line) as Note;
+    out.set(n.album, [...(out.get(n.album) ?? []), n]);
+  }
+  return out;
 }
-
 
 export async function addNote(note: Note): Promise<void> {
   const file = Bun.file(NOTES);

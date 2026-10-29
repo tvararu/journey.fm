@@ -1,49 +1,99 @@
 ---
+import Pane from "@/app/Pane.astro";
+import type { Check } from "@/lib/checks";
+import { stamp } from "@/lib/format";
 import type { Note } from "@/lib/records";
-import type { Review, ReviewStatus } from "@/lib/reviews";
-import type { Verdict } from "@/lib/verdicts";
+import type { Review } from "@/lib/reviews";
+import type { Question, Verdict } from "@/lib/verdicts";
 
-type Props = { notes: Note[]; reviews: Review[]; verdicts: Verdict[]; album: string; back: string; status: ReviewStatus | null };
-const { notes, reviews, verdicts, album, back, status } = Astro.props;
-type Entry = { at: string; by: string; text: string; verdict?: Review["verdict"] | Verdict["verdict"]; cover?: string };
+type Props = {
+  notes: Note[];
+  reviews: Review[];
+  verdicts: Verdict[];
+  album: string;
+  back: string;
+  reviewable: boolean;
+  checks: Check[] | null;
+  question: Question | null;
+  master: string;
+};
+const { notes, reviews, verdicts, album, back, reviewable, checks, question, master } = Astro.props;
+type Kind = Review["verdict"] | Verdict["verdict"];
+type Entry = { at: string; by: string; text: string; verdict?: Kind; cover?: string; question?: Question };
 const entries: Entry[] = [
   ...notes.map((n) => ({ at: n.at, by: n.by, text: n.text })),
+  ...verdicts.map((v) => ({ at: v.at, by: v.by, text: v.message, verdict: v.verdict, question: v.question })),
   ...reviews.map((r) => ({ at: r.at, by: r.by, cover: r.cover, text: r.message, verdict: r.verdict })),
-  ...verdicts.map((v) => ({ at: v.at, by: v.by, text: v.message, verdict: v.verdict })),
 ].sort((a, b) => a.at.localeCompare(b.at));
-const VERDICT = { accept: "accepted", approve: "approved", flag: "flagged", request_changes: "requested changes" } as const;
-const good = (v: Entry["verdict"]) => v === "accept" || v === "approve";
+const BADGE: Record<Kind, [string, string]> = {
+  accept: ["badge-accepted", "ACCEPTED"],
+  approve: ["badge-accepted", "APPROVED"],
+  flag: ["badge-blocked", "FLAGGED"],
+  request_changes: ["badge-open", "CHANGES REQUESTED"],
+};
 ---
-<h2>Conversation</h2>
-<ol class="space-y-4">
-  {entries.map((e) => (
-    <li class={`border-l-2 pl-3 ${good(e.verdict) ? "border-new-fg" : e.verdict ? "border-chg-fg" : "border-rule"}`}>
-      <div class="text-xs text-muted">
-        {e.at} · <b class="text-fg">{e.by}</b>
-        {e.verdict && <span class={`badge ml-1 border-transparent ${good(e.verdict) ? "new" : "chg"}`}>{VERDICT[e.verdict]}</span>}
-      </div>
-      {e.text && <p class="whitespace-pre-line">{e.text}</p>}
-      {e.cover && <p class="text-xs text-muted">master cover: {e.cover.split(":")[0]}</p>}
-    </li>
-  ))}
-</ol>
-
-{status && (
-  <form id="review" method="post" action="/api/review" class="mt-6 flex flex-col gap-2 border border-rule bg-bg p-3">
-    <input type="hidden" name="album" value={album} />
-    <input type="hidden" name="back" value={back} />
-    <input type="hidden" name="list" value="/?f=review" />
-    <input type="hidden" name="next" value="" />
-    <textarea
-      name="message"
-      rows="3"
-      class="w-full border border-rule bg-gap p-2"
-      placeholder="Leave a comment"
-    ></textarea>
-    <div class="flex flex-wrap justify-end gap-2">
-      <button name="verdict" value="request_changes" class="border border-chg-fg bg-chg px-3 py-1 text-chg-fg">Request changes</button>
-      <button name="verdict" value="accept" class="border border-new-fg bg-new px-3 py-1 text-new-fg">Accept</button>
-      <button id="accept-next" name="verdict" value="accept_next" hidden class="border border-new-fg bg-new-fg px-3 py-1 font-bold text-bg">Accept, next album →</button>
+<div id="review-pane" class="flex lg:w-[380px] lg:flex-none">
+  <Pane label="review" key="r" tag="aside" aria-label="Review" note={`${entries.length} entries`} class="flex-1">
+    <div class="flex min-h-0 flex-1 flex-col gap-[18px] overflow-auto px-3.5 pt-[18px] pb-3.5">
+      {question && (
+        <div class="box">
+          <span class="box-label">decision<span class="font-normal text-muted"> · {question.field}</span></span>
+          <div class="grid grid-cols-[minmax(0,1fr)_auto] items-baseline gap-2"><b>{question.pick.value}</b><span class="text-muted">{question.pick.from}</span></div>
+          <div class="grid grid-cols-[minmax(0,1fr)_auto] items-baseline gap-2"><b>{question.other.value}</b><span class="text-muted">{question.other.from}</span></div>
+          <div class="mt-1.5 flex flex-wrap gap-2">
+            <button form="review" name="decision" value="pick" class="btn">keep {question.pick.value}</button>
+            <button form="review" name="decision" value="other" class="btn-2">use {question.other.value}</button>
+          </div>
+        </div>
+      )}
+      {checks && (
+        <div class="box">
+          <span class="box-label">checks<span class="font-normal text-muted"> · from the record</span></span>
+          {checks.map((c) => (
+            <div class="grid grid-cols-[14px_64px_minmax(0,1fr)] items-baseline gap-1.5">
+              <span class={c.ok ? "font-extrabold" : "font-extrabold text-danger"}>{c.ok ? "✓" : "!"}</span>
+              <span class="text-muted">{c.key}</span>
+              <span class="text-fg2">{c.value}</span>
+            </div>
+          ))}
+        </div>
+      )}
+      {entries.map((e) => (
+        <article class="flex flex-col gap-1.5">
+          <div class="flex flex-wrap items-center gap-2">
+            <b class="font-extrabold">{e.by}</b>
+            {e.verdict ? <span class={BADGE[e.verdict][0]}>{BADGE[e.verdict][1]}</span> : <span class="text-muted">note</span>}
+            <span class="text-muted">{stamp(e.at)}</span>
+          </div>
+          {e.text && <p class="leading-[1.55] whitespace-pre-line text-fg2">{e.text}</p>}
+          {e.question && (
+            <p class="text-[11px] text-muted">
+              question · {e.question.field}: {e.question.pick.value} ({e.question.pick.from}) or {e.question.other.value} ({e.question.other.from})
+            </p>
+          )}
+          {e.cover && <p class="text-[11px] text-muted">master cover: {e.cover.split(":")[0]}</p>}
+        </article>
+      ))}
+      {entries.length === 0 && <p class="text-muted">no entries yet</p>}
     </div>
-  </form>
-)}
+    {reviewable && (
+      <form id="review" method="post" action="/api/review" class="flex shrink-0 flex-col gap-2 border-t border-f18 px-3.5 pt-3 pb-3.5">
+        <input type="hidden" name="album" value={album} />
+        <input type="hidden" name="back" value={back} />
+        <input type="hidden" name="list" value="/" />
+        <input type="hidden" name="next" value="" />
+        <label for="rv-msg" class="text-[11px] text-muted">comment · sent with your verdict</label>
+        <textarea
+          id="rv-msg"
+          name="message"
+          rows="3"
+          class="w-full resize-none border border-ctl bg-f4 p-2 leading-normal outline-none"
+          placeholder="what should change, or why it is fine"></textarea>
+        <div class="flex items-center gap-2">
+          <span class="min-w-0 flex-1 truncate text-[11px] text-muted">master · <span id="master-label">{master}</span></span>
+          <button name="verdict" value="request_changes" class="btn-2">request changes</button>
+        </div>
+      </form>
+    )}
+  </Pane>
+</div>

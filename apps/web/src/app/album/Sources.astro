@@ -1,6 +1,6 @@
 ---
 import { FIELD_NAMES } from "@/lib/album";
-import { label, type RawFile } from "@/lib/raw";
+import type { RawFile } from "@/lib/raw";
 import type { AlbumRecord, Field } from "@/lib/records";
 import ValueView from "./Value.astro";
 
@@ -12,39 +12,53 @@ const seen = new Set(fields.flatMap(([, f]) => Object.keys(f.candidates)));
 const sources = [...ORDER.filter((s) => seen.has(s)), ...[...seen].filter((s) => !ORDER.includes(s)).sort()];
 const picked = (f: Field, s: string) => (f.source ?? "").split(", refined by ").includes(s);
 const short = (v: unknown) => (Array.isArray(v) && v.length > 8 ? [...v.slice(0, 8), `+${v.length - 8} more`] : v);
+const GROUPS: [string, RegExp][] = [
+  ["edition", /^(mb_release_|mb_rg_releases_|mb_discid|edition-report|red_)/],
+  ["metadata", /^(mb_rg_|mb_credits_|discogs_|rym-)/],
+  ["cover", /^(caa_|itunes|deezer)/],
+];
+const grouped = [...GROUPS.map(([g]) => g), "tracks"].map((g) => ({
+  g,
+  files: raw.filter((r) => (GROUPS.find(([, re]) => re.test(r.name))?.[0] ?? "tracks") === g),
+}));
+const cols = { gridTemplateColumns: `150px repeat(${sources.length}, minmax(0, 1fr))` };
 ---
-<h3>By field</h3>
-<div class="card">
-  <table class="grid-table">
-    <thead><tr><th>Field</th>{sources.map((s) => <th>{s}</th>)}</tr></thead>
-    <tbody>
+<div class="flex flex-col">
+  <div class="max-lg:overflow-x-auto">
+    <div class="max-lg:min-w-[640px]">
+      <div class="grid h-[26px] items-center gap-3 border-b border-faint px-2.5 text-[11px] text-muted" style={cols}>
+        <span>field</span>{sources.map((s) => <span>{s}</span>)}
+      </div>
       {fields.map(([k, f]) => (
-        <tr>
-          <th>{FIELD_NAMES[k] ?? k}</th>
+        <div class="grid min-h-7 items-center gap-3 border-b border-f8 px-2.5 py-[3px]" style={cols}>
+          <span class="text-fg2">{FIELD_NAMES[k] ?? k}</span>
           {sources.map((s) => (
-            <td class={picked(f, s) ? "outline-2 -outline-offset-2 outline-new-fg" : ""}>
-              {s in f.candidates ? <ValueView value={short(f.candidates[s]) as never} /> : <span class="text-faint">·</span>}
-            </td>
+            <span class={`min-w-0 break-words ${picked(f, s) ? "shadow-[inset_0_0_0_2px_var(--fg)]" : ""}`}>
+              {s in f.candidates ? <ValueView value={short(f.candidates[s]) as never} /> : <span class="text-muted">·</span>}
+            </span>
           ))}
-        </tr>
+        </div>
       ))}
-    </tbody>
-  </table>
-</div>
-
-<h3>Raw responses</h3>
-<div class="card">
-  <table class="grid-table">
-    <thead><tr><th>File</th><th>What</th><th>Fetched</th><th>Size</th></tr></thead>
-    <tbody>
-      {raw.map((r) => (
-        <tr class={r.used ? "" : "text-muted"}>
-          <td class={r.used ? "font-bold" : ""}><a href={`/data/raw/${rec.slug}/${r.name}`}>{r.name}</a></td>
-          <td>{label(r.name)}</td>
-          <td class="whitespace-nowrap">{r.fetched ?? "29 Oct spike"}</td>
-          <td class="whitespace-nowrap">{(r.bytes / 1024).toFixed(0)} KB</td>
-        </tr>
-      ))}
-    </tbody>
-  </table>
+    </div>
+  </div>
+  <div class="flex gap-3.5 px-2.5 pt-2.5 text-[11px] text-muted">
+    <span><span class="inline-block size-2.5 align-[-1px] shadow-[inset_0_0_0_2px_var(--fg)]"></span> picked</span><span>· none</span>
+  </div>
+  <div class="rule-head mt-[22px]"><span>──</span><b class="font-extrabold text-fg">raw responses · {raw.length}</b><span class="truncate">kept whole · raw/{rec.slug}/ on sol</span><i class="h-px flex-1 bg-faint"></i></div>
+  <div class="grid grid-cols-2 gap-x-7 gap-y-3.5 px-2.5 pt-2.5 max-lg:grid-cols-1">
+    {grouped.filter((x) => x.files.length).map(({ g, files }) => (
+      <div class="flex min-w-0 flex-col gap-[3px]">
+        <b class="font-extrabold">{g}</b>
+        <div class="flex flex-col text-[11px] leading-[1.6] text-fg2">
+          {files.map((r) => (
+            <div class="leader">
+              <a href={`/data/raw/${rec.slug}/${r.name}`} class={`truncate hover:underline ${r.used ? "font-bold" : ""}`}>{r.name}</a>
+              <i></i>
+              <span class="shrink-0 whitespace-nowrap text-muted">{Math.round(r.bytes / 1024)} KB · {r.fetched ?? "—"}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    ))}
+  </div>
 </div>

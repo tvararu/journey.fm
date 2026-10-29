@@ -67,3 +67,50 @@ export function quality(files: Audio[]): string {
   const parts = [...kinds].map(([k, n]) => (kinds.size > 1 ? `${k} ×${n}` : k));
   return `${parts.join(", ")} · ${kbps} kbps average`;
 }
+
+export function mmss(s: number): string {
+  const t = Math.round(s);
+  return `${Math.floor(t / 60)}:${String(t % 60).padStart(2, "0")}`;
+}
+
+export function mins(s: number): string {
+  const m = Math.round(s / 60);
+  return m >= 60 ? `${Math.floor(m / 60)} h ${m % 60} min` : `${m} min`;
+}
+
+export function minsec(s: number): string {
+  const t = Math.round(s);
+  return `${Math.floor(t / 60)} min ${t % 60} s`;
+}
+
+export function audio(bits: string, sr: string): string {
+  if (bits.includes(",") || sr.includes(",")) return "mixed";
+  return `${bits}/${Number(sr) / 1000}`;
+}
+
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+export function day(iso: string): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso);
+  return m ? `${Number(m[3])} ${MONTHS[Number(m[2]) - 1]}` : iso;
+}
+
+export function stamp(at: string): string {
+  const m = /^\d{4}-\d{2}-\d{2}[T ](\d{2}:\d{2})/.exec(at);
+  return m ? `${day(at)} ${m[1]}` : day(at);
+}
+
+export function when(at: string): string {
+  const today = new Date().toLocaleDateString("sv-SE", { timeZone: "Europe/London" });
+  const m = /^(\d{4}-\d{2}-\d{2})[T ](\d{2}:\d{2})/.exec(at);
+  return m && m[1] === today ? m[2]! : day(at);
+}
+
+export function redTail(name: string): string {
+  return name.replace(/^.*\)\s*/, "").replace(/^[-\s]+/, "").replace(/[[\]]/g, "").trim() || "copy";
+}
+
+export function dots(n: number, total: number, width = 20): { on: string; off: string } {
+  const k = total ? Math.min(width, Math.max(n > 0 ? 1 : 0, Math.round((n / total) * width))) : 0;
+  return { on: "▪".repeat(k), off: "·".repeat(width - k) };
+}

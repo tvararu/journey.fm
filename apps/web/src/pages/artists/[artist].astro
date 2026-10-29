@@ -1,0 +1,242 @@
+---
+import Layout from "@/app/Layout.astro";
+import Pane from "@/app/Pane.astro";
+import StatusLine from "@/app/StatusLine.astro";
+import { day, dots, mins, size } from "@/lib/format";
+import { library, libraryStats, type LibraryEntry } from "@/lib/library";
+import { processed, type AlbumRecord, type Value } from "@/lib/records";
+
+const all = await library();
+const stats = libraryStats(all);
+const name = Astro.params.artist ?? "";
+const rows = all.filter((r) => r.artist_dir === name);
+if (rows.length === 0) return new Response("not found", { status: 404 });
+
+const href = (a: string) => `/artists/${encodeURIComponent(a)}`;
+const letterOf = (a: string) => {
+  const c = a.normalize("NFD").replace(/[̀-ͯ]/g, "").charAt(0).toUpperCase();
+  return /[A-Z]/.test(c) ? c : "#";
+};
+const LETTERS = ["#", ..."ABCDEFGHIJKLMNOPQRSTUVWXYZ"];
+
+const people = new Map<string, { name: string; n: number; acc: number }>();
+for (const r of all) {
+  const p = people.get(r.artist_dir) ?? { name: r.artist_dir, n: 0, acc: 0 };
+  p.n++;
+  if (r.state === "accepted") p.acc++;
+  people.set(r.artist_dir, p);
+}
+const artists = [...people.values()].sort((a, b) => a.name.localeCompare(b.name, "en", { sensitivity: "base" }));
+const groups = LETTERS.map((l) => ({ letter: l, list: artists.filter((a) => letterOf(a.name) === l) })).filter((g) => g.list.length > 0);
+const present = new Set(groups.map((g) => g.letter));
+const mine = letterOf(name);
+
+const recs = await processed();
+const cat = rows.flatMap((r) => {
+  const rec = recs.get(r.path);
+  return rec ? [{ r, rec }] : [];
+});
+const vals = (v: Value | undefined): string[] => (v === null || v === undefined || v === "" ? [] : Array.isArray(v) ? v.map(String) : [String(v)]);
+const distinct = (l: string[]) => [...new Set(l.filter(Boolean))];
+const tally = (l: string[]) => {
+  const m = new Map<string, number>();
+  for (const x of l) m.set(x, (m.get(x) ?? 0) + 1);
+  return [...m].sort((a, b) => b[1] - a[1]);
+};
+const top = (l: string[]) => tally(l)[0]?.[0];
+
+const mediaPart = (rec: AlbumRecord) => {
+  const m = vals(rec.album["media"]?.value);
+  const kinds = distinct(m);
+  return kinds.length === 1 && m.length > 1 ? `${m.length} × ${kinds[0]}` : kinds.join(" + ");
+};
+const yearOf = (v: string | null) => {
+  const m = /^(\d{4})/.exec(v ?? "");
+  return m ? Number(m[1]) : null;
+};
+const metaOf = (r: LibraryEntry) => {
+  const rec = recs.get(r.path);
+  if (!rec) return `${r.n} tracks · ${mins(r.dur)}`;
+  const ey = yearOf(r.edition);
+  return `${mediaPart(rec)}${ey && ey !== r.year ? ` · reissue ${ey}` : ""}`;
+};
+
+const disc = [...rows].sort((a, b) => (a.year ?? 1e9) - (b.year ?? 1e9) || a.title.localeCompare(b.title));
+const covers = disc.filter((r) => r.cover).slice(0, 12);
+const accepted = rows.filter((r) => r.state === "accepted").length;
+const triage = rows.filter((r) => r.state === "triage").length;
+const withIssues = rows.filter((r) => r.issues.length > 0).length;
+const years = rows.flatMap((r) => (r.year ? [r.year] : []));
+const range = years.length ? `${Math.min(...years)}–${Math.max(...years)}` : "—";
+const tracks = rows.reduce((s, r) => s + r.n, 0);
+const secs = rows.reduce((s, r) => s + r.dur, 0);
+const bytes = rows.reduce((s, r) => s + r.bytes, 0);
+const meter = dots(accepted, rows.length);
+const focus = top(cat.flatMap(({ rec }) => vals(rec.album["scene"]?.value))) ?? top(cat.flatMap(({ rec }) => vals(rec.album["genre"]?.value)));
+
+const mbid = cat.map(({ rec }) => vals(rec.album.ids["musicbrainz_album_artist"] as Value)[0]).find(Boolean);
+const rym = cat.map(({ rec }) => rec.album.rym_links?.artists[0]).find(Boolean);
+const ratings = cat.flatMap(({ rec }) => (rec.album.ratings["RYM"] ? [rec.album.ratings["RYM"].value] : []));
+
+const fromCat: [string, string][] = [];
+if (cat.length > 0) {
+  const g = distinct(cat.flatMap(({ rec }) => vals(rec.album["genre"]?.value)));
+  const s = distinct(cat.flatMap(({ rec }) => vals(rec.album["scene"]?.value)));
+  const l = distinct(cat.map(({ r }) => r.label ?? ""));
+  if (g.length) fromCat.push(["genre", g.join(", ")]);
+  if (s.length) fromCat.push(["scene", s.join(", ")]);
+  if (l.length) fromCat.push(["labels", l.join(", ")]);
+  if (ratings.length) fromCat.push(["RYM", `${(ratings.reduce((a, b) => a + b, 0) / ratings.length).toFixed(2)} (${ratings.length} albums)`]);
+  const ids = [mbid && `MB ${mbid.slice(0, 8)}`, rym && `RYM ${rym.id}`].filter(Boolean);
+  if (ids.length) fromCat.push(["ids", ids.join(" · ")]);
+}
+const kinds = tally(rows.map((r) => r.audio));
+const issues = tally(rows.flatMap((r) => r.issues));
+const onDisk: [string, string][] = [
+  ["audio", kinds.length === 1 ? `all ${rows.length} folders` : kinds.map(([k, n]) => `${k} ×${n}`).join(", ")],
+  ["RED copies", `${rows.filter((r) => !r.issues.includes("no RED copy")).length} of ${rows.length}`],
+  ["MusicBrainz IDs", `${rows.length - rows.filter((r) => r.issues.includes("no MusicBrainz ID")).length} of ${rows.length}`],
+  ["issues", issues.length ? issues.map(([k, n]) => `${k} ×${n}`).join(", ") : "none"],
+  ["size", `${size(bytes)} · ${tracks} tracks`],
+];
+
+const queue = disc.map((r) => ({ id: r.id, title: r.title, artist: r.artist, cover: r.cover, state: r.state }));
+---
+<Layout title={`journey.fm · ${name}`} page="artists" stats={stats}>
+  <details class="pane lg:hidden">
+    <summary class="flex h-11 cursor-pointer items-center px-3.5 font-bold">artists · {artists.length}</summary>
+    <div class="max-h-72 overflow-auto px-1.5 pb-3">
+      {groups.map((g) => (
+        <>
+          <div class="rule-head pt-2 pr-1"><span>──</span><b class="font-bold text-fg">{g.letter}</b><i class="h-px flex-1 bg-faint"></i></div>
+          {g.list.map((a) => (
+            <a href={href(a.name)} aria-current={a.name === name ? "page" : undefined} class="flex min-h-11 items-center gap-2 px-2 aria-[current]:bg-sel aria-[current]:font-extrabold">
+              <span class="min-w-0 flex-1 truncate">{a.name}</span>
+              {a.acc > 0 && <b class="font-extrabold">✓{a.acc}</b>}
+              <span class="text-muted">{a.n}</span>
+            </a>
+          ))}
+        </>
+      ))}
+    </div>
+  </details>
+
+  <Pane label="artists" key="a" note={String(artists.length)} tag="nav" class="w-[260px] flex-none max-lg:hidden">
+    <div class="flex shrink-0 flex-col gap-2.5 px-2.5 pt-4 pb-2">
+      <div class="flex items-center gap-2">
+        <label for="ar-q" class="text-muted">/</label>
+        <input id="ar-q" data-search type="text" placeholder="artist" autocomplete="off" class="box-border h-6 min-w-0 flex-1 rounded-none border border-ctl bg-f4 px-2 outline-none" />
+      </div>
+      <div role="group" aria-label="Jump to letter" class="grid grid-cols-9 gap-px text-[11px]">
+        {LETTERS.map((l) => (
+          <button
+            type="button"
+            data-letter={l}
+            disabled={!present.has(l)}
+            class:list={["h-[22px]", present.has(l) ? (l === mine ? "bg-fg font-extrabold text-bg" : "hover:bg-f8") : "text-faint"]}
+          >{l}</button>
+        ))}
+      </div>
+    </div>
+    <div id="ar-list" class="flex min-h-0 flex-1 flex-col overflow-auto px-1.5 pt-0.5 pb-3">
+      {groups.map((g) => (
+        <>
+          <div data-head={g.letter} class="rule-head pt-2 pr-1"><span>──</span><b class="font-bold text-fg">{g.letter}</b><i class="h-px flex-1 bg-faint"></i></div>
+          {g.list.map((a) => (
+            <a
+              data-row={g.letter}
+              data-name={a.name.toLowerCase()}
+              href={href(a.name)}
+              aria-current={a.name === name ? "page" : undefined}
+              class="flex h-[22px] shrink-0 items-center gap-2 px-2 aria-[current]:bg-sel aria-[current]:font-extrabold"
+            >
+              <span class="min-w-0 flex-1 truncate">{a.name}</span>
+              {a.acc > 0 && <b class="font-extrabold">✓{a.acc}</b>}
+              <span class:list={[a.acc > 0 ? "text-muted" : "text-faint"]}>{a.n}</span>
+            </a>
+          ))}
+        </>
+      ))}
+    </div>
+  </Pane>
+
+  <Pane label="artist" key="r" note={`Music/${name} · ${rows.length} folders`} active tag="main" class="min-w-0 lg:flex-[1_1_560px]">
+    <div class="flex min-h-0 flex-1 flex-col gap-[26px] px-5 pt-5 pb-[22px] lg:overflow-auto">
+      {covers.length > 0 && (
+        <div aria-hidden="true" class="grid grid-cols-6 gap-1 lg:grid-cols-12">
+          {covers.map((r) => <img src={r.cover!} alt="" loading="lazy" class="aspect-square w-full object-cover" />)}
+        </div>
+      )}
+
+      <section aria-label="Artist" class="flex flex-wrap items-end justify-between gap-6">
+        <div class="flex min-w-0 flex-col gap-2.5">
+          <span class="eyebrow">ARTIST{focus ? ` · ${focus.toUpperCase()}` : ""}</span>
+          <h1 class="display text-[64px] leading-[0.95] tracking-[-0.03em] max-lg:text-[40px]">{name}</h1>
+          <span class="text-[13px] text-fg2">{rows.length} albums · {range} · {tracks} tracks · {mins(secs)} · {size(bytes)}</span>
+          <div class="flex flex-wrap items-center gap-2.5 whitespace-nowrap">
+            <b class="font-extrabold">catalogued</b>
+            <span class="tracking-[1px]">{meter.on}<span class="text-faint">{meter.off}</span></span>
+            <span><b class="font-extrabold">{accepted}</b><span class="text-muted"> / {rows.length} · {triage} in triage · {withIssues === 0 ? "no issues" : `${withIssues} with issues`}</span></span>
+          </div>
+        </div>
+        {(mbid || rym) && (
+          <span class="flex gap-3 text-muted">
+            {mbid && <a href={`https://musicbrainz.org/artist/${mbid}`} target="_blank" rel="noreferrer">MusicBrainz ↗</a>}
+            {rym && <a href={rym.url} target="_blank" rel="noreferrer">RYM artist {rym.id} ↗</a>}
+          </span>
+        )}
+      </section>
+
+      <section aria-label="Discography" class="flex flex-col gap-3.5">
+        <div class="rule-head flex-wrap gap-2.5">
+          <span>──</span><b class="text-[14px] font-extrabold text-fg">discography</b>
+          <span role="group" aria-label="Show" class="flex">
+            <button type="button" data-show="all" aria-pressed="true" class="seg">all {rows.length}</button>
+            <button type="button" data-show="accepted" aria-pressed="false" class="seg">accepted {accepted}</button>
+            <button type="button" data-show="triage" aria-pressed="false" class="seg">triage {triage}</button>
+          </span>
+          <i class="h-px min-w-5 flex-1 bg-faint"></i>
+          <span class="max-lg:hidden">years: original date once catalogued, else the files' date tag</span>
+        </div>
+        <div id="disc" class="grid grid-cols-2 gap-x-3.5 gap-y-[18px] lg:grid-cols-6">
+          {disc.map((r) => (
+            <a href={`/album/${r.id}`} data-state={r.state} class="flex min-w-0 flex-col gap-[7px]">
+              <span class="relative block aspect-square w-full bg-dark">
+                {r.cover && <img src={r.cover} alt="" loading="lazy" class="size-full object-cover" />}
+                {r.state === "accepted" && <span class="absolute bottom-1 left-1 grid size-4 place-items-center bg-fg text-[11px] font-extrabold text-bg">✓</span>}
+              </span>
+              <span class="flex min-w-0 flex-col gap-px px-0.5">
+                <span class="truncate font-bold">{r.title}</span>
+                <span class="truncate text-[11px] text-muted"><span class:list={[r.state === "accepted" && "font-extrabold text-fg"]}>{r.year ?? "—"}</span> · {metaOf(r)}</span>
+              </span>
+            </a>
+          ))}
+        </div>
+      </section>
+
+      <div class="grid grid-cols-1 gap-x-4 gap-y-[18px] pt-1 lg:grid-cols-2">
+        <div class="box px-3 pt-4 pb-3">
+          <span class="absolute -top-2 left-2 bg-bg px-1 leading-4"><b class="font-extrabold">from the catalogue</b><span class="text-muted"> · {cat.length} of {rows.length} albums so far</span></span>
+          {fromCat.length === 0 && <span class="text-muted">nothing catalogued yet</span>}
+          {fromCat.map(([k, v]) => <div class="leader"><span class="shrink-0 text-muted">{k}</span><i></i><span>{v}</span></div>)}
+        </div>
+        <div class="box px-3 pt-4 pb-3">
+          <span class="absolute -top-2 left-2 bg-bg px-1 leading-4"><b class="font-extrabold">on disk</b><span class="text-muted"> · sol, scanned {stats.scanned ? day(stats.scanned) : "—"}</span></span>
+          {onDisk.map(([k, v]) => <div class="leader"><span class="shrink-0 text-muted">{k}</span><i></i><span>{v}</span></div>)}
+        </div>
+      </div>
+    </div>
+    <StatusLine
+      slot="status"
+      mode="ARTIST"
+      count={name}
+      context={`${rows.length} albums · ${accepted} accepted · ${triage} in triage`}
+      keys="a–z jump · / search · j k artist"
+    />
+  </Pane>
+
+  <script type="application/json" id="disc-queue" set:html={JSON.stringify(queue).replaceAll("<", "\\u003c")} />
+  <script>
+    import "@/app/artists";
+  </script>
+</Layout>

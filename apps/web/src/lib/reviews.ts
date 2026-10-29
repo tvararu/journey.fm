@@ -1,5 +1,6 @@
 import { REVIEWS } from "./paths";
 import type { AlbumRecord } from "./records";
+import type { State } from "./state";
 
 export type Verdict = "accept" | "request_changes";
 
@@ -13,7 +14,7 @@ export type Review = {
   cover?: string;
 };
 
-export type ReviewStatus = "awaiting agents" | "blocked" | "changes requested" | "accepted";
+export type ReviewStatus = Exclude<State, "triage">;
 export type Status = { state: ReviewStatus; by: string | null; message: string | null };
 type Flag = { at: string; by: string; verdict: string; message: string; fingerprint: string };
 
@@ -48,8 +49,8 @@ export async function reviews(): Promise<Map<string, Review[]>> {
 
 export function statusOf(rec: AlbumRecord, list: Review[] | undefined, flags: Flag[] = []): Status {
   const events = [
-    ...(list ?? []).map((r) => ({ at: r.at, by: r.by, fingerprint: r.fingerprint, kind: r.verdict as string, message: r.message })),
     ...flags.filter((v) => v.verdict === "flag").map((v) => ({ at: v.at, by: v.by, fingerprint: v.fingerprint, kind: "flag", message: v.message })),
+    ...(list ?? []).map((r) => ({ at: r.at, by: r.by, fingerprint: r.fingerprint, kind: r.verdict as string, message: r.message })),
   ].sort((x, y) => x.at.localeCompare(y.at));
   const last = events.at(-1);
   if (!last || last.fingerprint !== fingerprint(rec)) return { by: null, message: null, state: "awaiting agents" };

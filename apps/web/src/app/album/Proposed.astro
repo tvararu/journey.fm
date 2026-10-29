@@ -1,8 +1,7 @@
 ---
-import { CHIP_FIELDS, change, FIELD_NAMES, FIELD_TAGS, type Tag, valuesFor } from "@/lib/album";
-import { empty, show } from "@/lib/format";
+import { CHIP_FIELDS, change, FIELD_NAMES, FIELD_TAGS, invisible, type Tag, valuesFor } from "@/lib/album";
+import { day, empty, show } from "@/lib/format";
 import type { AlbumRecord, Field, RymLink, Value } from "@/lib/records";
-import Tracks from "./Tracks.astro";
 import ValueView from "./Value.astro";
 
 type Props = { rec: AlbumRecord; tags: Map<number, Tag[]> };
@@ -17,47 +16,95 @@ const had = (k: string): Value => {
   return keys ? valuesFor(tags, keys) : null;
 };
 const proposed = (k: string, f: Field): Value => (k === "scene" && typeof f.value === "string" ? [f.value] : f.value);
+const CHIP: Record<string, "chip" | "chip-2" | "chip-scene"> = { genre: "chip", scene: "chip-scene" };
+const rows = fields.map(([k, f]) => {
+  const value = proposed(k, f);
+  const now = had(k);
+  const cls = change(now, value);
+  const join = (v: Value) => (Array.isArray(v) ? v.join(", ") : v);
+  const mark = cls === "chg" ? "~" : cls === "new" ? "+" : empty(value) ? "·" : "=";
+  return { f, k, mark, note: cls === "chg" ? invisible(join(now), join(value)) : null, now, value };
+});
+const count = (c: string) => rows.filter((r) => r.mark === c).length;
+const chg = count("~");
+const added = count("+") + Object.keys(rec.album.ratings).length + 1;
+const same = count("=");
+const none = count("·");
+const total = rows.length + Object.keys(rec.album.ratings).length + 1;
 const ids = Object.entries(rec.album.ids).filter(([, v]) => v !== null && !(Array.isArray(v) && v.length === 0));
-const STATUS = { "": "same", chg: "changed", new: "new" } as const;
+const unchanged = rows.filter((r) => r.mark === "=").map((r) => FIELD_NAMES[r.k] ?? r.k);
+const ROW = "grid grid-cols-[14px_170px_minmax(0,1fr)_110px_minmax(0,1fr)] max-lg:grid-cols-[14px_minmax(0,1fr)_minmax(0,1.4fr)] items-center gap-3.5 min-h-[34px] px-2.5 py-[5px] border-b border-f8";
 ---
-<h2>Tags</h2>
-<div class="card">
-  <table class="grid-table">
-    <thead><tr><th>Field</th><th>Proposed</th><th>From</th><th>Files have</th></tr></thead>
-    <tbody>
-      {fields.map(([k, f]) => {
-        const cls = change(had(k), f.value);
-        return (
-          <tr>
-            <th>{FIELD_NAMES[k] ?? k}</th>
-            <td class={cls}><ValueView value={proposed(k, f)} chips={CHIP_FIELDS.has(k)} links={links} /></td>
-            <td class="text-xs whitespace-nowrap text-muted">{f.source}</td>
-            <td class="text-xs">
-              {cls === "chg" ? <span>{show(had(k))}</span> : <span class="text-muted">{empty(f.value) ? "" : STATUS[cls]}</span>}
-            </td>
-          </tr>
-        );
-      })}
-      {Object.entries(rec.album.ratings).map(([s, r]) => (
-        <tr>
-          <th>{s} rating</th>
-          <td class="new">{r.value.toFixed(2)} <span class="text-muted">({r.count.toLocaleString("en-GB")} votes{r.as_of && `, as of ${r.as_of}`})</span></td>
-          <td class="text-xs whitespace-nowrap text-muted">{s}</td>
-          <td class="text-xs text-muted">new</td>
-        </tr>
-      ))}
-      <tr>
-        <th>Catalogued at</th>
-        <td class="new">on write</td>
-        <td class="text-xs whitespace-nowrap text-muted">time the files were last synced</td>
-        <td class="text-xs text-muted">new</td>
-      </tr>
-      <tr>
-        <th>IDs</th>
-        <td colspan="3" class="text-xs">{ids.map(([k, v]) => <div>{k}: <ValueView value={v} /></div>)}</td>
-      </tr>
-    </tbody>
-  </table>
+<div class="group/tags flex flex-col" data-tags data-mode="changes">
+  <div class="flex flex-wrap items-center gap-3 pb-3">
+    <span><b class="font-extrabold">~ {chg}</b> changed</span>
+    <span><b class="font-extrabold">+ {added}</b> new</span>
+    <span class="text-muted">= {same} same · {none} empty</span>
+    <span class="flex-1"></span>
+    <span role="group" aria-label="Rows" class="flex">
+      <button type="button" class="seg max-lg:h-11" data-mode-set="changes" aria-pressed="true">changes {chg + added}</button>
+      <button type="button" class="seg max-lg:h-11" data-mode-set="all" aria-pressed="false">all {total}</button>
+    </span>
+  </div>
+  <div class="grid grid-cols-[14px_170px_minmax(0,1fr)_110px_minmax(0,1fr)] max-lg:grid-cols-[14px_minmax(0,1fr)_minmax(0,1.4fr)] items-center gap-3.5 h-[26px] px-2.5 border-b border-faint text-[11px] text-muted">
+    <span></span><span>field</span><span>proposed</span><span class="max-lg:hidden">from</span><span class="max-lg:hidden">files have</span>
+  </div>
+  {rows.map((r) => {
+    const quiet = r.mark === "=" || r.mark === "·";
+    return (
+      <div class={`${ROW} ${quiet ? "group-data-[mode=changes]/tags:hidden" : ""}`}>
+        <span class={quiet ? "text-muted" : "font-extrabold"}>{r.mark}</span>
+        <span class="text-fg2">{FIELD_NAMES[r.k] ?? r.k}</span>
+        <span class={`flex min-w-0 flex-col gap-0.5 ${quiet ? "" : "font-bold"}`}>
+          {r.mark === "·" ? <span class="font-normal text-muted">no source has it</span> : <ValueView value={r.value} chips={CHIP_FIELDS.has(r.k)} chip={CHIP[r.k] ?? "chip-2"} links={links} />}
+          {r.note && <span class="text-[11px] font-normal text-muted">{r.note}</span>}
+        </span>
+        <span class="text-muted max-lg:hidden">{r.f.source ?? ""}</span>
+        <span class={`max-lg:hidden ${r.mark === "~" ? "text-muted line-through" : "text-muted"}`}>
+          {r.mark === "~" ? show(r.now) : r.mark === "+" ? "—" : r.mark === "=" ? show(r.value) : ""}
+        </span>
+      </div>
+    );
+  })}
+  {Object.entries(rec.album.ratings).map(([s, r]) => (
+    <div class={ROW}>
+      <span class="font-extrabold">+</span>
+      <span class="text-fg2">{s} rating</span>
+      <span><b>{r.value.toFixed(2)}</b><span class="text-muted"> · {r.count.toLocaleString("en-GB")} votes{r.as_of && ` · as of ${day(r.as_of)}`}</span></span>
+      <span class="text-muted max-lg:hidden">{s}</span>
+      <span class="text-muted max-lg:hidden">—</span>
+    </div>
+  ))}
+  <div class={ROW}>
+    <span class="font-extrabold">+</span>
+    <span class="text-fg2">Catalogued at</span>
+    <span class="font-bold">on write</span>
+    <span class="text-muted max-lg:hidden">oldest fetch</span>
+    <span class="text-muted max-lg:hidden">—</span>
+  </div>
+  {(same > 0 || none > 0) && (
+    <button type="button" data-mode-set="all" class="hidden group-data-[mode=changes]/tags:grid grid-cols-[14px_minmax(0,1fr)_auto] items-center gap-3.5 min-h-[34px] px-2.5 py-[5px] border-b border-f8 text-left text-muted">
+      <span>=</span>
+      <span class="truncate">{same} unchanged · {none} empty · {unchanged.join(", ").toLowerCase()}</span>
+      <span class="text-fg">show</span>
+    </button>
+  )}
+  <div class="mt-[18px] flex flex-col gap-1.5">
+    <div class="rule-head"><span>──</span><b class="font-extrabold text-fg">ids</b><span>{ids.length} written as tags</span><i class="h-px flex-1 bg-faint"></i></div>
+    <div class="grid grid-cols-2 gap-x-7 gap-y-[3px] px-2.5 text-[11px] text-fg2 max-lg:grid-cols-1">
+      {ids.map(([k, v]) => <span class="min-w-0 break-all"><span class="text-muted">{k} </span>{Array.isArray(v) ? v.join(", ") : String(v)}</span>)}
+    </div>
+  </div>
 </div>
 
-<Tracks rec={rec} />
+<script>
+  for (const root of document.querySelectorAll<HTMLElement>("[data-tags]")) {
+    root.addEventListener("click", (e) => {
+      const b = (e.target as Element).closest<HTMLElement>("[data-mode-set]");
+      if (!b) return;
+      const mode = b.dataset["modeSet"] ?? "changes";
+      root.dataset["mode"] = mode;
+      for (const s of root.querySelectorAll<HTMLElement>("button.seg")) s.setAttribute("aria-pressed", String(s.dataset["modeSet"] === mode));
+    });
+  }
+</script>

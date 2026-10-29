@@ -75,6 +75,11 @@ the catalogue" onward.
 3. Record the verdict:
    `mise run verdict <slug> approve "<one paragraph>"` or
    `mise run verdict <slug> flag "<what's wrong, what you checked>"`.
+   When the flag is a choice between two values (label, catalogue number,
+   edition, cover), add `--question <field> --pick "<current value>"
+   --pick-from "<its sources>" --other "<the alternative>" --other-from
+   "<its sources>"` so deity can decide it from the review page. Keep the
+   message as the full explanation.
    For an approval, say the edition and its evidence, the cover, the
    lyrics counts and anything you changed. Run `resolve` before the
    verdict if you changed anything, so the verdict matches the final

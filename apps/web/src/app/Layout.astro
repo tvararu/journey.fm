@@ -1,10 +1,21 @@
 ---
 import "./styles.css";
+import { day, dots, size } from "@/lib/format";
+import type { Stats } from "@/lib/library";
 
-type Props = { title: string };
-const { title } = Astro.props;
+type Props = { title: string; page: "library" | "review" | "artists" | "album"; stats: Stats; phoneTop?: boolean };
+const { title, page, stats, phoneTop = true } = Astro.props;
 const flash = Astro.cookies.get("flash")?.value;
 if (flash) Astro.cookies.delete("flash", { path: "/" });
+
+const nav = [
+  { key: "1", name: "library", href: "/", page: "library" },
+  { key: "2", name: "review", href: "/review", page: "review" },
+  { key: "3", name: "artists", href: "/artists", page: "artists" },
+];
+const here = (p: string) => p === page || (page === "album" && p === "library");
+const wide = dots(stats.accepted, stats.albums, 20);
+const narrow = dots(stats.accepted, stats.albums, 10);
 ---
 <!doctype html>
 <html lang="en">
@@ -14,10 +25,59 @@ if (flash) Astro.cookies.delete("flash", { path: "/" });
     <link rel="preload" href="/fonts/iosevka-nfp-400.woff2" as="font" type="font/woff2" crossorigin />
     <title>{title}</title>
   </head>
-  <body class="min-h-dvh bg-gap font-mono text-fg">
-    {flash && <div class="flash fixed top-4 right-4 z-50 border border-new-fg bg-new px-4 py-2 text-sm text-new-fg">{flash}</div>}
-    <main class="mx-auto max-w-[1400px] px-4 pt-6 pb-16">
-      <slot />
-    </main>
+  <body class="font-mono text-[12px] leading-[1.4] bg-gap text-fg">
+    <div class="flex flex-col min-h-dvh lg:h-dvh lg:min-h-[760px] lg:overflow-hidden">
+      <header class="hidden lg:grid h-[26px] shrink-0 grid-cols-[1fr_auto_1fr] items-center gap-3.5 px-3.5 bg-bg whitespace-nowrap">
+        <nav aria-label="Pages" class="flex items-center gap-3.5 min-w-0">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="1" y="1" width="12" height="12"></rect><path d="M5 1v12"></path></svg>
+          {nav.map((n) => (
+            <a href={n.href} aria-current={here(n.page) ? "page" : undefined} class:list={["flex gap-1.5", here(n.page) ? "font-extrabold text-fg" : "text-muted"]}>
+              <span>{n.key}</span><span>{n.name}</span>
+              {n.page === "review" && stats.blocked > 0 && <span class="px-1 bg-danger text-bg font-extrabold">{stats.blocked}</span>}
+            </a>
+          ))}
+        </nav>
+        <span class="flex items-center gap-2.5"><span class="block size-1.5 bg-fg"></span><span>sol · Music · {stats.albums} albums · {size(stats.bytes)}{stats.scanned ? ` · scanned ${day(stats.scanned)}` : ""}</span></span>
+        <div class="justify-self-end flex items-center gap-3.5">
+          <span class="flex items-center gap-2"><span>accepted</span><span class="tracking-[1px]">{wide.on}<span class="text-faint">{wide.off}</span></span><span>{stats.accepted}/{stats.albums}</span></span>
+          <span class="text-muted">written 0</span>
+          <button type="button" data-palette class="text-muted cursor-pointer">⌘K</button>
+        </div>
+      </header>
+
+      <header class:list={["lg:hidden sticky top-0 z-20 h-10 shrink-0 flex items-center justify-between px-3.5 bg-bg whitespace-nowrap", !phoneTop && "hidden"]}>
+        <slot name="phone-top">
+          <span class="flex items-center gap-2.5"><svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="1" y="1" width="12" height="12"></rect><path d="M5 1v12"></path></svg><span class="font-extrabold text-[13px]">journey.fm</span></span>
+          <span class="flex items-center gap-2"><span class="tracking-[1px]">{narrow.on}<span class="text-faint">{narrow.off}</span></span><span>{stats.accepted}/{stats.albums}</span></span>
+        </slot>
+      </header>
+
+      <div class="flex-1 min-h-0 flex flex-col lg:flex-row gap-2.5 p-2.5 lg:overflow-auto pb-[calc(72px+env(safe-area-inset-bottom))] lg:pb-2.5">
+        <slot />
+      </div>
+
+      <nav aria-label="Pages" class="lg:hidden fixed inset-x-0 bottom-0 z-20 h-[62px] pb-3 grid grid-cols-4 bg-bg text-[12px]">
+        {nav.map((n) => (
+          <a href={n.href} aria-current={here(n.page) ? "page" : undefined} class:list={["flex items-center justify-center gap-1.5", here(n.page) ? "font-extrabold text-fg" : "text-muted"]}>
+            <span>{n.key}</span><span>{n.name}</span>
+            {n.page === "review" && stats.blocked > 0 && <span class="px-1 bg-danger text-bg font-extrabold">{stats.blocked}</span>}
+          </a>
+        ))}
+        <button type="button" data-palette class="flex items-center justify-center text-muted">⌘K</button>
+      </nav>
+    </div>
+
+    {flash && <div class="flash fixed top-4 right-4 z-50 bg-fg text-bg font-extrabold px-3 py-1.5">{flash}</div>}
+
+    <dialog id="palette" class="pane m-auto mt-[12vh] w-[560px] max-w-[calc(100vw-24px)] overflow-visible p-3 text-fg backdrop:bg-black/50 not-open:hidden">
+      <div class="pane-label"><span>palette</span></div>
+      <input id="palette-input" type="text" autocomplete="off" spellcheck="false" placeholder="album, artist or page" class="w-full h-11 lg:h-7 px-2 bg-f4 border border-ctl outline-none" />
+      <ol id="palette-results" class="mt-2 max-h-[50vh] overflow-auto"></ol>
+    </dialog>
+
+    <script>
+      import "@/app/keys";
+      import "@/app/palette";
+    </script>
   </body>
 </html>
