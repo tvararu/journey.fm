@@ -10,13 +10,23 @@ const kb = (n: number) => `${Math.floor(n / 1024)} KB`;
 <h2>Cover</h2>
 <div class="flex flex-wrap items-start gap-6">
   {cover ? (
-    <figure>
-      <a href={`/data/${cover.master}`}><img class="size-72 bg-faint object-cover" src={`/data/${cover.master}`} alt="" /></a>
-      <figcaption class="mt-2 text-xs text-muted">
-        {cover.chosen.source}, {cover.chosen.width}x{cover.chosen.height}<br />
-        embedded {cover.embed_size[0]}x{cover.embed_size[1]}, {kb(cover.embed_bytes)}
-      </figcaption>
-    </figure>
+    <>
+      <figure>
+        <a href={`/data/${cover.master}`}><img class="size-72 bg-faint object-cover" src={`/data/${cover.master}`} alt="" /></a>
+        <figcaption class="mt-2 text-xs text-muted">
+          cover.{cover.master.split(".").at(-1)}<br />
+          {cover.chosen.width}x{cover.chosen.height}, {kb(cover.chosen.bytes)}<br />
+          {cover.chosen.source}
+        </figcaption>
+      </figure>
+      <figure>
+        <a href={`/data/${cover.embed}`}><img class="size-72 bg-faint object-cover" src={`/data/${cover.embed}`} alt="" /></a>
+        <figcaption class="mt-2 text-xs text-muted">
+          embedded<br />
+          {cover.embed_size[0]}x{cover.embed_size[1]}, {kb(cover.embed_bytes)}
+        </figcaption>
+      </figure>
+    </>
   ) : fallback ? (
     <img class="size-72 bg-faint object-cover" src={fallback} alt="" />
   ) : (
