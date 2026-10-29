@@ -101,7 +101,7 @@ const labels = (r: { "label-info"?: LabelInfo[] }): string =>
 
 const squash = (s: string | null | undefined) => (s ?? "").toLowerCase().normalize("NFKD").replace(/[^a-z0-9]+/g, "");
 
-async function main(slug: string, path: string) {
+export async function edition(slug: string, path: string): Promise<Record<string, unknown>> {
   const fs = files(path);
   const redMap = JSON.parse(readFileSync(`${INV}/music-red.json`, "utf8")) as Record<string, string[]>;
   const redDirs = (redMap[path] ?? []).map(basename);
@@ -214,7 +214,7 @@ async function main(slug: string, path: string) {
   }
   candidates.sort((a, b) => b.evidence.length - a.evidence.length);
   save(slug, "edition-report", report);
-  console.log(dumps(report));
+  return report;
 }
 
 if (import.meta.main) {
@@ -224,5 +224,5 @@ if (import.meta.main) {
     process.exit(1);
   }
   if (process.env["REDACTED_API_KEY"] === undefined) throw new Error("REDACTED_API_KEY is not set");
-  await main(slug, path);
+  console.log(dumps(await edition(slug, path)));
 }

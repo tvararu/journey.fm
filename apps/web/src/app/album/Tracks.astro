@@ -6,9 +6,11 @@ import ValueView from "./Value.astro";
 
 type Props = { rec: AlbumRecord };
 const { rec } = Astro.props;
-const LYRICS = new Set(["lyrics", "instrumental", "acoustid"]);
+const CREDITS = ["composer", "lyricist", "writer", "arranger", "conductor", "performer", "producer", "engineer", "mixer", "remixer"];
+const LYRICS = new Set(["lyrics", "instrumental", "acoustid", ...CREDITS]);
 const keys = Object.keys(rec.tracks[0]?.fields ?? {}).filter((k) => !LYRICS.has(k));
 const hasLyrics = rec.tracks.some((t) => t.fields["lyrics"]);
+const hasCredits = rec.tracks.some((t) => CREDITS.some((k) => t.fields[k]));
 const hasAcoustid = rec.tracks.some((t) => t.ids["acoustid_agrees"] !== undefined);
 
 function filesValue(k: string, v: Value | undefined): Value | undefined {
@@ -30,7 +32,7 @@ const counts = rec.tracks.reduce<Record<string, number>>((m, t) => {
 <h3>Tracks</h3>
 <div class="card">
   <table class="grid-table">
-    <thead><tr><th>File</th>{keys.map((k) => <th>{k}</th>)}{hasLyrics && <th>lyrics</th>}{hasAcoustid && <th>acoustid</th>}</tr></thead>
+    <thead><tr><th>File</th>{keys.map((k) => <th>{k}</th>)}{hasLyrics && <th>lyrics</th>}{hasCredits && <th>credits</th>}{hasAcoustid && <th>acoustid</th>}</tr></thead>
     <tbody>
       {rec.tracks.map((t) => (
         <tr>
@@ -68,6 +70,31 @@ const counts = rec.tracks.reduce<Record<string, number>>((m, t) => {
                     <pre class="mt-2 max-h-96 overflow-auto text-xs whitespace-pre-wrap">{text}</pre>
                   </details>
                 ) : kind}
+              </td>
+            );
+          })()}
+          {hasCredits && (() => {
+            const roles = CREDITS.filter((k) => t.fields[k]);
+            const changed = roles.some((k) => change(t.fields[k]!.candidates["files"], t.fields[k]!.value) === "chg");
+            const n = roles.reduce((m, k) => m + (Array.isArray(t.fields[k]!.value) ? (t.fields[k]!.value as unknown[]).length : 0), 0);
+            return (
+              <td class={`whitespace-nowrap ${n ? (changed ? "chg" : "") : "text-muted"}`}>
+                {roles.length ? (
+                  <details>
+                    <summary class="cursor-pointer">{n} credits</summary>
+                    <dl class="mt-2 grid grid-cols-[auto_1fr] gap-x-3 text-xs whitespace-normal">
+                      {roles.map((k) => (
+                        <>
+                          <dt class="text-muted">{k}</dt>
+                          <dd>
+                            <ValueView value={t.fields[k]!.value} />
+                            {change(t.fields[k]!.candidates["files"], t.fields[k]!.value) === "chg" && <span class="src">files: {String(t.fields[k]!.candidates["files"] ?? "none")}</span>}
+                          </dd>
+                        </>
+                      ))}
+                    </dl>
+                  </details>
+                ) : "none"}
               </td>
             );
           })()}

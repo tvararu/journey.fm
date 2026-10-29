@@ -145,6 +145,16 @@ function trackOrder(a: Inv, b: Inv): number {
   return ka[0]! - kb[0]! || ka[1]! - kb[1]! || (a.relpath < b.relpath ? -1 : a.relpath > b.relpath ? 1 : 0);
 }
 
+function creditFields(mb: Record<string, string[]> | null, f: Inv): Record<string, ReturnType<typeof field>> {
+  const out: Record<string, ReturnType<typeof field>> = {};
+  for (const role of CREDIT_ROLES) {
+    const files = f.tags.filter(([k]) => k.toUpperCase() === role.toUpperCase()).map(([, v]) => v);
+    const fromMb = mb?.[role] ?? [];
+    if (fromMb.length || files.length) out[role] = field({ MusicBrainz: mb ? fromMb : null, files }, mb ? ["MusicBrainz"] : ["files"]);
+  }
+  return out;
+}
+
 const credit = (ac: J[] | null | undefined) => (ac ?? []).map((a) => a.name + (a.joinphrase ?? "")).join("");
 const sortCredit = (ac: J[] | null | undefined) => (ac ?? []).map((a) => a.artist["sort-name"] + (a.joinphrase ?? "")).join("");
 const artists = (ac: J[] | null | undefined) => (ac ?? []).map((a) => a.artist.name as string);
@@ -210,6 +220,42 @@ function distance(a: string, b: string): number {
   return prev[b.length]!;
 }
 
+const ROLES: Record<string, string> = {
+  arranger: "arranger", "instrument arranger": "arranger", "vocal arranger": "arranger", orchestrator: "arranger",
+  audio: "engineer", composer: "composer", conductor: "conductor", engineer: "engineer", lyricist: "lyricist",
+  mix: "mixer", producer: "producer", recording: "engineer", remixer: "remixer", sound: "engineer", writer: "writer",
+};
+export const CREDIT_ROLES = ["composer", "lyricist", "writer", "arranger", "conductor", "performer", "producer", "engineer", "mixer", "remixer"];
+
+function credits(recording: J, releaseRels: J[]): Record<string, string[]> {
+  const out: Record<string, string[]> = {};
+  const played = new Map<string, string[]>();
+  const add = (role: string, v: string) => {
+    if (!(out[role] ??= []).includes(v)) out[role]!.push(v);
+  };
+  const play = (name: string, what: string[]) => {
+    const now = played.get(name) ?? [];
+    for (const w of what) if (!now.includes(w)) now.push(w);
+    played.set(name, now);
+  };
+  const artistRel = (r: J) => {
+    const name = r["target-credit"] || r.artist?.name;
+    if (!name) return;
+    const attrs: string[] = r.attributes ?? [];
+    if (r.type === "instrument") play(name, attrs.length ? attrs : ["instruments"]);
+    else if (r.type === "vocal") play(name, attrs.length ? attrs : ["vocals"]);
+    else if (r.type === "performer" || r.type === "performing orchestra") play(name, attrs);
+    else if (ROLES[r.type]) add(ROLES[r.type]!, name);
+  };
+  for (const r of releaseRels) if (r["target-type"] === "artist") artistRel(r);
+  for (const r of recording?.relations ?? []) {
+    if (r["target-type"] === "artist") artistRel(r);
+    if (r["target-type"] === "work") for (const w of r.work?.relations ?? []) if (w["target-type"] === "artist") artistRel(w);
+  }
+  if (played.size) out["performer"] = [...played].map(([name, what]) => (what.length ? `${name} (${what.join(", ")})` : name));
+  return out;
+}
+
 function pairTracks(fs: Inv[], mtracks: [unknown, J, number][], ac: Record<string, J[] | null> = {}): (number | undefined)[] {
   const out: (number | undefined)[] = fs.map(() => undefined);
   const used = new Set<number>();
@@ -261,6 +307,8 @@ function resolve(slug: string, choice: J) {
   const caa = load(slug, `caa_release_${rid}`) ?? load(slug, `caa_rg_${choice.release_group}`);
   const f0 = fs[0]!;
   const lrclib = load(slug, "lrclib") ?? {};
+  const cr = load(slug, `mb_credits_${rid}`);
+  const crTracks = new Map<string, J>((cr?.media ?? []).flatMap((m: J) => (m.tracks ?? []).map((t: J) => [t.id, t.recording])));
 
   const li: J[] = rel["label-info"] ?? [];
   const rgTypes: unknown[] = rg ? [rg["primary-type"], ...(rg["secondary-types"] ?? [])] : [];
@@ -384,6 +432,7 @@ function resolve(slug: string, choice: J) {
         }, ["LRCLIB synced", "files", "LRCLIB plain"]),
         instrumental: field({ LRCLIB: ly?.instrumental || null }, ["LRCLIB"]),
         acoustid: field({ AcoustID: acTop?.id ?? null, files: tag(f, "ACOUSTID_ID") }, ["AcoustID", "files"]),
+        ...creditFields(t && cr ? credits(crTracks.get(t.id), cr.relations ?? []) : null, f),
       },
       order: pairs[i] ?? 1e6 + i,
       ids: { musicbrainz_track: t?.id ?? null, musicbrainz_recording: rec.id ?? null, lrclib: ly?.id ?? null,

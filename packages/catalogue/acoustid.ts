@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
 
-import { UA } from "./lib/fetch";
+import { slot, UA } from "./lib/fetch";
 import { files } from "./lib/inventory";
 import { META } from "./lib/paths";
 import { save } from "./lib/raw";
@@ -9,7 +9,6 @@ type Print = { path: string; duration?: number; fingerprint?: string };
 export type Match = { id: string; score: number; recordings: string[] };
 
 const PRINTS = `${META}/fingerprints/music.jsonl`;
-let last = 0;
 
 export function prints(): Map<string, Print> {
   const out = new Map<string, Print>();
@@ -28,9 +27,7 @@ async function lookup(p: Print): Promise<Match[]> {
     client: key, duration: String(Math.round(p.duration ?? 0)), fingerprint: p.fingerprint ?? "", meta: "recordingids",
   });
   for (let attempt = 0; attempt < 5; attempt++) {
-    const wait = last + 350 - Date.now();
-    if (wait > 0) await Bun.sleep(wait);
-    last = Date.now();
+    await slot("api.acoustid.org", 350);
     const r = await fetch("https://api.acoustid.org/v2/lookup", {
       body, headers: { "User-Agent": UA }, method: "POST", signal: AbortSignal.timeout(30_000),
     }).catch(() => null);

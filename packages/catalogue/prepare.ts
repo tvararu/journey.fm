@@ -1,6 +1,8 @@
 import { existsSync, readFileSync } from "node:fs";
 
 import { album as lookupAcoustid, prints } from "./acoustid";
+import { edition as runEdition } from "./edition";
+import { enrich } from "./enrich";
 import { files } from "./lib/inventory";
 import { CATALOGUE, META, RAW } from "./lib/paths";
 import { squash } from "./lib/py";
@@ -93,8 +95,7 @@ function acoustidHits(slug: string, rid: string): [number, number] {
 }
 
 async function edition(a: Album): Promise<boolean> {
-  run(["bun", "scripts/edition.ts", a.slug, a.path]);
-  const looked = await lookupAcoustid(a.slug, a.path);
+  const [, looked] = await Promise.all([runEdition(a.slug, a.path), lookupAcoustid(a.slug, a.path)]);
   if (looked.missing.length) say(a, `AcoustID: no fingerprint for ${looked.missing.length} files`);
   const report = load(a.slug, "edition-report") as { candidates: Candidate[]; red?: { year?: number } } | null;
   const cands = report?.candidates ?? [];
@@ -120,12 +121,12 @@ async function edition(a: Album): Promise<boolean> {
       }`
     : "";
   const why = `auto-picked: ${best.ev.join(", ") || "no evidence"}; ${best.lengths}${breaker}`;
-  run(["bun", "scripts/enrich.ts", a.slug, a.path, best.id, why]);
+  await enrich(a.slug, a.path, best.id, why);
   say(a, `edition: ${best.id} (${best.date ?? "?"}) ${why}`);
   return true;
 }
 
-function cover(a: Album): void {
+async function cover(a: Album): Promise<void> {
   const cands = JSON.parse(readFileSync(`${RAW}/${a.slug}/covers/candidates.json`, "utf8")) as Cover[];
   const fronts = cands.filter((c) =>
     COVER_TIERS.includes(c.source) && (c.types.includes("Front") || !c.types.length) &&
@@ -136,7 +137,7 @@ function cover(a: Album): void {
     say(a, "cover: no front candidate; pick one by hand");
     return;
   }
-  const out = run(["bun", "scripts/covers.ts", "choose", a.slug, c.id, `auto-picked: ${c.source} front, ${c.width}x${c.height}`]);
+  const { out } = await runAsync(["bun", "scripts/covers.ts", "choose", a.slug, c.id, `auto-picked: ${c.source} front, ${c.width}x${c.height}`]);
   say(a, `cover: ${c.source} ${c.width}x${c.height}${out.includes("upscaling") ? ", upscaling to master" : ""}`);
 }
 
@@ -158,27 +159,26 @@ const started = Date.now();
 fingerprints();
 const rymDone = rym();
 const ok: Album[] = [];
-for (const a of albums) {
+await Promise.all(albums.map(async (a) => {
   try {
-    if (await edition(a)) ok.push(a);
+    if (!(await edition(a))) return;
+    const r = await runAsync(["bun", "scripts/covers.ts", PREVIEWS, a.slug]);
+    if (r.code !== 0) say(a, `covers failed: ${r.out.slice(-400)}`);
+    else await cover(a);
+    ok.push(a);
   } catch (e) {
-    say(a, `edition failed: ${(e as Error).message}`);
+    say(a, `failed: ${(e as Error).message}`);
   }
-}
-await Promise.all(ok.map(async (a) => {
-  const r = await runAsync(["bun", "scripts/covers.ts", PREVIEWS, a.slug]);
-  if (r.code !== 0) say(a, `covers failed: ${r.out.slice(-400)}`);
-  else cover(a);
 }));
-await rymDone;
 run(["bun", "scripts/resolve.ts"]);
-const ly = await runAsync(["bun", "scripts/lyrics.ts", ...ok.map((a) => a.slug)]);
-for (const a of ok) {
+await Promise.all(ok.map(async (a) => {
+  const ly = await runAsync(["bun", "scripts/lyrics.ts", a.slug]);
   const lines = ly.out.split("\n").filter((l) => l.startsWith(`${a.slug} `));
   const count = (k: string) => lines.filter((l) => l.includes(`-> ${k}`)).length;
   say(a, `lyrics: ${count("synced")} synced, ${count("plain")} plain, ${count("instrumental")} instrumental, ${count("missing")} missing${
     count("failed") ? `, ${count("failed")} failed (rerun music:lyrics)` : ""}`);
-}
+}));
+await rymDone;
 await upscalesDone(started);
 run(["bun", "scripts/resolve.ts"]);
 for (const a of ok) {
