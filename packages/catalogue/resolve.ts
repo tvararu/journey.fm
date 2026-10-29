@@ -1,6 +1,8 @@
 import { Database } from "bun:sqlite";
 import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 
+import { unescapeHtml } from "./lib/py";
+
 type J = any;
 type Cands = Record<string, unknown>;
 type Pick = (cands: Cands, order: string[]) => [unknown, string | null];
@@ -21,17 +23,7 @@ const ASCII: Record<string, string> = {
   "‒": "-", "–": "-", "—": "-", "―": "-", "−": "-", "…": "...", " ": " ", " ": " ", " ": " ",
 };
 const ASCII_RE = new RegExp(`[${Object.keys(ASCII).join("")}]`, "g");
-const ENTITIES: Record<string, string> = {
-  amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", nbsp: " ", rsquo: "’", lsquo: "‘", rdquo: "”", ldquo: "“",
-  ndash: "–", mdash: "—", hellip: "…",
-};
-
-export const unescape = (s: string): string =>
-  s.replace(/&(#x[0-9a-f]+|#\d+|[a-z]+);/gi, (m, e: string) =>
-    e[0] === "#"
-      ? String.fromCodePoint(e[1]?.toLowerCase() === "x" ? parseInt(e.slice(2), 16) : parseInt(e.slice(1), 10))
-      : (ENTITIES[e] ?? m),
-  );
+export const unescape = unescapeHtml;
 
 const empty = (v: unknown) => v === null || v === undefined || v === "" || (Array.isArray(v) && v.length === 0);
 const truthy = (v: unknown) => !empty(v) && v !== 0 && v !== false;

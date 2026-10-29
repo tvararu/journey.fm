@@ -40,11 +40,28 @@ export function dump(path: string, data: unknown, ascii = false): void {
   writeFileSync(path, dumps(data, ascii));
 }
 
-const ENTITIES: Record<string, string> = { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", nbsp: " " };
+const ENTITIES: Record<string, string> = {
+  amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", nbsp: " ", ndash: "–", mdash: "—", lsquo: "‘",
+  rsquo: "’", sbquo: "‚", ldquo: "“", rdquo: "”", bdquo: "„", hellip: "…", laquo: "«",
+  raquo: "»", lsaquo: "‹", rsaquo: "›", middot: "·", bull: "•", times: "×", divide: "÷",
+  deg: "°", copy: "©", reg: "®", trade: "™", iexcl: "¡", iquest: "¿", szlig: "ß",
+  aelig: "æ", AElig: "Æ", oslash: "ø", Oslash: "Ø", eth: "ð", ETH: "Ð", thorn: "þ",
+  THORN: "Þ", oelig: "œ", OElig: "Œ", euro: "€", pound: "£", yen: "¥", cent: "¢",
+  sect: "§", para: "¶", dagger: "†", prime: "′", Prime: "″", minus: "−", shy: "­",
+};
+const MARKS: Record<string, string> = {
+  acute: "́", grave: "̀", circ: "̂", uml: "̈", tilde: "̃", ring: "̊", cedil: "̧", caron: "̌",
+};
+
+const named = (e: string): string | undefined => {
+  if (ENTITIES[e] !== undefined) return ENTITIES[e];
+  const m = /^([A-Za-z])(acute|grave|circ|uml|tilde|ring|cedil|caron)$/.exec(e);
+  return m ? (m[1]! + MARKS[m[2]!]!).normalize("NFC") : undefined;
+};
 
 export const unescapeHtml = (s: string): string =>
   s.replace(/&(#[xX][0-9a-fA-F]+|#\d+|[a-zA-Z]+);/g, (m, e: string) => {
-    if (e[0] !== "#") return ENTITIES[e] ?? m;
+    if (e[0] !== "#") return named(e) ?? m;
     const n = e[1] === "x" || e[1] === "X" ? parseInt(e.slice(2), 16) : parseInt(e.slice(1), 10);
     return n === 0 || n > 0x10ffff || (n >= 0xd800 && n <= 0xdfff) ? "�" : String.fromCodePoint(n);
   });
