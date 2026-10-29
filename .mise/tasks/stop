@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+#MISE description="Stop the catalogue viewer"
+set -euo pipefail
+cd "$MISE_PROJECT_ROOT/hobbies/music/catalogue/web"
+exec bun --bun run astro dev stop

@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+#MISE description="Install the catalogue viewer's dependencies"
+set -euo pipefail
+cd "$MISE_PROJECT_ROOT/hobbies/music/catalogue/web"
+exec bun install

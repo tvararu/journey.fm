@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+#MISE description="Search albums by folder name or any tag value: music:search <text>"
+set -euo pipefail
+cd "$MISE_PROJECT_ROOT/hobbies/music/catalogue"
+exec bun scripts/search.ts "$@"

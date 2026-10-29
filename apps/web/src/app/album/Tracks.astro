@@ -1,0 +1,49 @@
+---
+import { change } from "@/lib/album";
+import { clock } from "@/lib/format";
+import type { AlbumRecord, Value } from "@/lib/records";
+import ValueView from "./Value.astro";
+
+type Props = { rec: AlbumRecord };
+const { rec } = Astro.props;
+const keys = Object.keys(rec.tracks[0]?.fields ?? {});
+
+function filesValue(k: string, v: Value | undefined): Value | undefined {
+  return (k === "disc" || k === "track") && typeof v === "string" ? (v.split("/")[0] ?? v) : v;
+}
+---
+<h2>Tracks</h2>
+<div class="card">
+  <table class="grid-table">
+    <thead><tr><th>File</th>{keys.map((k) => <th>{k}</th>)}</tr></thead>
+    <tbody>
+      {rec.tracks.map((t) => (
+        <tr>
+          <td class="whitespace-nowrap">{t.file}</td>
+          {keys.map((k) => {
+            const f = t.fields[k];
+            if (!f) return <td />;
+            if (k === "length") {
+              const mb = f.candidates["MusicBrainz"];
+              const off = typeof mb === "number" && typeof f.value === "number" && Math.abs(mb - f.value) > 2;
+              return (
+                <td class={`whitespace-nowrap ${off ? "chg" : ""}`}>
+                  {typeof f.value === "number" ? clock(f.value) : "-"}
+                  {off && typeof mb === "number" && <span class="src">MB {clock(mb)}</span>}
+                </td>
+              );
+            }
+            const now = f.candidates["files"];
+            const cls = change(filesValue(k, now), f.value);
+            return (
+              <td class={cls}>
+                <ValueView value={f.value} />
+                {cls === "chg" && <span class="src">was {String(now)}</span>}
+              </td>
+            );
+          })}
+        </tr>
+      ))}
+    </tbody>
+  </table>
+</div>

@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+#MISE description="Find the exact edition behind an album: music:edition <slug> <Music/Artist/Album>"
+set -euo pipefail
+cd "$MISE_PROJECT_ROOT/hobbies/music/catalogue"
+exec python3 edition.py "$@"

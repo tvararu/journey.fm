@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+#MISE description="Generate Astro types, then type-check the catalogue viewer"
+set -euo pipefail
+cd "$MISE_PROJECT_ROOT/hobbies/music/catalogue/web"
+bun --bun run astro sync
+exec bun check

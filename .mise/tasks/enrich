@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+#MISE description="Fetch release group, covers and Discogs for a chosen edition: music:enrich <slug> <path> <release-id> <why>"
+set -euo pipefail
+cd "$MISE_PROJECT_ROOT/hobbies/music/catalogue"
+exec python3 enrich.py "$@"

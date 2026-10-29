@@ -1,0 +1,25 @@
+---
+import { show } from "@/lib/format";
+import type { RymLink, Value } from "@/lib/records";
+
+type Props = { value: Value | undefined; chips?: boolean; links?: Map<string, RymLink> };
+const { value, chips = false, links } = Astro.props;
+const list = Array.isArray(value) ? value : [value];
+const url = typeof value === "string" && value.startsWith("https://") ? value : null;
+---
+{chips && value ? (
+  <div>
+    {list.map((v) => {
+      const link = links?.get(String(v));
+      return link ? (
+        <a class="chip" href={link.url} title={`RYM genre ${link.id}`}>{v}</a>
+      ) : (
+        <span class="chip">{v}</span>
+      );
+    })}
+  </div>
+) : url ? (
+  <a href={url}>{url.replace(/\/$/, "").split("/").at(-1)}</a>
+) : (
+  <span class={show(value) === "-" ? "text-faint" : ""}>{show(value)}</span>
+)}

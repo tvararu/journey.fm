@@ -1,0 +1,118 @@
+@import "tailwindcss";
+
+@font-face {
+  font-family: "Iosevka NFP";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("/fonts/iosevka-nfp-400.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Iosevka NFP";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("/fonts/iosevka-nfp-700.woff2") format("woff2");
+}
+
+:root {
+  color-scheme: light;
+  --bg: #ffffff;
+  --gap: #f2f2f2;
+  --fg: #000000;
+  --muted: #6e6e6e;
+  --faint: #c8c8c8;
+  --rule: rgb(0 0 0 / 0.1);
+  --accent: #2c5fb3;
+  --chg: #fff2cc;
+  --chg-fg: #6b4e00;
+  --new: #e3f4e8;
+  --new-fg: #1d6b3a;
+  --bad: #fbe4e4;
+  --bad-fg: #9b2226;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    --bg: #090909;
+    --gap: #000000;
+    --fg: #ececec;
+    --muted: #8d8d8d;
+    --faint: #3b3b3b;
+    --rule: rgb(255 255 255 / 0.1);
+    --accent: #86aef0;
+    --chg: #3b3214;
+    --chg-fg: #f0d27a;
+    --new: #183323;
+    --new-fg: #7fd6a0;
+    --bad: #3d1d1f;
+    --bad-fg: #f1a0a3;
+  }
+}
+
+@theme inline {
+  --font-mono: "Iosevka NFP", ui-monospace, Menlo, monospace;
+  --color-bg: var(--bg);
+  --color-gap: var(--gap);
+  --color-fg: var(--fg);
+  --color-muted: var(--muted);
+  --color-faint: var(--faint);
+  --color-rule: var(--rule);
+  --color-accent: var(--accent);
+  --color-chg: var(--chg);
+  --color-chg-fg: var(--chg-fg);
+  --color-new: var(--new);
+  --color-new-fg: var(--new-fg);
+  --color-bad: var(--bad);
+  --color-bad-fg: var(--bad-fg);
+}
+
+@layer components {
+  .card {
+    @apply overflow-x-auto border border-rule bg-bg;
+  }
+  .grid-table {
+    @apply w-full border-collapse text-sm;
+  }
+  .grid-table th,
+  .grid-table td {
+    @apply border-b border-rule px-3 py-1.5 text-left align-top;
+  }
+  .grid-table thead th {
+    @apply sticky top-0 bg-bg text-xs font-bold whitespace-nowrap text-muted uppercase;
+  }
+  .grid-table tbody th {
+    @apply font-bold whitespace-nowrap text-muted;
+  }
+  .grid-table tbody tr:last-child > * {
+    @apply border-b-0;
+  }
+  .badge {
+    @apply mr-1 inline-block rounded-full border border-rule px-2 text-xs whitespace-nowrap;
+  }
+  .badge-processed {
+    @apply border-transparent bg-new text-new-fg;
+  }
+  .badge-issue {
+    @apply border-transparent bg-bad text-bad-fg;
+  }
+  .chg {
+    @apply bg-chg text-chg-fg;
+  }
+  .new {
+    @apply bg-new text-new-fg;
+  }
+  .src {
+    @apply block text-xs text-muted;
+  }
+  .chip {
+    @apply mr-1 mb-1 inline-block rounded-full border border-rule bg-gap px-2 text-xs;
+  }
+  h2 {
+    @apply mt-8 mb-2 text-base font-bold;
+  }
+  a {
+    @apply text-accent hover:underline;
+  }
+}

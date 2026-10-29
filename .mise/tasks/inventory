@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+#MISE description="Rescan sol's Music into a new dated inventory on sol (read-only on the music), then pull it"
+set -euo pipefail
+
+stamp=$(date +%Y-%m-%d-%H%M)
+dest="/mnt/pool/music-meta/inventory-$stamp"
+scp -q "$MISE_PROJECT_ROOT/hobbies/music/tagging/inventory.py" sol:catalogue/inventory.py
+ssh sol bash -s <<SH
+set -euo pipefail
+[ ! -e "$dest" ] || { echo "$dest exists" >&2; exit 1; }
+mkdir -p "$dest"
+cd ~/catalogue
+python3 -I inventory.py "$dest" | awk 'NR % 100 == 0 { print NR, \$0; fflush() }'
+cp ~/catalogue/music-red.json "$dest/"
+sqlite3 "$dest/inventory.sqlite" "select count(*) || ' albums' from albums; select count(*) || ' files, ' || sum(error is not null) || ' errors' from files;"
+SH
+exec mise music:pull

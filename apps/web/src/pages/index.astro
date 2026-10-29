@@ -1,0 +1,102 @@
+---
+import Layout from "@/app/Layout.astro";
+import { format } from "@/lib/format";
+import { library } from "@/lib/library";
+
+const rows = await library();
+const processedCount = rows.filter((r) => r.state === "processed").length;
+---
+<Layout title="Music library">
+  <h1 class="text-2xl font-bold">Music library</h1>
+  <p class="mt-1 text-muted">
+    {rows.length} albums in sol's Music, scanned 29 Oct. {processedCount} processed,
+    {rows.length - processedCount} in triage. Files as they are on disk, nothing written.
+  </p>
+  <div class="my-4 flex flex-wrap items-center gap-2">
+    <input
+      id="q"
+      autofocus
+      class="min-w-64 border border-rule bg-bg px-3 py-1.5"
+      placeholder="Filter by artist, album or issue"
+    />
+    {["all", "processed", "triage", "issues"].map((f) => (
+      <button
+        data-f={f}
+        aria-pressed={f === "all" ? "true" : "false"}
+        class="border border-rule bg-bg px-3 py-1 capitalize aria-pressed:border-accent aria-pressed:bg-accent aria-pressed:text-bg"
+      >
+        {f === "issues" ? "with issues" : f}
+      </button>
+    ))}
+    <span id="n" class="text-muted"></span>
+  </div>
+  <div class="card">
+    <table class="grid-table">
+      <thead>
+        <tr><th></th><th>Album</th><th>State</th><th>Date tag</th><th>Format</th><th>Tracks</th><th>Length</th><th>Issues</th></tr>
+      </thead>
+      <tbody id="rows">
+        {rows.map((r) => (
+          <tr
+            data-state={r.state}
+            data-issues={r.issues.length}
+            data-q={`${r.path} ${r.issues.join(" ")}`.toLowerCase()}
+          >
+            <td>
+              {r.thumb ? (
+                <img class="size-10 bg-faint object-cover" loading="lazy" src={`/blob/${r.thumb}`} alt="" />
+              ) : (
+                <div class="size-10 bg-faint" />
+              )}
+            </td>
+            <td>
+              <a href={`/album/${r.id}`}>{r.album_dir}</a>
+              <span class="src">{r.artist_dir}</span>
+            </td>
+            <td><span class={`badge ${r.state === "processed" ? "badge-processed" : ""}`}>{r.state}</span></td>
+            <td class="whitespace-nowrap">{r.dates.join(", ")}</td>
+            <td class="whitespace-nowrap">{format(r.codec, r.bits, r.sr)}</td>
+            <td>{r.n}</td>
+            <td class="whitespace-nowrap">{Math.floor(r.dur / 60)} min</td>
+            <td>{r.issues.map((i) => <span class="badge badge-issue">{i}</span>)}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  </div>
+</Layout>
+
+<script>
+  const q = document.querySelector<HTMLInputElement>("#q");
+  const n = document.querySelector("#n");
+  const rows = [...document.querySelectorAll<HTMLTableRowElement>("#rows tr")];
+  const buttons = [...document.querySelectorAll<HTMLButtonElement>("[data-f]")];
+  let filter = "all";
+
+  function matches(r: HTMLTableRowElement, s: string): boolean {
+    if (s && !r.dataset["q"]?.includes(s)) return false;
+    if (filter === "all") return true;
+    if (filter === "issues") return Number(r.dataset["issues"]) > 0;
+    return r.dataset["state"] === filter;
+  }
+
+  function run() {
+    const s = q?.value.toLowerCase() ?? "";
+    let shown = 0;
+    for (const r of rows) {
+      r.hidden = !matches(r, s);
+      if (!r.hidden) shown++;
+    }
+    if (n) n.textContent = `${shown} shown`;
+  }
+
+  q?.addEventListener("input", run);
+  for (const b of buttons) {
+    b.addEventListener("click", () => {
+      filter = b.dataset["f"] ?? "all";
+      for (const x of buttons) x.setAttribute("aria-pressed", String(x === b));
+      run();
+    });
+  }
+  run();
+</script>

@@ -1,0 +1,20 @@
+---
+import "./styles.css";
+
+type Props = { title: string };
+const { title } = Astro.props;
+---
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="preload" href="/fonts/iosevka-nfp-400.woff2" as="font" type="font/woff2" crossorigin />
+    <title>{title}</title>
+  </head>
+  <body class="min-h-dvh bg-gap font-mono text-fg">
+    <main class="mx-auto max-w-[1400px] px-4 pt-6 pb-16">
+      <slot />
+    </main>
+  </body>
+</html>

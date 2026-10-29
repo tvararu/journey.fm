@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+#MISE description="Start the catalogue viewer (Astro dev server, localhost:8787, runs in the background)"
+set -euo pipefail
+cd "$MISE_PROJECT_ROOT/hobbies/music/catalogue/web"
+[ -d node_modules ] || bun install
+exec bun --bun run astro dev

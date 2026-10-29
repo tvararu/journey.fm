@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+#MISE description="Copy sol's music-meta (inventories, raw responses, catalogue) here and point data/inventory at the newest scan"
+set -euo pipefail
+
+data="$MISE_PROJECT_ROOT/hobbies/music/catalogue/data"
+mkdir -p "$data"
+rsync -au sol:/mnt/pool/music-meta/ "$data/"
+latest=$(cd "$data" && ls -d inventory-*/ | sort | tail -1)
+ln -sfn "${latest%/}" "$data/inventory"
+echo "data/inventory -> ${latest%/}"

@@ -1,0 +1,42 @@
+---
+import AlbumFields from "@/app/album/AlbumFields.astro";
+import Cover from "@/app/album/Cover.astro";
+import FileDetails from "@/app/album/FileDetails.astro";
+import Tracks from "@/app/album/Tracks.astro";
+import Layout from "@/app/Layout.astro";
+import { album } from "@/lib/inventory";
+import { coverCandidates, coverChoices, processed, redCopies } from "@/lib/records";
+
+const data = album(Number(Astro.params["id"]));
+if (!data) return new Response("not found", { status: 404 });
+const { album: a, files, tags, pictures, extras } = data;
+const [done, covers, red] = await Promise.all([processed(), coverChoices(), redCopies()]);
+const rec = done.get(a.path);
+const cover = rec ? covers[rec.slug] : undefined;
+const candidates = rec && cover ? await coverCandidates(rec.slug) : [];
+const fallback = pictures.find((p) => p.type === 3)?.sha256 ?? extras.find((x) => /\.(jpe?g|png)$/i.test(x.relpath))?.sha256;
+const img = cover ? `/data/${cover.master}` : fallback ? `/blob/${fallback}` : null;
+---
+<Layout title={a.album_dir}>
+  <p><a href="/">← Library</a></p>
+  <div class="mt-3 flex flex-wrap items-start gap-5">
+    {img ? <img class="size-56 bg-faint object-cover" src={img} alt="" /> : <div class="size-56 bg-faint" />}
+    <div>
+      <h1 class="text-2xl font-bold">{a.album_dir}</h1>
+      <p class="text-muted">{a.artist_dir} · {a.path}</p>
+      <p class="mt-2"><span class={`badge ${rec ? "badge-processed" : ""}`}>{rec ? "processed" : "triage"}</span></p>
+      <p class="mt-2 text-muted">RED copy: {(red[a.path] ?? []).join(", ") || "none"}</p>
+      {rec && (
+        <p class="text-muted">
+          Edition: MusicBrainz release{" "}
+          <a href={`https://musicbrainz.org/release/${rec.edition_choice.release}`}>{rec.edition_choice.release.slice(0, 8)}</a>
+          {" "}· {rec.edition_choice.how}
+        </p>
+      )}
+    </div>
+  </div>
+  {rec && <AlbumFields rec={rec} tags={tags} />}
+  {rec && <Tracks rec={rec} />}
+  {cover && <Cover choice={cover} candidates={candidates} />}
+  <FileDetails files={files} tags={tags} pictures={pictures} extras={extras} />
+</Layout>
