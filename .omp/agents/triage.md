@@ -9,12 +9,12 @@ Use `mise run music:<task>` for everything.
 
 ## Steps
 
-1. Wait for the album to finish preparing. Run this in the foreground
-   (timeout 600000 ms), repeating it until the file exists, at most six
-   times:
-   `until [ -f data/raw/<slug>/prepared.json ]; do sleep 10; done`
-   If it never appears, or `prepared.json` has a non-null `failed`,
-   return `needs_work` with that as the reason.
+1. Wait for the album to finish preparing: run
+   `mise run music:wait <slug>` in the foreground with a 600000 ms
+   timeout. It blocks for up to 9 minutes. If it prints "still waiting",
+   run it again, as many times as it takes; albums can take 40 minutes.
+   Don't background it and don't start monitors. If it prints
+   "failed: ...", return `needs_work` with that reason.
 2. Run `mise run music:inspect <slug>`. That page is everything you need
    about the edition, fields, tracks and cover candidates.
 3. Run `mise run music:sheet <slug>` and look at the image it names with
@@ -25,7 +25,9 @@ Use `mise run music:<task>` for everything.
 
 - **Edition:** the pick has track-length evidence, plus AcoustID matching
   every track, a disc ID, or the files' MusicBrainz tag. It's an official
-  release. A tie broken by the files' tag is fine.
+  release. Ties between releases with the same audio are normal, and
+  however the tie was broken (files' tag, disc ID order, RED year) is
+  fine; don't send an album on for a tie.
 - **Tracks:** every file is in the record, no `GAP`, no `AC DIFFERS`.
   A bonus file with no MusicBrainz track is fine if it is the only one.
   `ac ?` on every track is fine when AcoustID simply has no data.
