@@ -1,21 +1,35 @@
 ---
 import { change } from "@/lib/album";
 import { clock } from "@/lib/format";
-import type { AlbumRecord, Value } from "@/lib/records";
+import type { AlbumRecord, Field, Value } from "@/lib/records";
 import ValueView from "./Value.astro";
 
 type Props = { rec: AlbumRecord };
 const { rec } = Astro.props;
-const keys = Object.keys(rec.tracks[0]?.fields ?? {});
+const LYRICS = new Set(["lyrics", "instrumental"]);
+const keys = Object.keys(rec.tracks[0]?.fields ?? {}).filter((k) => !LYRICS.has(k));
+const hasLyrics = rec.tracks.some((t) => t.fields["lyrics"]);
 
 function filesValue(k: string, v: Value | undefined): Value | undefined {
   return (k === "disc" || k === "track") && typeof v === "string" ? (v.split("/")[0] ?? v) : v;
 }
+
+function lyricsKind(fs: Record<string, Field>): string {
+  if (fs["instrumental"]?.value) return "instrumental";
+  const src = fs["lyrics"]?.source;
+  return src === "LRCLIB synced" ? "synced" : src === "LRCLIB plain" ? "plain" : src === "files" ? "from files" : "missing";
+}
+
+const counts = rec.tracks.reduce<Record<string, number>>((m, t) => {
+  const k = lyricsKind(t.fields);
+  m[k] = (m[k] ?? 0) + 1;
+  return m;
+}, {});
 ---
 <h3>Tracks</h3>
 <div class="card">
   <table class="grid-table">
-    <thead><tr><th>File</th>{keys.map((k) => <th>{k}</th>)}</tr></thead>
+    <thead><tr><th>File</th>{keys.map((k) => <th>{k}</th>)}{hasLyrics && <th>lyrics</th>}</tr></thead>
     <tbody>
       {rec.tracks.map((t) => (
         <tr>
@@ -42,8 +56,25 @@ function filesValue(k: string, v: Value | undefined): Value | undefined {
               </td>
             );
           })}
+          {hasLyrics && (() => {
+            const kind = lyricsKind(t.fields);
+            const text = t.fields["lyrics"]?.value;
+            return (
+              <td class={`whitespace-nowrap ${kind === "missing" ? "text-muted" : kind === "instrumental" ? "" : "new"}`}>
+                {typeof text === "string" ? (
+                  <details>
+                    <summary class="cursor-pointer">{kind}</summary>
+                    <pre class="mt-2 max-h-96 overflow-auto text-xs whitespace-pre-wrap">{text}</pre>
+                  </details>
+                ) : kind}
+              </td>
+            );
+          })()}
         </tr>
       ))}
     </tbody>
   </table>
+  {hasLyrics && (
+    <p class="mt-2 text-xs text-muted">Lyrics: {Object.entries(counts).map(([k, n]) => `${n} ${k}`).join(", ")}</p>
+  )}
 </div>
