@@ -208,6 +208,16 @@ const round1 = (x: number) => Math.round(x * 10) / 10;
 
 const norm = (s: string | null | undefined) => (s ?? "").toLowerCase().normalize("NFKD").replace(/[^a-z0-9]+/g, "");
 
+function distance(a: string, b: string): number {
+  let prev = Array.from({ length: b.length + 1 }, (_, j) => j);
+  for (let i = 1; i <= a.length; i++) {
+    const row = [i];
+    for (let j = 1; j <= b.length; j++) row[j] = Math.min(prev[j]! + 1, row[j - 1]! + 1, prev[j - 1]! + (a[i - 1] === b[j - 1] ? 0 : 1));
+    prev = row;
+  }
+  return prev[b.length]!;
+}
+
 function pairTracks(fs: Inv[], mtracks: [unknown, J, number][]): (number | undefined)[] {
   const out: (number | undefined)[] = fs.map(() => undefined);
   const used = new Set<number>();
@@ -228,6 +238,12 @@ function pairTracks(fs: Inv[], mtracks: [unknown, J, number][]): (number | undef
   fs.forEach((f, i) => {
     claim(i, mtracks.findIndex(([, t], j) =>
       !used.has(j) && norm(t.title) === norm(tag(f, "TITLE")) && Math.abs((t.length ?? 0) / 1000 - f.duration) <= 3));
+  });
+  const secs = (t: J) => (t.length ?? 0) / 1000;
+  fs.forEach((f, i) => {
+    const a = norm(tag(f, "TITLE"));
+    claim(i, mtracks.findIndex(([, t], j) =>
+      !used.has(j) && a.length > 3 && distance(a, norm(t.title)) <= Math.max(2, a.length / 10) && Math.abs(secs(t) - f.duration) <= 3));
   });
   if (fs.length === mtracks.length) fs.forEach((_, i) => claim(i, i));
   return out;
