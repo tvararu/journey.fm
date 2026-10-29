@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-#MISE description="Gather cover candidates and previews: music:covers [slug...], or music:covers choose <slug> <candidate-id> <why>"
+#MISE description="Gather cover candidates: music:covers [slug...]; music:covers add <slug> <url> <source> <note>; music:covers choose <slug> <candidate-id> <why>"
 set -euo pipefail
 cd "$MISE_PROJECT_ROOT/hobbies/music/catalogue"
-if [ "${1:-}" = choose ]; then exec python3 covers.py "$@"; fi
+if [ "${1:-}" = choose ] || [ "${1:-}" = add ]; then exec python3 covers.py "$@"; fi
 exec python3 covers.py "$MISE_PROJECT_ROOT/tmp/music-covers" "$@"
