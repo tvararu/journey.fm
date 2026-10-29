@@ -7,7 +7,7 @@ import ValueView from "./Value.astro";
 type Props = { rec: AlbumRecord; raw: RawFile[] };
 const { rec, raw } = Astro.props;
 const ORDER = ["files", "MusicBrainz", "RYM", "RED", "Discogs"];
-const fields = Object.entries(rec.album).filter(([k]) => !["ids", "rym_links", "cover"].includes(k)) as [string, Field][];
+const fields = Object.entries(rec.album).filter(([k]) => !["ids", "rym_links", "cover", "ratings"].includes(k)) as [string, Field][];
 const seen = new Set(fields.flatMap(([, f]) => Object.keys(f.candidates)));
 const sources = [...ORDER.filter((s) => seen.has(s)), ...[...seen].filter((s) => !ORDER.includes(s)).sort()];
 const picked = (f: Field, s: string) => (f.source ?? "").split(", refined by ").includes(s);

@@ -63,8 +63,11 @@ if (conversation.length) {
 const rec = records.find((r) => r.path === a.path);
 if (rec) {
   console.log(`Processed as ${rec.slug}:`);
+  const ratings = (rec.album as unknown as { ratings?: Record<string, { value: number; count: number }> }).ratings ?? {};
+  const line = Object.entries(ratings).map(([s, r]) => `${s} ${r.value.toFixed(2)} (${r.count})`).join(" · ");
+  if (line) console.log(`  ${"ratings".padEnd(18)} ${line}`);
   for (const [k, f] of Object.entries(rec.album)) {
-    if (k === "ids" || k === "rym_links") continue;
+    if (k === "ids" || k === "rym_links" || k === "ratings") continue;
     const v = Array.isArray(f.value) ? f.value.join(", ") : String(f.value ?? "-");
     console.log(`  ${k.padEnd(18)} ${v.length > 90 ? `${v.slice(0, 90)}…` : v}  [${f.source ?? ""}]`);
   }

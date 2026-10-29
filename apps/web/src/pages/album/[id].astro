@@ -46,6 +46,12 @@ const minutes = Math.round(files.reduce((s, f) => s + (f.duration ?? 0), 0) / 60
       <dt class="text-muted">Audio</dt><dd>{quality(files)}</dd>
       <dt class="text-muted">Size</dt><dd>{size(totalBytes)} · {files.length} tracks · {minutes} min</dd>
       <dt class="text-muted">On sol</dt><dd class="break-all">{a.path}</dd>
+      {rec && Object.keys(rec.album.ratings).length > 0 && (
+        <>
+          <dt class="text-muted">Ratings</dt>
+          <dd>{Object.entries(rec.album.ratings).map(([s, r]) => `${s} ${r.value.toFixed(2)} (${r.count.toLocaleString("en-GB")})`).join(" · ")}</dd>
+        </>
+      )}
       <dt class="text-muted">RED</dt><dd class="break-all">{(red[a.path] ?? []).join(", ") || "none"}</dd>
     </dl>
   </header>

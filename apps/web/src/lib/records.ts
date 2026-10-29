@@ -12,6 +12,8 @@ export type Field = {
 
 export type RymLink = { name: string; id: number; url: string };
 
+export type Rating = { value: number; count: number; scale: number };
+
 export type AlbumRecord = {
   slug: string;
   path: string;
@@ -19,6 +21,7 @@ export type AlbumRecord = {
   edition_choice: { release: string; how: string };
   album: Record<string, Field> & {
     ids: Record<string, Value>;
+    ratings: Record<string, Rating>;
     rym_links: {
       artists: RymLink[];
       primary: RymLink[];

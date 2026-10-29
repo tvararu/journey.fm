@@ -10,7 +10,11 @@ export type ReviewStatus = "awaiting review" | "changes requested" | "updated si
 export function fingerprint(rec: AlbumRecord): string {
   const value = (f: unknown) => (f && typeof f === "object" && "value" in f ? f.value : f);
   const values = {
-    album: Object.fromEntries(Object.entries(rec.album).map(([k, f]) => [k, value(f)])),
+    album: Object.fromEntries(
+      Object.entries(rec.album)
+        .filter(([k]) => k !== "ratings")
+        .map(([k, f]) => [k, value(f)]),
+    ),
     edition: rec.edition_choice.release,
     tracks: rec.tracks.map((t) => Object.fromEntries(Object.entries(t.fields).map(([k, f]) => [k, f.value]))),
   };
