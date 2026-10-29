@@ -10,16 +10,18 @@ import { album } from "@/lib/inventory";
 import { rawFiles } from "@/lib/raw";
 import { coverCandidates, coverChoices, notesFor, processed, redCopies } from "@/lib/records";
 import { reviews, statusOf } from "@/lib/reviews";
+import { agentState, verdicts } from "@/lib/verdicts";
 
 const data = album(Number(Astro.params["id"]));
 if (!data) return new Response("not found", { status: 404 });
 const { album: a, files, tags, pictures, extras } = data;
-const [done, covers, red, notes, allReviews] = await Promise.all([
+const [done, covers, red, notes, allReviews, allVerdicts] = await Promise.all([
   processed(),
   coverChoices(),
   redCopies(),
   notesFor(a.path),
   reviews(),
+  verdicts(),
 ]);
 const rec = done.get(a.path);
 const cover = rec ? covers[rec.slug] : undefined;
@@ -27,6 +29,8 @@ const candidates = rec ? await coverCandidates(rec.slug) : [];
 const raw = rec ? await rawFiles(rec) : [];
 const albumReviews = allReviews.get(a.path) ?? [];
 const status = rec ? statusOf(rec, albumReviews) : null;
+const albumVerdicts = allVerdicts.get(a.path) ?? [];
+const agent = rec ? agentState(rec, albumVerdicts) : null;
 const state = status ?? "triage";
 const BADGE: Record<string, string> = { accepted: "badge-processed", triage: "" };
 const embedded = pictures.find((p) => p.type === 3)?.sha256;
@@ -41,7 +45,15 @@ const minutes = Math.round(files.reduce((s, f) => s + (f.duration ?? 0), 0) / 60
   <header class="mt-4">
     <h1>{a.album_dir}</h1>
     <p class="text-muted">{a.artist_dir}</p>
-    <p class="mt-2"><span class={`badge ${BADGE[state] ?? "chg border-transparent"}`}>{state}</span></p>
+    <p class="mt-2">
+      <span class={`badge ${BADGE[state] ?? "chg border-transparent"}`}>{state}</span>
+      {agent && (
+        <span class={`badge ml-1 border-transparent ${agent.stale ? "text-muted" : agent.verdict === "approve" ? "new" : "badge-issue"}`}>
+          {agent.stale ? "agent verdict stale" : agent.verdict === "approve" ? "agent approved" : "agent flagged"}
+        </span>
+      )}
+    </p>
+    {agent?.verdict === "flag" && !agent.stale && <p class="mt-2 max-w-3xl border-l-2 border-chg-fg pl-3 text-chg-fg">{agent.message}</p>}
     <dl class="mt-3 grid grid-cols-[auto_1fr] gap-x-4 text-sm">
       <dt class="text-muted">Audio</dt><dd>{quality(files)}</dd>
       <dt class="text-muted">Size</dt><dd>{size(totalBytes)} · {files.length} tracks · {minutes} min</dd>
@@ -64,7 +76,7 @@ const minutes = Math.round(files.reduce((s, f) => s + (f.duration ?? 0), 0) / 60
 
   <Cover cover={cover} candidates={candidates} fallback={fallback ? `/blob/${fallback}` : null} slug={rec?.slug} album={a.path} back={here} />
   {rec && <Proposed rec={rec} tags={tags} />}
-  <Conversation notes={notes} reviews={albumReviews} album={a.path} back={here} status={status} />
+  <Conversation notes={notes} reviews={albumReviews} verdicts={albumVerdicts} album={a.path} back={here} status={status} />
 
   {rec && (
     <details>

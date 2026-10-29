@@ -4,7 +4,7 @@ import { format, size } from "@/lib/format";
 import { library } from "@/lib/library";
 
 const rows = await library();
-const FILTERS = ["all", "triage", "review", "changes", "accepted", "issues"];
+const FILTERS = ["all", "triage", "ready", "investigate", "review", "changes", "accepted", "issues"];
 const GROUP: Record<string, string> = {
   "accepted, then changed": "review",
   "awaiting review": "review",
@@ -12,7 +12,14 @@ const GROUP: Record<string, string> = {
   "updated since request": "review",
 };
 const BADGE: Record<string, string> = { accepted: "badge-processed", triage: "" };
-const LABELS: Record<string, string> = { changes: "changes requested", issues: "with issues", review: "to review" };
+const LABELS: Record<string, string> = {
+  changes: "changes requested", investigate: "to investigate", issues: "with issues", ready: "ready for you", review: "to review",
+};
+const bucket = (r: (typeof rows)[number]): string => {
+  const g = GROUP[r.state] ?? r.state;
+  if (g !== "review" || !r.agent || r.agent.stale) return g;
+  return r.agent.verdict === "approve" ? "ready" : "investigate";
+};
 const initialFilter = FILTERS.find((f) => f === Astro.url.searchParams.get("f")) ?? "all";
 const initialQuery = Astro.url.searchParams.get("q") ?? "";
 const count = (s: string) => rows.filter((r) => r.state === s).length;
@@ -23,6 +30,7 @@ const totalBytes = rows.reduce((s, r) => s + r.bytes, 0);
   <p class="mt-1 text-muted">
     {rows.length} albums in sol's Music ({size(totalBytes)}), scanned 29 Oct. {count("triage")} in triage,
     {count("awaiting review") + count("updated since request") + count("accepted, then changed")} to review,
+    {rows.filter((r) => bucket(r) === "ready").length} of them ready for you, {rows.filter((r) => bucket(r) === "investigate").length} to investigate,
     {count("changes requested")} with changes requested, {count("accepted")} accepted. Nothing written yet.
   </p>
   <div class="my-4 flex flex-wrap items-center gap-2">
@@ -52,9 +60,9 @@ const totalBytes = rows.reduce((s, r) => s + r.bytes, 0);
       <tbody id="rows">
         {rows.map((r) => (
           <tr
-            data-state={GROUP[r.state] ?? r.state}
+            data-state={bucket(r)}
             data-issues={r.issues.length}
-            data-q={`${r.path} ${r.issues.join(" ")}`.toLowerCase()}
+            data-q={`${r.path} ${r.issues.join(" ")} ${r.agent?.message ?? ""}`.toLowerCase()}
           >
             <td>
               {r.thumb ? (
@@ -67,13 +75,23 @@ const totalBytes = rows.reduce((s, r) => s + r.bytes, 0);
               <a href={`/album/${r.id}`}>{r.album_dir}</a>
               <span class="src">{r.artist_dir}</span>
             </td>
-            <td><span class={`badge whitespace-nowrap ${BADGE[r.state] ?? "chg border-transparent"}`}>{r.state}</span></td>
+            <td>
+              <span class={`badge whitespace-nowrap ${BADGE[r.state] ?? "chg border-transparent"}`}>{r.state}</span>
+              {r.agent && (bucket(r) === "ready" || bucket(r) === "investigate" || r.agent.stale) && (
+                <span class={`badge ml-1 whitespace-nowrap border-transparent ${r.agent.stale ? "text-muted" : r.agent.verdict === "approve" ? "new" : "badge-issue"}`}>
+                  {r.agent.stale ? "agent verdict stale" : r.agent.verdict === "approve" ? "agent approved" : "agent flagged"}
+                </span>
+              )}
+            </td>
             <td class="whitespace-nowrap">{r.dates.join(", ")}</td>
             <td class="whitespace-nowrap">{format(r.codec, r.bits, r.sr)}</td>
             <td class="whitespace-nowrap">{size(r.bytes)}</td>
             <td>{r.n}</td>
             <td class="whitespace-nowrap">{Math.floor(r.dur / 60)} min</td>
-            <td>{r.issues.map((i) => <span class="badge badge-issue">{i}</span>)}</td>
+            <td>
+              {r.issues.map((i) => <span class="badge badge-issue">{i}</span>)}
+              {r.agent?.verdict === "flag" && !r.agent.stale && <p class="mt-1 max-w-md text-xs text-chg-fg">{r.agent.message}</p>}
+            </td>
           </tr>
         ))}
       </tbody>

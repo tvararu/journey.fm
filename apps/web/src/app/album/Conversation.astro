@@ -1,23 +1,26 @@
 ---
 import type { Note } from "@/lib/records";
 import type { Review, ReviewStatus } from "@/lib/reviews";
+import type { Verdict } from "@/lib/verdicts";
 
-type Props = { notes: Note[]; reviews: Review[]; album: string; back: string; status: ReviewStatus | null };
-const { notes, reviews, album, back, status } = Astro.props;
-type Entry = { at: string; by: string; text: string; verdict?: Review["verdict"]; cover?: string };
+type Props = { notes: Note[]; reviews: Review[]; verdicts: Verdict[]; album: string; back: string; status: ReviewStatus | null };
+const { notes, reviews, verdicts, album, back, status } = Astro.props;
+type Entry = { at: string; by: string; text: string; verdict?: Review["verdict"] | Verdict["verdict"]; cover?: string };
 const entries: Entry[] = [
   ...notes.map((n) => ({ at: n.at, by: n.by, text: n.text })),
   ...reviews.map((r) => ({ at: r.at, by: r.by, cover: r.cover, text: r.message, verdict: r.verdict })),
+  ...verdicts.map((v) => ({ at: v.at, by: v.by, text: v.message, verdict: v.verdict })),
 ].sort((a, b) => a.at.localeCompare(b.at));
-const VERDICT = { accept: "accepted", request_changes: "requested changes" } as const;
+const VERDICT = { accept: "accepted", approve: "approved", flag: "flagged", request_changes: "requested changes" } as const;
+const good = (v: Entry["verdict"]) => v === "accept" || v === "approve";
 ---
 <h2>Conversation</h2>
 <ol class="space-y-4">
   {entries.map((e) => (
-    <li class={`border-l-2 pl-3 ${e.verdict === "accept" ? "border-new-fg" : e.verdict ? "border-chg-fg" : "border-rule"}`}>
+    <li class={`border-l-2 pl-3 ${good(e.verdict) ? "border-new-fg" : e.verdict ? "border-chg-fg" : "border-rule"}`}>
       <div class="text-xs text-muted">
         {e.at} · <b class="text-fg">{e.by}</b>
-        {e.verdict && <span class={`badge ml-1 border-transparent ${e.verdict === "accept" ? "new" : "chg"}`}>{VERDICT[e.verdict]}</span>}
+        {e.verdict && <span class={`badge ml-1 border-transparent ${good(e.verdict) ? "new" : "chg"}`}>{VERDICT[e.verdict]}</span>}
       </div>
       {e.text && <p class="whitespace-pre-line">{e.text}</p>}
       {e.cover && <p class="text-xs text-muted">master cover: {e.cover.split(":")[0]}</p>}

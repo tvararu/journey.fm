@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+#MISE description="Record the review agent's verdict on a processed album: music:verdict <slug> approve|flag \"<message>\""
+set -euo pipefail
+cd "$MISE_PROJECT_ROOT/hobbies/music/catalogue"
+exec bun scripts/verdict.ts "$@"
