@@ -52,10 +52,18 @@ The session coordinates; nothing spawns child agent processes.
 2. At once, start one `triage` subagent per album, giving each its slug
    and path. Each waits for its own album, then approves it (the final
    accept) or returns `needs_work` with reasons.
-3. When the triage results are in, hand every `needs_work` album with
-   its reasons to one `fixer` subagent. It approves or flags each;
-   flagged albums go to Blocked, deity's only queue.
-4. Report the totals, and every flag with its reason.
+3. When every triage result is in, hand all the `needs_work` albums,
+   each with its reasons, to a single `fixer` subagent in one task. Don't
+   start a fixer per album. It approves or flags each; flagged albums go
+   to Blocked, deity's only queue.
+4. Review the batch yourself before reporting. Read the triage and fixer
+   results and the `prepare` log, and look for problems that repeat:
+   pipeline bugs, missing tools, races, brief wording that sent albums on
+   for nothing, or verdicts that claim checks the agent didn't do. Fix
+   them in code or in the briefs, verify the fix, and commit, so the next
+   batch runs more smoothly.
+5. Report the totals, every flag with its reason, and what the review
+   changed.
 
 Slugs are `squash(artist dir)[:12]-squash(album dir)[:16]` (see
 `packages/catalogue/prepare.ts`).

@@ -52,9 +52,11 @@ async function get(url: string, dest: string): Promise<string> {
   if (!existsSync(dest)) {
     for (let attempt = 0; ; attempt++) {
       await Bun.sleep(500 + 3000 * attempt);
-      const r = await fetch(url, { headers: { "User-Agent": UA }, signal: AbortSignal.timeout(60_000) }).catch((e: Error) => e);
-      if (r instanceof Response && r.ok) {
-        writeFileSync(dest, new Uint8Array(await r.arrayBuffer()));
+      const r = await fetch(url, { headers: { "User-Agent": UA }, signal: AbortSignal.timeout(300_000) })
+        .then(async (res) => (res.ok ? new Uint8Array(await res.arrayBuffer()) : res))
+        .catch((e: Error) => e);
+      if (r instanceof Uint8Array) {
+        writeFileSync(dest, r);
         break;
       }
       const why = r instanceof Response ? `HTTP ${r.status} ${r.statusText}` : r.message;
