@@ -147,15 +147,16 @@ async function edition(a: Album): Promise<boolean> {
   const scored = cands.map((c) => {
     const [hit, of] = acoustidHits(a.slug, c.id);
     const ev = [...c.evidence, ...(of && hit === of ? [`AcoustID ${hit}/${of}`] : [])];
-    return { ...c, ev, hit, of };
+    const status = (load(a.slug, `mb_release_${c.id}`) as { status?: string } | null)?.status ?? null;
+    return { ...c, ev, hit, of, official: status === "Official" };
   });
   const tagged = files(a.path)[0]!.tags["MUSICBRAINZ_ALBUMID"];
   const rank = (c: (typeof scored)[number]) =>
-    [c.ev.length, c.hit, Number(c.id === tagged), Number(c.how === "discid"), Number(c.ev.includes("RED year"))];
+    [Number(c.official), c.ev.length, c.hit, Number(c.id === tagged), Number(c.how === "discid"), Number(c.ev.includes("RED year"))];
   const cmp = (x: number[], y: number[]) => x.reduce((d, v, i) => d || y[i]! - v, 0);
   scored.sort((x, y) => cmp(rank(x), rank(y)));
   const best = scored[0]!;
-  const tied = scored.filter((c) => c !== best && c.ev.length === best.ev.length && c.hit === best.hit);
+  const tied = scored.filter((c) => c !== best && c.official === best.official && c.ev.length === best.ev.length && c.hit === best.hit);
   const breaker = tied.length
     ? `; tied on evidence with ${tied.map((c) => `${c.id.slice(0, 8)} (${c.date ?? "?"})`).join(", ")}, broken by ${
         best.id === tagged ? "the files' MusicBrainz tag" : best.how === "discid" ? "disc ID order" : "RED year"

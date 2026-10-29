@@ -98,6 +98,7 @@ const union: Pick = (cands, order) => {
   const from: string[] = [];
   for (const s of order) {
     for (const v of (cands[s] as string[] | null | undefined) ?? []) {
+      if (/^\[?none\]?$/i.test(v.trim())) continue;
       if (out.some((x) => catKey(x) === catKey(v))) continue;
       out.push(v);
       if (!from.includes(s)) from.push(s);
