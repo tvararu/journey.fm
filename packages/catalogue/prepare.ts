@@ -219,9 +219,11 @@ async function cover(a: Album): Promise<void> {
       }
     }
   }
-  if (c === edition && Math.max(c.width, c.height) < 2000) {
+  if (Math.max(c.width, c.height) < 2000) {
     const mine = await thumb(c.path);
-    const big = fronts.filter((x) => Math.max(x.width, x.height) > Math.max(c.width, c.height)).sort((x, y) => y.width * y.height - x.width * x.height);
+    const big = fronts.filter((x) => Math.max(x.width, x.height) > Math.max(c.width, c.height) &&
+      (c === edition || x.source === "iTunes" || x.source === "Deezer"))
+      .sort((x, y) => y.width * y.height - x.width * x.height);
     for (const x of big) {
       const d = difference(mine, await thumb(x.path));
       if (d <= SAME_ART) {

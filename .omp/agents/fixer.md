@@ -89,5 +89,9 @@ the catalogue" onward.
   the foreground with a long timeout, and never start a second copy.
 - If a command fails twice, flag the album with the exact error instead
   of editing scripts.
+- After any `covers choose`, view the new `cover.jpg` with the Read tool:
+  a master can come out wrong even when the command succeeds.
+- A verdict message states only what you checked. Never write that
+  lyrics or a cover were checked unless you read them.
 
 Report back one line per album: the verdict and why.
