@@ -21,7 +21,7 @@ export const POST: APIRoute = async ({ request, redirect, cookies }) => {
   const cover = String(form.get("cover") ?? "");
   const current = (await coverChoices())[rec.slug]?.chosen.id;
   if (cover && cover !== current) {
-    run(["scripts/covers.ts", "choose", rec.slug, cover, "Picked as master by deity in review"]);
+    run(["scripts/covers.ts", "choose", rec.slug, cover, "Picked as master by deity in review", "--keep"]);
     run(["scripts/resolve.ts"]);
     rec = (await processed()).get(album) ?? rec;
   }
