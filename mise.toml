@@ -6,3 +6,5 @@ bun = "latest"
 age.key_file = "~/.config/journey.fm/age.key"
 
 [env]
+REDACTED_API_KEY = { age = "REMOVED" }
+ACOUSTID_API_KEY = { age = "REMOVED" }
