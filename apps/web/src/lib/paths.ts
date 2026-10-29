@@ -4,3 +4,5 @@ export const INVENTORY = `${DATA}/inventory`;
 export const CATALOGUE = `${DATA}/catalogue`;
 export const NOTES = `${DATA}/../notes.jsonl`;
 export const REVIEWS = `${DATA}/../reviews.jsonl`;
+export const COMFY = process.env["COMFY_URL"] ?? "https://t1.example.ts.net:8188";
+export const ROOT = `${DATA}/..`;

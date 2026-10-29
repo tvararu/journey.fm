@@ -1,13 +1,21 @@
 ---
 import type { CoverCandidate, CoverChoice } from "@/lib/records";
+import { UPSCALERS } from "@/lib/upscale";
 
-type Props = { cover: CoverChoice | undefined; candidates: CoverCandidate[]; fallback: string | null };
-const { cover, candidates, fallback } = Astro.props;
+type Props = {
+  cover: CoverChoice | undefined;
+  candidates: CoverCandidate[];
+  fallback: string | null;
+  slug: string | undefined;
+  album: string;
+  back: string;
+};
+const { cover, candidates, fallback, slug, album, back } = Astro.props;
 const fronts = candidates.filter((c) => c.types.includes("Front"));
 const others = candidates.length - fronts.length;
 const kb = (n: number) => `${Math.floor(n / 1024)} KB`;
 ---
-<h2>Cover</h2>
+<h2 id="cover">Cover</h2>
 <div class="flex flex-wrap items-start gap-6">
   {cover ? (
     <>
@@ -41,9 +49,38 @@ const kb = (n: number) => `${Math.floor(n / 1024)} KB`;
           <figcaption class="mt-1 text-xs text-muted">
             {c.source}<br />{c.width}x{c.height}, {kb(c.bytes)}{c.note && <><br />{c.note}</>}
           </figcaption>
+          {slug && (
+            <label class="mt-1 flex items-center gap-1 text-xs">
+              <input type="radio" name="cover" form="review" value={c.id} checked={c.id === cover?.chosen.id} /> master
+            </label>
+          )}
+          {slug && (
+            <form method="post" action="/api/upscale" class="upscale mt-1 flex gap-1 text-xs">
+              <input type="hidden" name="slug" value={slug} />
+              <input type="hidden" name="album" value={album} />
+              <input type="hidden" name="back" value={back} />
+              <input type="hidden" name="candidate" value={c.id} />
+              <select name="upscaler" class="min-w-0 flex-1 border border-rule bg-bg">
+                {Object.entries(UPSCALERS).map(([k, u]) => <option value={k}>{u.label}</option>)}
+              </select>
+              <button class="border border-rule bg-bg px-2">Upscale</button>
+            </form>
+          )}
         </figure>
       ))}
     </div>
   )}
 </div>
 {others > 0 && <p class="mt-2 text-xs text-muted">{others} more images archived</p>}
+
+<script>
+  for (const form of document.querySelectorAll<HTMLFormElement>("form.upscale")) {
+    form.addEventListener("submit", () => {
+      const button = form.querySelector("button");
+      if (button) {
+        button.disabled = true;
+        button.textContent = "Upscaling…";
+      }
+    });
+  }
+</script>

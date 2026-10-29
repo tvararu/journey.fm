@@ -62,7 +62,7 @@ const minutes = Math.round(files.reduce((s, f) => s + (f.duration ?? 0), 0) / 60
     </dl>
   </header>
 
-  <Cover cover={cover} candidates={candidates} fallback={fallback ? `/blob/${fallback}` : null} />
+  <Cover cover={cover} candidates={candidates} fallback={fallback ? `/blob/${fallback}` : null} slug={rec?.slug} album={a.path} back={here} />
   {rec && <Proposed rec={rec} tags={tags} />}
   <Conversation notes={notes} reviews={albumReviews} album={a.path} back={here} status={status} />
 

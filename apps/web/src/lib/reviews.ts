@@ -3,7 +3,15 @@ import type { AlbumRecord } from "./records";
 
 export type Verdict = "accept" | "request_changes";
 
-export type Review = { at: string; album: string; by: string; verdict: Verdict; message: string; fingerprint: string };
+export type Review = {
+  at: string;
+  album: string;
+  by: string;
+  verdict: Verdict;
+  message: string;
+  fingerprint: string;
+  cover?: string;
+};
 
 export type ReviewStatus = "awaiting review" | "changes requested" | "updated since request" | "accepted" | "accepted, then changed";
 

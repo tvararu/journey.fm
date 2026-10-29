@@ -4,10 +4,10 @@ import type { Review, ReviewStatus } from "@/lib/reviews";
 
 type Props = { notes: Note[]; reviews: Review[]; album: string; back: string; status: ReviewStatus | null };
 const { notes, reviews, album, back, status } = Astro.props;
-type Entry = { at: string; by: string; text: string; verdict?: Review["verdict"] };
+type Entry = { at: string; by: string; text: string; verdict?: Review["verdict"]; cover?: string };
 const entries: Entry[] = [
   ...notes.map((n) => ({ at: n.at, by: n.by, text: n.text })),
-  ...reviews.map((r) => ({ at: r.at, by: r.by, text: r.message, verdict: r.verdict })),
+  ...reviews.map((r) => ({ at: r.at, by: r.by, cover: r.cover, text: r.message, verdict: r.verdict })),
 ].sort((a, b) => a.at.localeCompare(b.at));
 const VERDICT = { accept: "accepted", request_changes: "requested changes" } as const;
 ---
@@ -20,6 +20,7 @@ const VERDICT = { accept: "accepted", request_changes: "requested changes" } as 
         {e.verdict && <span class={`badge ml-1 border-transparent ${e.verdict === "accept" ? "new" : "chg"}`}>{VERDICT[e.verdict]}</span>}
       </div>
       {e.text && <p class="whitespace-pre-line">{e.text}</p>}
+      {e.cover && <p class="text-xs text-muted">master cover: {e.cover.split(":")[0]}</p>}
     </li>
   ))}
 </ol>

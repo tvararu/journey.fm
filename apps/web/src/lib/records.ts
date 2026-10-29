@@ -100,3 +100,9 @@ export async function notesFor(album: string): Promise<Note[]> {
     .filter((n) => n.album === album);
 }
 
+
+export async function addNote(note: Note): Promise<void> {
+  const file = Bun.file(NOTES);
+  const before = (await file.exists()) ? await file.text() : "";
+  await Bun.write(NOTES, `${before}${JSON.stringify(note)}\n`);
+}
