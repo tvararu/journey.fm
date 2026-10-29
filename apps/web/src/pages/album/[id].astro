@@ -1,46 +1,93 @@
 ---
-import AlbumFields from "@/app/album/AlbumFields.astro";
-import Cover from "@/app/album/Cover.astro";
-import FileDetails from "@/app/album/FileDetails.astro";
+import Approve from "@/app/album/Approve.astro";
+import InFiles from "@/app/album/InFiles.astro";
 import Notes from "@/app/album/Notes.astro";
-import Tracks from "@/app/album/Tracks.astro";
+import Proposed from "@/app/album/Proposed.astro";
+import Section from "@/app/album/Section.astro";
+import Sources from "@/app/album/Sources.astro";
 import Layout from "@/app/Layout.astro";
+import { approvals, stateOf } from "@/lib/approvals";
+import { quality, size } from "@/lib/format";
 import { album } from "@/lib/inventory";
+import { rawFiles } from "@/lib/raw";
 import { coverCandidates, coverChoices, notesFor, processed, redCopies } from "@/lib/records";
 
 const data = album(Number(Astro.params["id"]));
 if (!data) return new Response("not found", { status: 404 });
 const { album: a, files, tags, pictures, extras } = data;
-const [done, covers, red, notes] = await Promise.all([processed(), coverChoices(), redCopies(), notesFor(a.path)]);
+const [done, covers, red, notes, approved] = await Promise.all([
+  processed(),
+  coverChoices(),
+  redCopies(),
+  notesFor(a.path),
+  approvals(),
+]);
 const rec = done.get(a.path);
 const cover = rec ? covers[rec.slug] : undefined;
-const candidates = rec && cover ? await coverCandidates(rec.slug) : [];
-const fallback = pictures.find((p) => p.type === 3)?.sha256 ?? extras.find((x) => /\.(jpe?g|png)$/i.test(x.relpath))?.sha256;
+const candidates = rec ? await coverCandidates(rec.slug) : [];
+const raw = rec ? await rawFiles(rec) : [];
+const approval = stateOf(rec, approved.get(a.path));
+const state = approval.status === "approved" ? "approved" : rec ? "processed" : "triage";
+const fallback =
+  pictures.find((p) => p.type === 3)?.sha256 ?? extras.find((x) => /\.(jpe?g|png)$/i.test(x.relpath))?.sha256;
 const img = cover ? `/data/${cover.master}` : fallback ? `/blob/${fallback}` : null;
+const here = Astro.url.pathname;
+const totalBytes = files.reduce((s, f) => s + f.size, 0) + extras.reduce((s, x) => s + x.size, 0);
+const minutes = Math.round(files.reduce((s, f) => s + (f.duration ?? 0), 0) / 60);
+const nav = [
+  ["files", "01 In the files"],
+  ["sources", "02 Fetched"],
+  ["proposed", "03 Proposed"],
+  ["notes", `04 Notes (${notes.length})`],
+];
 ---
 <Layout title={a.album_dir}>
   <p><a id="back" href="/">← Library</a></p>
-  <div class="mt-3 flex flex-wrap items-start gap-5">
-    {img ? <img class="size-56 bg-faint object-cover" src={img} alt="" /> : <div class="size-56 bg-faint" />}
-    <div>
+  <header class="mt-3 flex flex-wrap items-start gap-5">
+    {img ? <img class="size-48 bg-faint object-cover" src={img} alt="" /> : <div class="size-48 bg-faint" />}
+    <div class="min-w-0">
       <h1 class="text-2xl font-bold">{a.album_dir}</h1>
-      <p class="text-muted">{a.artist_dir} · {a.path}</p>
-      <p class="mt-2"><span class={`badge ${rec ? "badge-processed" : ""}`}>{rec ? "processed" : "triage"}</span></p>
-      <p class="mt-2 text-muted">RED copy: {(red[a.path] ?? []).join(", ") || "none"}</p>
-      {rec && (
-        <p class="text-muted">
-          Edition: MusicBrainz release{" "}
-          <a href={`https://musicbrainz.org/release/${rec.edition_choice.release}`}>{rec.edition_choice.release.slice(0, 8)}</a>
-          {" "}· {rec.edition_choice.how}
-        </p>
-      )}
+      <p class="text-muted">{a.artist_dir}</p>
+      <p class="mt-2"><span class={`badge ${state === "triage" ? "" : "badge-processed"}`}>{state}</span></p>
+      <dl class="mt-3 grid grid-cols-[auto_1fr] gap-x-4 text-sm">
+        <dt class="text-muted">Audio</dt><dd>{quality(files)}</dd>
+        <dt class="text-muted">Size</dt><dd>{size(totalBytes)} · {files.length} tracks · {minutes} min</dd>
+        <dt class="text-muted">On sol</dt><dd class="break-all">{a.path}</dd>
+        <dt class="text-muted">RED copy</dt><dd class="break-all">{(red[a.path] ?? []).join(", ") || "none"}</dd>
+      </dl>
     </div>
-  </div>
-  <Notes notes={notes} />
-  {rec && <AlbumFields rec={rec} tags={tags} />}
-  {rec && <Tracks rec={rec} />}
-  {cover && <Cover choice={cover} candidates={candidates} />}
-  <FileDetails files={files} tags={tags} pictures={pictures} extras={extras} />
+  </header>
+
+  <nav class="sticky top-0 z-10 mt-6 flex flex-wrap gap-x-5 gap-y-1 border-y border-rule bg-gap py-2 text-sm">
+    {nav.map(([id, text]) => <a href={`#${id}`}>{text}</a>)}
+  </nav>
+
+  <Section id="files" n={1} title="In the files" lede="What's on disk now, exactly as scanned from sol on 29 Oct. Nothing here has been changed.">
+    <InFiles files={files} tags={tags} pictures={pictures} extras={extras} />
+  </Section>
+
+  <Section id="sources" n={2} title="Fetched from sources" lede="What each source says about this exact edition, plus the raw responses behind it.">
+    {rec ? (
+      <Sources rec={rec} raw={raw} cover={cover} candidates={candidates} />
+    ) : (
+      <p class="text-muted">Nothing fetched yet. This album is still in triage.</p>
+    )}
+  </Section>
+
+  <Section id="proposed" n={3} title="Proposed" lede="What the resolver suggests writing, picked from the sources by the agreed order.">
+    {rec ? (
+      <>
+        <Approve state={approval} album={a.path} back={here} />
+        <Proposed rec={rec} tags={tags} cover={cover} />
+      </>
+    ) : (
+      <p class="text-muted">Not resolved yet.</p>
+    )}
+  </Section>
+
+  <Section id="notes" n={4} title="Notes" lede="Judgement calls and instructions, left by agents and by you. Newest first.">
+    <Notes notes={notes} album={a.path} back={here} />
+  </Section>
 </Layout>
 
 <script>

@@ -3,12 +3,16 @@ import { appendFileSync } from "node:fs";
 
 const NOTES = `${import.meta.dir}/../notes.jsonl`;
 const args = Bun.argv.slice(2);
-const byAt = args.indexOf("--by");
-const by = byAt >= 0 ? (args.splice(byAt, 2)[1] ?? "claude") : "claude";
+function flag(name: string, fallback: string): string {
+  const at = args.indexOf(name);
+  return at >= 0 ? (args.splice(at, 2)[1] ?? fallback) : fallback;
+}
+const by = flag("--by", "claude");
+const kind = flag("--kind", "note") === "instruction" ? "instruction" : "note";
 const [query, ...rest] = args;
 const text = rest.join(" ").trim();
 if (!(query && text)) {
-  console.error('usage: music:note <album id | slug | text in its path> "<note>" [--by theo]');
+  console.error('usage: music:note <album id | slug | text in its path> "<note>" [--by theo] [--kind instruction]');
   process.exit(1);
 }
 
@@ -25,6 +29,7 @@ if (rows.length !== 1) {
   process.exit(1);
 }
 
-const entry = { at: new Date().toISOString().slice(0, 16).replace("T", " "), album: rows[0]?.path, by, text };
+const at = new Date().toLocaleString("sv-SE", { timeZone: "Europe/London" }).slice(0, 16);
+const entry = { album: rows[0]?.path, at, by, kind, text };
 appendFileSync(NOTES, `${JSON.stringify(entry)}\n`);
 console.log(`noted on ${entry.album}`);

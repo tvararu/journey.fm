@@ -1,0 +1,12 @@
+---
+type Props = { id: string; n: number; title: string; lede: string };
+const { id, n, title, lede } = Astro.props;
+---
+<section id={id} class="mt-12 scroll-mt-16">
+  <div class="mb-4 border-b border-rule pb-2">
+    <div class="text-xs font-bold tracking-widest text-muted">0{n}</div>
+    <h2 class="m-0! text-xl">{title}</h2>
+    <p class="mt-1 text-sm text-muted">{lede}</p>
+  </div>
+  <slot />
+</section>

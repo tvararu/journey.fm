@@ -4,6 +4,8 @@ import type { APIRoute } from "astro";
 
 import { DATA } from "@/lib/paths";
 
+const TEXT = /\.(html|log)$/i;
+
 export const GET: APIRoute = async ({ params }) => {
   const root = realpathSync(DATA);
   let full: string;
@@ -13,8 +15,10 @@ export const GET: APIRoute = async ({ params }) => {
     return new Response("not found", { status: 404 });
   }
   const file = Bun.file(full);
-  if (!full.startsWith(`${root}/`) || !full.includes("/covers/") || !(await file.exists())) {
+  const allowed = full.includes("/covers/") || full.startsWith(`${root}/raw/`);
+  if (!full.startsWith(`${root}/`) || !allowed || !(await file.exists())) {
     return new Response("not found", { status: 404 });
   }
-  return new Response(file);
+  const text = TEXT.test(full) ? { "Content-Type": "text/plain; charset=utf-8" } : undefined;
+  return new Response(file, { headers: text ?? {} });
 };

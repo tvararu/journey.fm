@@ -82,7 +82,7 @@ export function redCopies(): Promise<Record<string, string[]>> {
   return readJson(`${INVENTORY}/music-red.json`, {});
 }
 
-export type Note = { at: string; album: string; by: string; text: string };
+export type Note = { at: string; album: string; by: string; text: string; kind?: "note" | "instruction" };
 
 export async function notesFor(album: string): Promise<Note[]> {
   const file = Bun.file(NOTES);
@@ -92,4 +92,10 @@ export async function notesFor(album: string): Promise<Note[]> {
     .map((l) => JSON.parse(l) as Note)
     .filter((n) => n.album === album)
     .reverse();
+}
+
+export async function addNote(note: Note): Promise<void> {
+  const file = Bun.file(NOTES);
+  const before = (await file.exists()) ? await file.text() : "";
+  await Bun.write(NOTES, `${before}${JSON.stringify(note)}\n`);
 }

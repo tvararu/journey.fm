@@ -1,19 +1,20 @@
 ---
 import Layout from "@/app/Layout.astro";
-import { format } from "@/lib/format";
+import { format, size } from "@/lib/format";
 import { library } from "@/lib/library";
 
 const rows = await library();
-const FILTERS = ["all", "processed", "triage", "issues"];
+const FILTERS = ["all", "triage", "processed", "approved", "issues"];
 const initialFilter = FILTERS.find((f) => f === Astro.url.searchParams.get("f")) ?? "all";
 const initialQuery = Astro.url.searchParams.get("q") ?? "";
-const processedCount = rows.filter((r) => r.state === "processed").length;
+const count = (s: string) => rows.filter((r) => r.state === s).length;
+const totalBytes = rows.reduce((s, r) => s + r.bytes, 0);
 ---
 <Layout title="Music library">
   <h1 class="text-2xl font-bold">Music library</h1>
   <p class="mt-1 text-muted">
-    {rows.length} albums in sol's Music, scanned 29 Oct. {processedCount} processed,
-    {rows.length - processedCount} in triage. Files as they are on disk, nothing written.
+    {rows.length} albums in sol's Music ({size(totalBytes)}), scanned 29 Oct. {count("triage")} in triage,
+    {count("processed")} processed, {count("approved")} approved for writing. Nothing written yet.
   </p>
   <div class="my-4 flex flex-wrap items-center gap-2">
     <input
@@ -37,7 +38,7 @@ const processedCount = rows.filter((r) => r.state === "processed").length;
   <div class="card">
     <table class="grid-table">
       <thead>
-        <tr><th></th><th>Album</th><th>State</th><th>Date tag</th><th>Format</th><th>Tracks</th><th>Length</th><th>Issues</th></tr>
+        <tr><th></th><th>Album</th><th>State</th><th>Date tag</th><th>Audio</th><th>Size</th><th>Tracks</th><th>Length</th><th>Issues</th></tr>
       </thead>
       <tbody id="rows">
         {rows.map((r) => (
@@ -57,9 +58,10 @@ const processedCount = rows.filter((r) => r.state === "processed").length;
               <a href={`/album/${r.id}`}>{r.album_dir}</a>
               <span class="src">{r.artist_dir}</span>
             </td>
-            <td><span class={`badge ${r.state === "processed" ? "badge-processed" : ""}`}>{r.state}</span></td>
+            <td><span class={`badge ${r.state === "triage" ? "" : "badge-processed"}`}>{r.state}</span></td>
             <td class="whitespace-nowrap">{r.dates.join(", ")}</td>
             <td class="whitespace-nowrap">{format(r.codec, r.bits, r.sr)}</td>
+            <td class="whitespace-nowrap">{size(r.bytes)}</td>
             <td>{r.n}</td>
             <td class="whitespace-nowrap">{Math.floor(r.dur / 60)} min</td>
             <td>{r.issues.map((i) => <span class="badge badge-issue">{i}</span>)}</td>

@@ -31,7 +31,7 @@ export function format(codec: string, bits: string, sr: string): string {
     .filter(Boolean)
     .map((x) => String(Number(x) / 1000))
     .join(", ");
-  return `${codec} ${bits}/${rates}`;
+  return `${codec.toUpperCase()} ${bits}/${rates}`;
 }
 
 const BLOCKS: Record<number, string> = {
@@ -47,4 +47,23 @@ const BLOCKS: Record<number, string> = {
 export function blocks(json: string | null): string {
   const list = (json ? JSON.parse(json) : []) as [number, number][];
   return list.map(([t, n]) => `${BLOCKS[t] ?? t}(${n})`).join(" ");
+}
+
+export function size(bytes: number): string {
+  return bytes >= 1e9 ? `${(bytes / 1e9).toFixed(2)} GB` : `${(bytes / 1e6).toFixed(0)} MB`;
+}
+
+type Audio = { codec: string; bits: number | null; sample_rate: number; size: number; duration: number | null };
+
+export function quality(files: Audio[]): string {
+  const kinds = new Map<string, number>();
+  for (const f of files) {
+    const k = `${f.codec.toUpperCase()} ${f.bits ? `${f.bits}-bit` : ""} ${f.sample_rate / 1000} kHz`.replace(/\s+/g, " ");
+    kinds.set(k, (kinds.get(k) ?? 0) + 1);
+  }
+  const bytes = files.reduce((s, f) => s + f.size, 0);
+  const secs = files.reduce((s, f) => s + (f.duration ?? 0), 0);
+  const kbps = secs ? Math.round((bytes * 8) / secs / 1000) : 0;
+  const parts = [...kinds].map(([k, n]) => (kinds.size > 1 ? `${k} ×${n}` : k));
+  return `${parts.join(", ")} · ${kbps} kbps average`;
 }

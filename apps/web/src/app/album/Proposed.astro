@@ -1,0 +1,67 @@
+---
+import { CHIP_FIELDS, change, FIELD_NAMES, FIELD_TAGS, type Tag, valuesFor } from "@/lib/album";
+import { empty, show } from "@/lib/format";
+import type { AlbumRecord, CoverChoice, Field, RymLink, Value } from "@/lib/records";
+import Tracks from "./Tracks.astro";
+import ValueView from "./Value.astro";
+
+type Props = { rec: AlbumRecord; tags: Map<number, Tag[]>; cover: CoverChoice | undefined };
+const { rec, tags, cover } = Astro.props;
+const rl = rec.album.rym_links;
+const links = new Map<string, RymLink>(
+  [...(rl?.primary ?? []), ...(rl?.secondary ?? []), ...(rl?.scenes ?? [])].map((g) => [g.name, g]),
+);
+const fields = Object.entries(rec.album).filter(([k]) => !["ids", "rym_links", "cover"].includes(k)) as [string, Field][];
+const had = (k: string): Value => {
+  const keys = FIELD_TAGS[k];
+  return keys ? valuesFor(tags, keys) : null;
+};
+const proposed = (k: string, f: Field): Value => (k === "scene" && typeof f.value === "string" ? [f.value] : f.value);
+const ids = Object.entries(rec.album.ids).filter(([, v]) => v !== null && !(Array.isArray(v) && v.length === 0));
+const STATUS = { "": "same", chg: "changed", new: "new" } as const;
+---
+<div class="mb-2 flex gap-4 text-xs text-muted">
+  <span><i class="mr-1 inline-block size-3 bg-chg align-[-1px]"></i>changes what the files say</span>
+  <span><i class="mr-1 inline-block size-3 bg-new align-[-1px]"></i>new, the files have nothing</span>
+</div>
+<div class="card">
+  <table class="grid-table">
+    <thead><tr><th>Field</th><th>Proposed</th><th>From</th><th>Files have</th></tr></thead>
+    <tbody>
+      {fields.map(([k, f]) => {
+        const cls = change(had(k), f.value);
+        return (
+          <tr>
+            <th>{FIELD_NAMES[k] ?? k}</th>
+            <td class={cls}><ValueView value={proposed(k, f)} chips={CHIP_FIELDS.has(k)} links={links} /></td>
+            <td class="text-xs whitespace-nowrap text-muted">{f.source}</td>
+            <td class="text-xs">
+              {cls === "chg" ? <span>{show(had(k))}</span> : <span class="text-muted">{empty(f.value) ? "" : STATUS[cls]}</span>}
+            </td>
+          </tr>
+        );
+      })}
+      <tr>
+        <th>IDs</th>
+        <td colspan="3" class="text-xs">{ids.map(([k, v]) => <div>{k}: <ValueView value={v} /></div>)}</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<Tracks rec={rec} />
+
+{cover && (
+  <>
+    <h3 class="mt-8 mb-2 font-bold">Cover</h3>
+    <div class="flex flex-wrap items-start gap-4">
+      <a href={`/data/${cover.master}`}><img class="size-48 bg-faint object-cover" src={`/data/${cover.master}`} alt="" /></a>
+      <div class="text-sm">
+        <div>Master: {cover.chosen.source}, {cover.chosen.width}x{cover.chosen.height}</div>
+        <div class="text-muted">{cover.master}</div>
+        <div class="mt-2">Embedded copy: {cover.embed_size[0]}x{cover.embed_size[1]}, {Math.floor(cover.embed_bytes / 1024)} KB</div>
+        <div class="text-muted">{cover.embed}</div>
+      </div>
+    </div>
+  </>
+)}

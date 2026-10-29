@@ -22,6 +22,7 @@ export type LibraryRow = AlbumRow & {
   bits: string;
   sr: string;
   dur: number;
+  bytes: number;
   id3: number;
   pics: number;
 };
@@ -57,7 +58,7 @@ export function libraryRows(): LibraryRow[] {
   return db()
     .query<LibraryRow, []>(
       `select a.id, a.path, a.artist_dir, a.album_dir, count(f.id) n, group_concat(distinct f.codec) codec,
-        group_concat(distinct f.bits) bits, group_concat(distinct f.sample_rate) sr, sum(f.duration) dur,
+        group_concat(distinct f.bits) bits, group_concat(distinct f.sample_rate) sr, sum(f.duration) dur, sum(f.size) bytes,
         coalesce(sum(f.id3v2), 0) + coalesce(sum(f.id3v1), 0) id3,
         (select count(*) from pictures p join files f2 on f2.id = p.file_id where f2.album_id = a.id) pics
       from albums a join files f on f.album_id = a.id where a.collection = 'Music' group by a.id order by a.path`,

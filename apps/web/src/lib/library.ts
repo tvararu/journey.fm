@@ -1,8 +1,9 @@
 import { albumKeyTags, type LibraryRow, libraryRows, thumbnails } from "./inventory";
-import { processed, redCopies } from "./records";
+import { type Approval, approvals, stateOf } from "./approvals";
+import { type AlbumRecord, processed, redCopies } from "./records";
 
 export type LibraryEntry = LibraryRow & {
-  state: "processed" | "triage";
+  state: "approved" | "processed" | "triage";
   issues: string[];
   dates: string[];
   thumb: string | undefined;
@@ -21,8 +22,13 @@ function issuesFor(r: LibraryRow, keys: Map<string, Set<string>>, red: Record<st
   return out;
 }
 
+function stateFor(rec: AlbumRecord | undefined, last: Approval | undefined): LibraryEntry["state"] {
+  if (!rec) return "triage";
+  return stateOf(rec, last).status === "approved" ? "approved" : "processed";
+}
+
 export async function library(): Promise<LibraryEntry[]> {
-  const [done, red] = await Promise.all([processed(), redCopies()]);
+  const [done, red, approved] = await Promise.all([processed(), redCopies(), approvals()]);
   const keys = albumKeyTags();
   const thumbs = thumbnails();
   return libraryRows().map((r) => {
@@ -31,7 +37,7 @@ export async function library(): Promise<LibraryEntry[]> {
       ...r,
       dates: [...(k.get("DATE") ?? [])].sort(),
       issues: issuesFor(r, k, red),
-      state: done.has(r.path) ? "processed" : "triage",
+      state: stateFor(done.get(r.path), approved.get(r.path)),
       thumb: thumbs.get(r.id),
     };
   });

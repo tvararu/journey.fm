@@ -3,3 +3,4 @@ export const DATA = process.env["CATALOGUE_DATA"] ?? `${process.cwd()}/../data`;
 export const INVENTORY = `${DATA}/inventory`;
 export const CATALOGUE = `${DATA}/catalogue`;
 export const NOTES = `${DATA}/../notes.jsonl`;
+export const APPROVALS = `${DATA}/../approvals.jsonl`;
