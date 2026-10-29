@@ -23,6 +23,7 @@ export type AlbumRecord = {
     ids: Record<string, Value>;
     ratings: Record<string, Rating>;
     links: { label: string; url: string }[];
+    catalogued_at: string | null;
     rym_links: {
       artists: RymLink[];
       primary: RymLink[];

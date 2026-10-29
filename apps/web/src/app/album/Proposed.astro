@@ -11,7 +11,7 @@ const rl = rec.album.rym_links;
 const links = new Map<string, RymLink>(
   [...(rl?.primary ?? []), ...(rl?.secondary ?? []), ...(rl?.scenes ?? [])].map((g) => [g.name, g]),
 );
-const fields = Object.entries(rec.album).filter(([k]) => !["ids", "rym_links", "cover", "ratings", "links"].includes(k)) as [string, Field][];
+const fields = Object.entries(rec.album).filter(([k]) => !["ids", "rym_links", "cover", "ratings", "links", "catalogued_at"].includes(k)) as [string, Field][];
 const had = (k: string): Value => {
   const keys = FIELD_TAGS[k];
   return keys ? valuesFor(tags, keys) : null;
@@ -46,6 +46,14 @@ const STATUS = { "": "same", chg: "changed", new: "new" } as const;
           <td class="text-xs text-muted">new</td>
         </tr>
       ))}
+      {rec.album.catalogued_at && (
+        <tr>
+          <th>Catalogued at</th>
+          <td class="new">{rec.album.catalogued_at}</td>
+          <td class="text-xs whitespace-nowrap text-muted">oldest source fetch</td>
+          <td class="text-xs text-muted">new</td>
+        </tr>
+      )}
       <tr>
         <th>IDs</th>
         <td colspan="3" class="text-xs">{ids.map(([k, v]) => <div>{k}: <ValueView value={v} /></div>)}</td>
