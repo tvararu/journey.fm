@@ -93,8 +93,21 @@ async function solved(env: Record<string, string>): Promise<boolean> {
   return false;
 }
 
+const rymReady = new Map<string, { done: Promise<void>; finish: () => void }>(albums.map((a) => {
+  let finish = () => {};
+  const done = new Promise<void>((r) => (finish = r));
+  return [a.slug, { done, finish }];
+}));
+
 async function rymEach(env: Record<string, string>): Promise<void> {
   for (const a of albums) {
+    await rymOne(a, env);
+    rymReady.get(a.slug)!.finish();
+  }
+}
+
+async function rymOne(a: Album, env: Record<string, string>): Promise<void> {
+  {
     for (let attempt = 0; attempt < 3; attempt++) {
       const found = await runAsync(["bun", `${MUSIC}/tagging/rym-find.ts`, a.artist, a.title], HERE, env);
       const r = JSON.parse(found.out.trim().split("\n").at(-1) || "{}") as { url?: string | null; how?: string | null; challenge?: boolean };
@@ -117,13 +130,6 @@ async function rymEach(env: Record<string, string>): Promise<void> {
       break;
     }
   }
-}
-
-async function pool<T>(items: T[], n: number, fn: (x: T) => Promise<void>): Promise<void> {
-  const queue = [...items];
-  await Promise.all(Array.from({ length: Math.min(n, queue.length) }, async () => {
-    for (let x = queue.shift(); x !== undefined; x = queue.shift()) await fn(x);
-  }));
 }
 
 function acoustidHits(slug: string, rid: string): [number, number] {
@@ -207,67 +213,91 @@ async function cover(a: Album): Promise<void> {
       }
     }
   }
-  const { out } = await runAsync(["bun", "scripts/covers.ts", "choose", a.slug, c.id, why]);
+  const { out } = await runAsync(["bun", "scripts/covers.ts", "choose", a.slug, c.id, why, "--wait"]);
   say(a, `cover: ${c.source} ${c.width}x${c.height}${c !== edition ? ` (same art as the ${edition.width} px edition front)` : ""}${out.includes("upscaling") ? ", upscaling to master" : ""}`);
 }
 
-async function upscalesDone(started: number): Promise<void> {
-  for (let i = 0; i < 60; i++) {
-    const pending = albums.filter((a) => {
-      const log = `${RAW}/${a.slug}/covers/upscale.log`;
-      const covers = JSON.parse(readFileSync(`${CATALOGUE}/covers.json`, "utf8")) as Record<string, { chosen: Cover }>;
-      const small = covers[a.slug] && Math.max(covers[a.slug]!.chosen.width, covers[a.slug]!.chosen.height) < 2000;
-      return small && !(existsSync(log) && Bun.file(log).lastModified >= started && readFileSync(log, "utf8").trim());
-    });
-    if (!pending.length) return;
-    await Bun.sleep(5000);
+class Gate {
+  private free: number;
+  private waiting: (() => void)[] = [];
+  constructor(n: number) {
+    this.free = n;
   }
-  console.log("some upscales are still running; their resolve runs when they finish");
+  async run<T>(fn: () => Promise<T>): Promise<T> {
+    if (this.free > 0) this.free--;
+    else await new Promise<void>((r) => this.waiting.push(r));
+    try {
+      return await fn();
+    } finally {
+      const next = this.waiting.shift();
+      if (next) next();
+      else this.free++;
+    }
+  }
+}
+
+const coverGate = new Gate(6);
+const lyricsGate = new Gate(3);
+
+async function album(a: Album): Promise<boolean> {
+  const times: Record<string, number> = {};
+  const step = async <T>(name: string, fn: () => Promise<T>): Promise<T> => {
+    const t = Date.now();
+    try {
+      return await fn();
+    } finally {
+      times[name] = Math.round((Date.now() - t) / 1000);
+    }
+  };
+  const marker = (extra: Record<string, unknown>) =>
+    Bun.write(`${RAW}/${a.slug}/prepared.json`, JSON.stringify({ at: new Date().toISOString(), log: a.log, path: a.path, slug: a.slug, times, ...extra }, null, 1));
+  try {
+    if (!(await step("edition", () => edition(a)))) {
+      await marker({ failed: "no edition picked" });
+      return false;
+    }
+    await step("covers", () => coverGate.run(async () => {
+      const r = await runAsync(["bun", "scripts/covers.ts", PREVIEWS, a.slug]);
+      if (r.code !== 0) throw new Error(`covers failed: ${r.out.slice(-400)}`);
+      await cover(a);
+    }));
+    run(["bun", "scripts/resolve.ts", a.slug]);
+    await step("lyrics", () => lyricsGate.run(async () => {
+      let ly = await runAsync(["bun", "scripts/lyrics.ts", a.slug]);
+      for (let retry = 1; retry <= 3 && ly.code !== 0; retry++) {
+        await Bun.sleep(20_000 * retry);
+        ly = await runAsync(["bun", "scripts/lyrics.ts", a.slug]);
+      }
+      const lines = ly.out.split("\n").filter((l) => l.startsWith(`${a.slug} `));
+      const count = (k: string) => lines.filter((l) => l.includes(`-> ${k}`)).length;
+      say(a, `lyrics: ${count("synced")} synced, ${count("plain")} plain, ${count("instrumental")} instrumental, ${count("missing")} missing${
+        count("failed") ? `, ${count("failed")} failed (rerun music:lyrics)` : ""}`);
+    }));
+    await step("rym wait", () => rymReady.get(a.slug)!.done);
+    run(["bun", "scripts/resolve.ts", a.slug]);
+    const rec = JSON.parse(readFileSync(`${CATALOGUE}/${a.slug}.json`, "utf8")) as { tracks: { ids: { acoustid_agrees?: boolean | null } }[] };
+    const agree = rec.tracks.map((t) => t.ids.acoustid_agrees);
+    say(a, `AcoustID: ${agree.filter((x) => x === true).length} agree, ${agree.filter((x) => x === false).length} differ, ${
+      agree.filter((x) => x == null).length} unknown`);
+    say(a, `times: ${Object.entries(times).map(([k, v]) => `${k} ${v}s`).join(", ")}`);
+    await marker({ failed: null });
+    console.log(`PREPARED ${a.slug}`);
+    return true;
+  } catch (e) {
+    say(a, `failed: ${(e as Error).message}`);
+    await marker({ failed: (e as Error).message });
+    console.log(`PREPARED ${a.slug} (failed)`);
+    return false;
+  }
 }
 
 const started = Date.now();
+for (const a of albums) if (existsSync(`${RAW}/${a.slug}/prepared.json`)) Bun.spawnSync(["mv", `${RAW}/${a.slug}/prepared.json`, `${RAW}/${a.slug}/prepared.previous.json`]);
 fingerprints();
-const rymDone = rym();
-const ok: Album[] = [];
-const editions = albums.map(async (a) => {
-  try {
-    return (await edition(a)) ? a : null;
-  } catch (e) {
-    say(a, `failed: ${(e as Error).message}`);
-    return null;
-  }
+const rymDone = rym().catch((e: Error) => {
+  console.log(`RYM step failed: ${e.message}`);
+  for (const r of rymReady.values()) r.finish();
 });
-await pool(editions, 6, async (pending) => {
-  const a = await pending;
-  if (!a) return;
-  try {
-    const r = await runAsync(["bun", "scripts/covers.ts", PREVIEWS, a.slug]);
-    if (r.code !== 0) say(a, `covers failed: ${r.out.slice(-400)}`);
-    else await cover(a);
-    ok.push(a);
-  } catch (e) {
-    say(a, `failed: ${(e as Error).message}`);
-  }
-});
-run(["bun", "scripts/resolve.ts"]);
-await pool(ok, 3, async (a) => {
-  let ly = await runAsync(["bun", "scripts/lyrics.ts", a.slug]);
-  for (let retry = 1; retry <= 3 && ly.code !== 0; retry++) {
-    await Bun.sleep(20_000 * retry);
-    ly = await runAsync(["bun", "scripts/lyrics.ts", a.slug]);
-  }
-  const lines = ly.out.split("\n").filter((l) => l.startsWith(`${a.slug} `));
-  const count = (k: string) => lines.filter((l) => l.includes(`-> ${k}`)).length;
-  say(a, `lyrics: ${count("synced")} synced, ${count("plain")} plain, ${count("instrumental")} instrumental, ${count("missing")} missing${
-    count("failed") ? `, ${count("failed")} failed (rerun music:lyrics)` : ""}`);
-});
+const results = await Promise.all(albums.map(album));
 await rymDone;
-await upscalesDone(started);
-run(["bun", "scripts/resolve.ts"]);
-for (const a of ok) {
-  const rec = JSON.parse(readFileSync(`${CATALOGUE}/${a.slug}.json`, "utf8")) as { tracks: { ids: { acoustid_agrees?: boolean | null } }[] };
-  const agree = rec.tracks.map((t) => t.ids.acoustid_agrees);
-  say(a, `AcoustID: ${agree.filter((x) => x === true).length} agree, ${agree.filter((x) => x === false).length} differ, ${
-    agree.filter((x) => x == null).length} unknown`);
-}
-console.log("\nprepared:", ok.map((a) => a.slug).join(" ") || "none");
+console.log(`\nprepared ${results.filter(Boolean).length} of ${albums.length} in ${Math.round((Date.now() - started) / 1000)} s`);

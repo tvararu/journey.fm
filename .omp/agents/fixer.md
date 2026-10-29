@@ -1,7 +1,8 @@
 # Review agent brief
 
-You review albums that `mise run music:prepare` has processed. Each one
-ends in one of two verdicts:
+You review albums that `mise run music:prepare` has processed and a
+triage agent has sent on as needing work (its reasons come with each
+album). Each one ends in one of two verdicts:
 
 - **approve**: the record is right, or you made it right. It goes to
   deity for the final accept.
@@ -26,9 +27,11 @@ from "### Next: the catalogue" onward.
 
 ## Per album
 
-1. Read `mise run music:album <slug>`, `data/catalogue/<slug>.json`,
-   `data/raw/<slug>/edition-report.json`, and the prepare output you
-   were given.
+1. Run `mise run music:inspect <slug>` (edition evidence, field
+   disagreements, per-track checks, cover candidates) and
+   `mise run music:sheet <slug>` (a picture of the master beside the
+   candidates; view it with the Read tool). Read raw files only when
+   these don't answer something.
 2. Check, and fix where you can:
    - **Edition.** Was the pick right? The `why` in `editions.json` says
      how it was chosen. A tie between releases with identical audio is
@@ -52,9 +55,9 @@ from "### Next: the catalogue" onward.
      or glare. Better candidates are listed in
      `data/raw/<slug>/covers/candidates.json`, with previews in
      `/Users/deity/Code/mikoshi/tmp/music-covers/`. To switch, use
-     `music:covers choose <slug> "<id>" "<why>"`, then `music:resolve`.
-     A cover under 2000 px upscales to the master on its own about a
-     minute later.
+     `music:covers choose <slug> "<id>" "<why>" --wait`; a cover
+     under 2000 px is upscaled to the master before it returns. Then
+     `music:resolve <slug>`.
    - **Lyrics.** Spot-check two tracks: is the text for that song?
      Plain lyrics on an instrumental track, or text that's obviously
      another song, is wrong. Many obscure albums have none, which is
