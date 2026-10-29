@@ -98,6 +98,7 @@ const first: Pick = (cands, order) => {
   return [null, null];
 };
 
+const labelKey = (s: string) => s.toLowerCase().replace(/\b(records|recordings|music|ltd|inc)\b/g, "").replace(/[^a-z0-9]/g, "");
 const catKey = (s: string) => s.toUpperCase().replace(/[^A-Z0-9]/g, "");
 
 const union: Pick = (cands, order) => {
@@ -251,6 +252,13 @@ function resolve(slug: string, choice: J) {
   const li: J[] = rel["label-info"] ?? [];
   const rgTypes: unknown[] = rg ? [rg["primary-type"], ...(rg["secondary-types"] ?? [])] : [];
   const uniq = <T>(xs: T[]) => [...new Set(xs)];
+  const labels: Record<string, string[] | null> = {
+    RED: splitLabels(rt.label), MusicBrainz: uniq(li.filter((l) => l.label).map((l) => l.label.name)),
+    Discogs: and(dr, () => uniq((dr.labels ?? []).map((l: J) => l.name))), files: tagall(fs, "LABEL"),
+  };
+  const label = field(labels, ["RED", "MusicBrainz", "Discogs", "files"]);
+  const chosenLabels = new Set(((label.value ?? []) as string[]).map(labelKey));
+  const sameLabel = (src: string) => (labels[src] ?? []).some((l) => chosenLabels.has(labelKey(plain(l) as string)));
   const album: J = {
     title: field({ MusicBrainz: rel.title, RYM: and(rym, () => rym.title), RED: and(redg, () => unescape(redg.name)), files: tag(f0, "ALBUM") },
       ["MusicBrainz", "RYM", "RED", "files"]),
@@ -270,16 +278,13 @@ function resolve(slug: string, choice: J) {
     date: field({ MusicBrainz: rel.date, RED: and(rt.year, () => String(rt.year)), files: tag(f0, "DATE") },
       ["MusicBrainz", "RED", "files"], datePick),
     edition: field({ RED: rt.title, MusicBrainz: rel.disambiguation }, ["RED", "MusicBrainz"]),
-    label: field({
-      RED: splitLabels(rt.label), MusicBrainz: uniq(li.filter((l) => l.label).map((l) => l.label.name)),
-      Discogs: and(dr, () => uniq((dr.labels ?? []).map((l: J) => l.name))), files: tagall(fs, "LABEL"),
-    }, ["RED", "MusicBrainz", "Discogs", "files"]),
+    label,
     catalogue_number: field({
       RED: rt.catno ? [rt.catno] : null,
       MusicBrainz: uniq(li.filter((l) => l["catalog-number"] && l["catalog-number"] !== "[none]").map((l) => l["catalog-number"])),
       Discogs: and(dr, () => uniq((dr.labels ?? []).filter((l: J) => l.catno !== "none").map((l: J) => l.catno))),
       files: tagall(fs, "CATALOGNUMBER"),
-    }, ["RED", "MusicBrainz", "Discogs"], union),
+    }, ["RED", "MusicBrainz", "Discogs"].filter(sameLabel), union),
     barcode: field({
       MusicBrainz: rel.barcode, Discogs: and(dr, () => (dr.identifiers ?? []).find((i: J) => i.type === "Barcode")?.value ?? null),
       files: tag(f0, "BARCODE"),
