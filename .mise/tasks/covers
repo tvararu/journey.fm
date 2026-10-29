@@ -2,5 +2,5 @@
 #MISE description="Gather cover candidates: music:covers [slug...]; music:covers add <slug> <url> <source> <note>; music:covers choose <slug> <candidate-id> <why>"
 set -euo pipefail
 cd "$MISE_PROJECT_ROOT/hobbies/music/catalogue"
-if [ "${1:-}" = choose ] || [ "${1:-}" = add ]; then exec python3 covers.py "$@"; fi
-exec python3 covers.py "$MISE_PROJECT_ROOT/tmp/music-covers" "$@"
+if [ "${1:-}" = choose ] || [ "${1:-}" = add ]; then exec bun scripts/covers.ts "$@"; fi
+exec bun scripts/covers.ts "$MISE_PROJECT_ROOT/tmp/music-covers" "$@"

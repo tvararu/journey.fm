@@ -1,0 +1,50 @@
+import { writeFileSync } from "node:fs";
+
+export function py(v: unknown): string {
+  if (v === null || v === undefined) return "None";
+  if (typeof v === "boolean") return v ? "True" : "False";
+  return String(v);
+}
+
+export function truthy(v: unknown): boolean {
+  if (Array.isArray(v) || v instanceof Uint8Array) return v.length > 0;
+  if (v !== null && typeof v === "object") return Object.keys(v).length > 0;
+  return Boolean(v);
+}
+
+export const basename = (p: string): string => p.slice(p.lastIndexOf("/") + 1);
+
+export function fixed1(x: number): string {
+  const q = x * 4;
+  if (Number.isInteger(q) && q % 2 !== 0) {
+    const n = Math.floor(x * 10);
+    return ((n % 2 === 0 ? n : n + 1) / 10).toFixed(1);
+  }
+  return x.toFixed(1);
+}
+
+export function stamp(d = new Date()): string {
+  const p = (n: number) => String(n).padStart(2, "0");
+  const off = -d.getTimezoneOffset();
+  const a = Math.abs(off);
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`
+    + `${off < 0 ? "-" : "+"}${p(Math.floor(a / 60))}${p(a % 60)}`;
+}
+
+export function dumps(data: unknown, ascii = false): string {
+  const s = JSON.stringify(data, null, 1);
+  return ascii ? s.replace(/[\u007f-￿]/g, (c) => `\\u${c.charCodeAt(0).toString(16).padStart(4, "0")}`) : s;
+}
+
+export function dump(path: string, data: unknown, ascii = false): void {
+  writeFileSync(path, dumps(data, ascii));
+}
+
+const ENTITIES: Record<string, string> = { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", nbsp: " " };
+
+export const unescapeHtml = (s: string): string =>
+  s.replace(/&(#[xX][0-9a-fA-F]+|#\d+|[a-zA-Z]+);/g, (m, e: string) => {
+    if (e[0] !== "#") return ENTITIES[e] ?? m;
+    const n = e[1] === "x" || e[1] === "X" ? parseInt(e.slice(2), 16) : parseInt(e.slice(1), 10);
+    return n === 0 || n > 0x10ffff || (n >= 0xd800 && n <= 0xdfff) ? "�" : String.fromCodePoint(n);
+  });

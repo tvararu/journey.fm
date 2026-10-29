@@ -1,0 +1,8 @@
+{
+  "extends": "../web/node_modules/astro/tsconfigs/strictest.json",
+  "compilerOptions": {
+    "typeRoots": ["../web/node_modules/@types"],
+    "types": ["bun"]
+  },
+  "include": ["**/*.ts"]
+}
