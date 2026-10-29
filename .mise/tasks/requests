@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
 #MISE description="List albums with open change requests, with the agent notes added since"
 set -euo pipefail
-cd "$MISE_PROJECT_ROOT/hobbies/music/catalogue"
-exec bun scripts/requests.ts
+cd "$MISE_PROJECT_ROOT/packages/catalogue"
+exec bun requests.ts

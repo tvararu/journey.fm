@@ -1,12 +1,14 @@
 import { Database } from "bun:sqlite";
 
+import { META } from "./lib/paths";
+
 const term = Bun.argv.slice(2).join(" ");
 if (!term) {
-  console.error("usage: music:search <text>");
+  console.error("usage: search <text>");
   process.exit(1);
 }
 
-const db = new Database(`${import.meta.dir}/../data/inventory/inventory.sqlite`, { readonly: true });
+const db = new Database(`${META}/inventory/inventory.sqlite`, { readonly: true });
 const like = `%${term}%`;
 
 const byPath = db

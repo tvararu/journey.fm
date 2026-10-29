@@ -21,8 +21,8 @@
     "exactOptionalPropertyTypes": true,
     "allowUnreachableCode": false,
     "allowUnusedLabels": false,
-    "typeRoots": ["./catalogue/web/node_modules/@types"],
+    "typeRoots": ["./node_modules/@types"],
     "types": ["bun"]
   },
-  "include": ["*.ts", "tagging/*.ts"]
+  "include": ["*.ts"]
 }

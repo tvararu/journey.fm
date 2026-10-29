@@ -1,16 +1,16 @@
 import { readFileSync } from "node:fs";
 
-process.env["CATALOGUE_DATA"] ??= `${import.meta.dir}/../data`;
-const { DATA } = await import("../web/src/lib/paths");
-const { addNote, coverCandidates } = await import("../web/src/lib/records");
-const { UPSCALERS, upscale } = await import("../web/src/lib/upscale");
+process.env["JOURNEY_ROOT"] ??= `${import.meta.dir}/../..`;
+const { DATA, SCRIPTS } = await import("../../apps/web/src/lib/paths");
+const { addNote, coverCandidates } = await import("../../apps/web/src/lib/records");
+const { UPSCALERS, upscale } = await import("../../apps/web/src/lib/upscale");
 type Upscaler = keyof typeof UPSCALERS;
 
 const args = Bun.argv.slice(2);
 const master = args.includes("--master");
 const [slug, id, which = "ultrasharpv2"] = args.filter((a) => a !== "--master");
 if (!(slug && id && which in UPSCALERS)) {
-  console.error(`usage: music:upscale <slug> <candidate-id> [${Object.keys(UPSCALERS).join(" | ")}] [--master]`);
+  console.error(`usage: upscale <slug> <candidate-id> [${Object.keys(UPSCALERS).join(" | ")}] [--master]`);
   process.exit(1);
 }
 const cands = await coverCandidates(slug);
@@ -27,8 +27,8 @@ const album = editions[slug]?.path ?? slug;
 const what = `Upscaled the ${c.source} cover (${c.width}x${c.height}) with ${u.label} to ${made.width}x${made.height}.`;
 if (master) {
   const why = `${u.label} upscale of the chosen ${c.width}x${c.height} ${c.source} cover, made master automatically because the original is under 2000 px`;
-  for (const cmd of [["scripts/covers.ts", "choose", slug, made.id, why, "--keep"], ["scripts/resolve.ts", slug]]) {
-    const p = Bun.spawnSync(["bun", ...cmd], { cwd: `${import.meta.dir}/..`, stderr: "pipe", stdout: "ignore" });
+  for (const cmd of [[`${SCRIPTS}/covers.ts`, "choose", slug, made.id, why, "--keep"], [`${SCRIPTS}/resolve.ts`, slug]]) {
+    const p = Bun.spawnSync(["bun", ...cmd], { cwd: import.meta.dir, stderr: "pipe", stdout: "ignore" });
     if (p.exitCode !== 0) throw new Error(`${cmd[0]} failed: ${p.stderr.toString().slice(0, 400)}`);
   }
 }

@@ -1,6 +1,6 @@
-# Review agent brief
+# Fixer agent brief
 
-You review albums that `mise run music:prepare` has processed and a
+You review albums that `mise run prepare` has processed and a
 triage agent has sent on as needing work (its reasons come with each
 album). Each one ends in one of two verdicts:
 
@@ -21,25 +21,25 @@ the album is when the audio is the same: default to what the files say
 the approval. The resolver already prefers the files' label when RED
 disagrees with them.
 
-Working directory: `hobbies/music/catalogue`. Use `mise run music:<task>`
-for everything; they load the secrets. Agreed rules: `../library.md`
-from "### Next: the catalogue" onward.
+Working directory: the repo root. Use `mise run <task>` for everything;
+they load the secrets. Agreed rules: `docs/library.md` from "### Next:
+the catalogue" onward.
 
 ## Per album
 
-1. Run `mise run music:inspect <slug>` (edition evidence, field
+1. Run `mise run inspect <slug>` (edition evidence, field
    disagreements, per-track checks, cover candidates) and
-   `mise run music:sheet <slug>` (a picture of the master beside the
+   `mise run sheet <slug>` (a picture of the master beside the
    candidates; view it with the Read tool). Read raw files only when
    these don't answer something.
 2. Check, and fix where you can:
    - **Edition.** Was the pick right? The `why` in `editions.json` says
      how it was chosen. A tie between releases with identical audio is
      normal: keep the pick, preferring the release the files are tagged
-     with, then an official release over a bootleg. To switch, run `music:enrich <slug>
-     <path> <release> "<why>"`, then `music:covers <slug>`, `music:covers
-     choose ...`, `music:resolve`, `music:lyrics <slug>` and
-     `music:resolve` again.
+     with, then an official release over a bootleg. To switch, run `enrich <slug>
+     <path> <release> "<why>"`, then `covers <slug>`, `covers
+     choose ...`, `resolve`, `lyrics <slug>` and
+     `resolve` again.
    - **Tracks.** Every file is paired with a MusicBrainz track, titles
      match (allowing fixes MusicBrainz makes, such as spelling), lengths
      are within 2 s, and `ids.acoustid_agrees` is not `false`. An extra
@@ -56,20 +56,20 @@ from "### Next: the catalogue" onward.
      edition, clean, square-ish, no tray card, booklet spread, sticker
      or glare. Better candidates are listed in
      `data/raw/<slug>/covers/candidates.json`, with previews in
-     `/Users/deity/Code/mikoshi/tmp/music-covers/`. To switch, use
-     `music:covers choose <slug> "<id>" "<why>" --wait`; a cover
+     `data/previews/`. To switch, use
+     `covers choose <slug> "<id>" "<why>" --wait`; a cover
      under 2000 px is upscaled to the master before it returns. Then
-     `music:resolve <slug>`.
+     `resolve <slug>`.
    - **Lyrics.** Spot-check two tracks: is the text for that song?
      Plain lyrics on an instrumental track, or text that's obviously
      another song, is wrong. Many obscure albums have none, which is
-     fine. Fix a wrong one with `music:lyrics-set <slug> <track> none
-     "<why>"` (or `instrumental`), then `music:resolve`.
+     fine. Fix a wrong one with `lyrics-set <slug> <track> none
+     "<why>"` (or `instrumental`), then `resolve`.
 3. Record the verdict:
-   `mise run music:verdict <slug> approve "<one paragraph>"` or
-   `mise run music:verdict <slug> flag "<what's wrong, what you checked>"`.
+   `mise run verdict <slug> approve "<one paragraph>"` or
+   `mise run verdict <slug> flag "<what's wrong, what you checked>"`.
    For an approval, say the edition and its evidence, the cover, the
-   lyrics counts and anything you changed. Run `music:resolve` before the
+   lyrics counts and anything you changed. Run `resolve` before the
    verdict if you changed anything, so the verdict matches the final
    record.
 
@@ -78,10 +78,9 @@ from "### Next: the catalogue" onward.
 - Never write to FLAC files or anything on sol. No deletions, no git
   commits, no Python, no browser.
 - Never print secrets.
-- Long commands (covers, lyrics): run them in the background and wait
-  for the notification. Don't start a second copy, and don't start
-  extra watch or monitor loops; one notification per command is enough.
+- Long commands (covers, lyrics) can take several minutes: run them in
+  the foreground with a long timeout, and never start a second copy.
 - If a command fails twice, flag the album with the exact error instead
   of editing scripts.
 
-Report back one line per album: the verdict and why.
+Return exactly one line: `approve: <slug>: <why>` or `flag: <slug>: <why>`.

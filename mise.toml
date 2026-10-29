@@ -1,0 +1,8 @@
+[tools]
+age = "latest"
+bun = "latest"
+
+[settings]
+age.key_file = "~/.config/journey.fm/age.key"
+
+[env]

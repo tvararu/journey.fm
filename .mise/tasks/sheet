@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#MISE description="Cover contact sheet for one album, master first, with same-art scores: music:sheet <slug>"
+#MISE description="Cover contact sheet for one album, master first, with same-art scores: sheet <slug>"
 set -euo pipefail
-cd "$MISE_PROJECT_ROOT/hobbies/music/catalogue"
-exec bun scripts/sheet.ts "$@"
+cd "$MISE_PROJECT_ROOT/packages/catalogue"
+exec bun sheet.ts "$@"

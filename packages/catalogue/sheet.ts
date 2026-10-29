@@ -8,7 +8,7 @@ const TILE = 360;
 const FONT = process.env["SHEET_FONT"] ?? ["/System/Library/Fonts/Supplemental/Arial.ttf", "/usr/share/fonts/TTF/DejaVuSans.ttf"].find(existsSync);
 const slug = Bun.argv[2];
 if (!slug) {
-  console.error("usage: music:sheet <slug>");
+  console.error("usage: sheet <slug>");
   process.exit(1);
 }
 const covers = JSON.parse(readFileSync(`${CATALOGUE}/covers.json`, "utf8")) as Record<string, { master: string; chosen: Cand }>;

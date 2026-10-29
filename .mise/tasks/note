@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#MISE description="Leave a note on an album for whoever works on the catalogue next: music:note <album> <text> [--by deity]"
+#MISE description="Leave a note on an album for whoever works on the catalogue next: note <album> <text> [--by deity]"
 set -euo pipefail
-cd "$MISE_PROJECT_ROOT/hobbies/music/catalogue"
-exec bun scripts/note.ts "$@"
+cd "$MISE_PROJECT_ROOT/packages/catalogue"
+exec bun note.ts "$@"

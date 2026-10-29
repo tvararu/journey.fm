@@ -4,6 +4,10 @@
   "workspaces": {
     "": {
       "name": "journey-fm",
+    },
+    "apps/web": {
+      "name": "journey-fm",
+      "version": "0.0.1",
       "dependencies": {
         "@astrojs/node": "^11.1.9",
         "@tailwindcss/vite": "^4.3.3",
@@ -13,6 +17,18 @@
       "devDependencies": {
         "@types/bun": "latest",
         "typescript": "^7",
+      },
+    },
+    "packages/catalogue": {
+      "name": "@journey.fm/catalogue",
+      "devDependencies": {
+        "@types/bun": "latest",
+      },
+    },
+    "tools/tagging": {
+      "name": "@journey.fm/tagging",
+      "devDependencies": {
+        "@types/bun": "latest",
       },
     },
   },
@@ -142,6 +158,10 @@
     "@img/sharp-win32-ia32": ["@img/sharp-win32-ia32@0.35.5", "", { "os": "win32", "cpu": "ia32" }, "sha512-5Zm82LoBc43nhwNybZlG7Y1KO//Zhsn306fQl29ZOuStHLGTo3BWL83q3cznX0poxSAMuYL1On/BHBxkBeKr6A=="],
 
     "@img/sharp-win32-x64": ["@img/sharp-win32-x64@0.35.5", "", { "os": "win32", "cpu": "x64" }, "sha512-x76eH0vEiHlcMQu8Y8IenntaACtddpT6W0wmXtWrnKcnKI7ME5DdgqhAD6SEWOEl1v2zDvkZDhFA9KnURwpfqg=="],
+
+    "@journey.fm/catalogue": ["@journey.fm/catalogue@workspace:packages/catalogue"],
+
+    "@journey.fm/tagging": ["@journey.fm/tagging@workspace:tools/tagging"],
 
     "@jridgewell/gen-mapping": ["@jridgewell/gen-mapping@0.3.13", "", { "dependencies": { "@jridgewell/sourcemap-codec": "^1.5.0", "@jridgewell/trace-mapping": "^0.3.24" } }, "sha512-2kkt/7niJ6MgEPxF0bYdQ6etZaA+fQvDcLKckhy1yIQOzaoKjBBjSj63/aLVjYE3qhRt5dvM+uUyfCg6UKCBbA=="],
 
@@ -440,6 +460,8 @@
     "is-plain-obj": ["is-plain-obj@4.1.0", "", {}, "sha512-+Pgi+vMuUNkJyExiMBt5IlFoMyKnr5zhJ4Uspz58WOhBF5QoIZkFyNHIbBAtHwzVAgk5RtndVNsDRN61/mmDqg=="],
 
     "jiti": ["jiti@2.7.0", "", { "bin": { "jiti": "lib/jiti-cli.mjs" } }, "sha512-AC/7JofJvZGrrneWNaEnJeOLUx+JlGt7tNa0wZiRPT4MY1wmfKjt2+6O2p2uz2+skll8OZZmJMNqeke7kKbNgQ=="],
+
+    "journey-fm": ["journey-fm@workspace:apps/web"],
 
     "jsonc-parser": ["jsonc-parser@3.3.1", "", {}, "sha512-HUgH65KyejrUFPvHFPbqOY0rsFip3Bo5wb4ngvdi1EpCYWUQDC5V+Y7mZws+DLkr4M//zQJoanu1SP+87Dv1oQ=="],
 

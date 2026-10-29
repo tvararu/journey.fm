@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
 #MISE description="Show the catalogue viewer's dev server logs"
 set -euo pipefail
-cd "$MISE_PROJECT_ROOT/hobbies/music/catalogue/web"
+cd "$MISE_PROJECT_ROOT/apps/web"
 exec bun --bun run astro dev logs

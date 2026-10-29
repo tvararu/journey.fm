@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
 #MISE description="Resolve every processed album into data/catalogue and rym-ids.tsv"
 set -euo pipefail
-cd "$MISE_PROJECT_ROOT/hobbies/music/catalogue"
-exec bun scripts/resolve.ts
+cd "$MISE_PROJECT_ROOT/packages/catalogue"
+exec bun resolve.ts

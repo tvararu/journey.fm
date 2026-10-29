@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#MISE description="Block until an album is prepared (up to 9 min): music:wait <slug> [minutes]"
+#MISE description="Block until an album is prepared (up to 9 min): wait <slug> [minutes]"
 set -euo pipefail
-cd "$MISE_PROJECT_ROOT/hobbies/music/catalogue"
-exec bun scripts/wait.ts "$@"
+cd "$MISE_PROJECT_ROOT/packages/catalogue"
+exec bun wait.ts "$@"

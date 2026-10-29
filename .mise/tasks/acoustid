@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#MISE description="Look up an album's fingerprints on AcoustID: music:acoustid <slug> <Music/Artist/Album>"
+#MISE description="Look up an album's fingerprints on AcoustID: acoustid <slug> <Music/Artist/Album>"
 set -euo pipefail
-cd "$MISE_PROJECT_ROOT/hobbies/music/catalogue"
-exec bun scripts/acoustid.ts "$@"
+cd "$MISE_PROJECT_ROOT/packages/catalogue"
+exec bun acoustid.ts "$@"

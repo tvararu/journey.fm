@@ -2,7 +2,7 @@
 #MISE description="Back up raw responses and the catalogue to sol's music-meta (adds and updates, never deletes)"
 set -euo pipefail
 
-data="$MISE_PROJECT_ROOT/hobbies/music/catalogue/data"
+data="$MISE_PROJECT_ROOT/data"
 rsync -au "$data/raw/" sol:/mnt/pool/music-meta/raw/
 rsync -au "$data/catalogue" sol:/mnt/pool/music-meta/
 echo "pushed raw/ and catalogue/ to sol"

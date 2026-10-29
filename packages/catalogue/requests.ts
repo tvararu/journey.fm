@@ -1,7 +1,9 @@
+import { RECORDS } from "./lib/paths";
+
 type Entry = { at: string; album: string; by: string; text?: string; verdict?: string; message?: string };
 
 async function lines(name: string): Promise<Entry[]> {
-  const file = Bun.file(`${import.meta.dir}/../${name}`);
+  const file = Bun.file(`${RECORDS}/${name}`);
   return (await file.exists()) ? (await file.text()).split("\n").filter(Boolean).map((l) => JSON.parse(l) as Entry) : [];
 }
 

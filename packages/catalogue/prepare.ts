@@ -4,7 +4,7 @@ import { album as lookupAcoustid, prints } from "./acoustid";
 import { edition as runEdition } from "./edition";
 import { enrich } from "./enrich";
 import { files } from "./lib/inventory";
-import { CATALOGUE, META, RAW } from "./lib/paths";
+import { CATALOGUE, META, ORCA, PREVIEWS, RAW, SCRIPTS, TAGGING } from "./lib/paths";
 import { squash } from "./lib/py";
 import { load } from "./lib/raw";
 
@@ -13,9 +13,7 @@ type Cover = { id: string; source: string; types: string[]; width: number; heigh
 type Release = { media: { tracks?: { recording?: { id: string } }[] }[] };
 type Album = { path: string; slug: string; artist: string; title: string; log: string[] };
 
-const HERE = `${import.meta.dir}/..`;
-const MUSIC = `${HERE}/..`;
-const PREVIEWS = `${HERE}/../../../tmp/music-covers`;
+const HERE = SCRIPTS;
 const SOL_BUN = "/home/user/.local/share/mise/installs/bun/latest/bin/bun";
 const COVER_TIERS = [
   "Cover Art Archive (release)", "Cover Art Archive (same catalogue number)", "Cover Art Archive (release group)",
@@ -24,7 +22,7 @@ const COVER_TIERS = [
 
 const paths = Bun.argv.slice(2);
 if (!paths.length) {
-  console.error('usage: music:prepare "Music/Artist/Album" ...');
+  console.error('usage: prepare "Music/Artist/Album" ...');
   process.exit(1);
 }
 
@@ -63,7 +61,7 @@ function fingerprints(): void {
   const have = prints();
   const missing = albums.filter((a) => files(a.path).some((f) => !have.has(`${a.path}/${f.relpath}`)));
   if (!missing.length) return;
-  run(["scp", "-q", `${MUSIC}/tagging/fingerprint.ts`, "sol:catalogue/fingerprint.ts"]);
+  run(["scp", "-q", `${TAGGING}/fingerprint.ts`, "sol:catalogue/fingerprint.ts"]);
   const q = (x: string) => `'${x.replaceAll("'", "'\\''")}'`;
   const script = `cd ~/catalogue && ${SOL_BUN} fingerprint.ts /mnt/pool/music-meta/fingerprints/music.jsonl ${missing.map((a) => q(a.path)).join(" ")}\n`;
   const p = Bun.spawnSync(["ssh", "sol", "bash", "-s"], { stdin: Buffer.from(script), stderr: "pipe", stdout: "pipe" });
@@ -72,14 +70,14 @@ function fingerprints(): void {
 }
 
 async function rym(): Promise<void> {
-  const tab = JSON.parse(run(["orca", "tab", "create", "--url", "https://rateyourmusic.com/", "--json"])) as { result?: { browserPageId?: string } };
+  const tab = JSON.parse(run([ORCA, "tab", "create", "--url", "https://rateyourmusic.com/", "--json"])) as { result?: { browserPageId?: string } };
   const page = tab.result?.browserPageId;
   if (!page) throw new Error("could not open an Orca tab for RYM");
   const env = { ORCA_PAGE: page };
   try {
     await rymEach(env);
   } finally {
-    run(["orca", "tab", "close", "--page", page, "--json"]);
+    run([ORCA, "tab", "close", "--page", page, "--json"]);
   }
 }
 
@@ -87,7 +85,7 @@ async function solved(env: Record<string, string>): Promise<boolean> {
   console.log("RYM: security check in the RYM tab; waiting up to 15 min for it to be solved");
   for (let i = 0; i < 60; i++) {
     await Bun.sleep(15_000);
-    const r = await runAsync(["orca", "eval", "--page", env["ORCA_PAGE"]!, "--expression", "document.title", "--json"]);
+    const r = await runAsync([ORCA, "eval", "--page", env["ORCA_PAGE"]!, "--expression", "document.title", "--json"]);
     if (!r.out.includes("Security check")) return true;
   }
   return false;
@@ -109,7 +107,7 @@ async function rymEach(env: Record<string, string>): Promise<void> {
 async function rymOne(a: Album, env: Record<string, string>): Promise<void> {
   {
     for (let attempt = 0; attempt < 3; attempt++) {
-      const found = await runAsync(["bun", `${MUSIC}/tagging/rym-find.ts`, a.artist, a.title], HERE, env);
+      const found = await runAsync(["bun", `${TAGGING}/rym-find.ts`, a.artist, a.title], HERE, env);
       const r = JSON.parse(found.out.trim().split("\n").at(-1) || "{}") as { url?: string | null; how?: string | null; challenge?: boolean };
       if (r.challenge) {
         if (await solved(env)) continue;
@@ -120,7 +118,7 @@ async function rymOne(a: Album, env: Record<string, string>): Promise<void> {
         say(a, `RYM: no match for "${a.artist} - ${a.title}"; grab it by hand`);
         break;
       }
-      const grab = await runAsync(["bash", `${MUSIC}/tagging/rym-album.sh`, a.slug, r.url], HERE, env);
+      const grab = await runAsync(["bash", `${TAGGING}/rym-album.sh`, a.slug, r.url], HERE, env);
       if (grab.out.includes("CHALLENGE")) {
         if (await solved(env)) continue;
         say(a, "RYM: security check not solved; grab it by hand");
@@ -233,7 +231,7 @@ async function cover(a: Album): Promise<void> {
       }
     }
   }
-  const { out } = await runAsync(["bun", "scripts/covers.ts", "choose", a.slug, c.id, why, "--wait"]);
+  const { out } = await runAsync(["bun", `${SCRIPTS}/covers.ts`, "choose", a.slug, c.id, why, "--wait"]);
   say(a, `cover: ${c.source} ${c.width}x${c.height}${c !== edition ? ` (same art as the ${edition.width} px edition front)` : ""}${out.includes("upscaling") ? ", upscaling to master" : ""}`);
 }
 
@@ -277,24 +275,24 @@ async function album(a: Album): Promise<boolean> {
       return false;
     }
     await step("covers", () => coverGate.run(async () => {
-      const r = await runAsync(["bun", "scripts/covers.ts", PREVIEWS, a.slug]);
+      const r = await runAsync(["bun", `${SCRIPTS}/covers.ts`, PREVIEWS, a.slug]);
       if (r.code !== 0) throw new Error(`covers failed: ${r.out.slice(-400)}`);
       await cover(a);
     }));
-    run(["bun", "scripts/resolve.ts", a.slug]);
+    run(["bun", `${SCRIPTS}/resolve.ts`, a.slug]);
     await step("lyrics", () => lyricsGate.run(async () => {
-      let ly = await runAsync(["bun", "scripts/lyrics.ts", a.slug]);
+      let ly = await runAsync(["bun", `${SCRIPTS}/lyrics.ts`, a.slug]);
       for (let retry = 1; retry <= 3 && ly.code !== 0; retry++) {
         await Bun.sleep(20_000 * retry);
-        ly = await runAsync(["bun", "scripts/lyrics.ts", a.slug]);
+        ly = await runAsync(["bun", `${SCRIPTS}/lyrics.ts`, a.slug]);
       }
       const lines = ly.out.split("\n").filter((l) => l.startsWith(`${a.slug} `));
       const count = (k: string) => lines.filter((l) => l.includes(`-> ${k}`)).length;
       say(a, `lyrics: ${count("synced")} synced, ${count("plain")} plain, ${count("instrumental")} instrumental, ${count("missing")} missing${
-        count("failed") ? `, ${count("failed")} failed (rerun music:lyrics)` : ""}`);
+        count("failed") ? `, ${count("failed")} failed (rerun lyrics)` : ""}`);
     }));
     await step("rym wait", () => rymReady.get(a.slug)!.done);
-    run(["bun", "scripts/resolve.ts", a.slug]);
+    run(["bun", `${SCRIPTS}/resolve.ts`, a.slug]);
     const rec = JSON.parse(readFileSync(`${CATALOGUE}/${a.slug}.json`, "utf8")) as { tracks: { ids: { acoustid_agrees?: boolean | null } }[] };
     const agree = rec.tracks.map((t) => t.ids.acoustid_agrees);
     say(a, `AcoustID: ${agree.filter((x) => x === true).length} agree, ${agree.filter((x) => x === false).length} differ, ${

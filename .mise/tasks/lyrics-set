@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#MISE description="Override one track's lyrics: music:lyrics-set <slug> <track | file> instrumental|none|clear [why]"
+#MISE description="Override one track's lyrics: lyrics-set <slug> <track | file> instrumental|none|clear [why]"
 set -euo pipefail
-cd "$MISE_PROJECT_ROOT/hobbies/music/catalogue"
-exec bun scripts/lyrics-set.ts "$@"
+cd "$MISE_PROJECT_ROOT/packages/catalogue"
+exec bun lyrics-set.ts "$@"

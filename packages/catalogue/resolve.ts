@@ -1,6 +1,7 @@
 import { Database } from "bun:sqlite";
 import { existsSync, readdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 
+import { META, RECORDS } from "./lib/paths";
 import { unescapeHtml } from "./lib/py";
 
 type J = any;
@@ -8,8 +9,6 @@ type Cands = Record<string, unknown>;
 type Pick = (cands: Cands, order: string[]) => [unknown, string | null];
 type Inv = Record<string, J> & { relpath: string; duration: number; tags: [string, string][]; pictures: J[] };
 
-const HERE = `${import.meta.dir}/..`;
-const META = process.env.JOURNEY_DATA ?? `${HERE}/data`;
 const OUT = process.env.JOURNEY_OUT ?? `${META}/catalogue`;
 const MONTHS = Object.fromEntries(
   "January February March April May June July August September October November December".split(" ").map((m, i) => [m, i + 1]),
@@ -482,5 +481,5 @@ if (import.meta.main) {
     if (ids.rym_id) rym.push([ch.path.split("/").slice(1).join("/"), ids.rym_id, ids.rym_path]);
   }
   rym.sort((a, b) => (a.join("\t") < b.join("\t") ? -1 : 1));
-  writeAtomic(process.env.JOURNEY_RYM_IDS ?? `${HERE}/rym-ids.tsv`, `folder\trym_id\trym_path\n${rym.map((r) => `${r.join("\t")}\n`).join("")}`);
+  writeAtomic(process.env.JOURNEY_RYM_IDS ?? `${RECORDS}/rym-ids.tsv`, `folder\trym_id\trym_path\n${rym.map((r) => `${r.join("\t")}\n`).join("")}`);
 }

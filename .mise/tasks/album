@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#MISE description="Show everything known about one album: music:album <id | slug | text in its path>"
+#MISE description="Show everything known about one album: album <id | slug | text in its path>"
 set -euo pipefail
-cd "$MISE_PROJECT_ROOT/hobbies/music/catalogue"
-exec bun scripts/album.ts "$@"
+cd "$MISE_PROJECT_ROOT/packages/catalogue"
+exec bun album.ts "$@"

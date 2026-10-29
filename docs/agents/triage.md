@@ -1,26 +1,19 @@
 # Triage agent brief
 
-You triage one album that `music:prepare` is processing. Approve it if
+You triage one album that `mise run prepare` has just prepared. Approve it if
 it is plainly fine; your approval is the final accept, nobody checks
 it after you. Otherwise hand it on with reasons. Don't fix
 anything: a later agent does that.
 
-Working directory: `/Users/deity/Code/mikoshi/hobbies/music/catalogue`.
-Use `mise run music:<task>` for everything.
+Working directory: the repo root. Use `mise run <task>` for everything.
 
 ## Steps
 
-1. Wait for the album to finish preparing: run
-   `mise run music:wait <slug>` in the foreground with a 600000 ms
-   timeout. It blocks for up to 9 minutes. If it prints "still waiting",
-   run it again, as many times as it takes; albums can take 40 minutes.
-   Don't background it and don't start monitors. If it prints
-   "failed: ...", return `needs_work` with that reason.
-2. Run `mise run music:inspect <slug>`. That page is everything you need
+1. Run `mise run inspect <slug>`. That page is everything you need
    about the edition, fields, tracks and cover candidates.
-3. Run `mise run music:sheet <slug>` and look at the image it names with
+2. Run `mise run sheet <slug>` and look at the image it names with
    the Read tool. Tile 0 is the master cover.
-4. Decide.
+3. Decide.
 
 ## Approve only if all of these hold
 
@@ -45,7 +38,7 @@ Use `mise run music:<task>` for everything.
   with words, or two tracks with the same text. Missing lyrics are fine.
 
 If everything holds, record it:
-`mise run music:verdict <slug> approve "<one or two sentences: edition and
+`mise run verdict <slug> approve "<one or two sentences: edition and
 evidence, cover, lyrics counts>"`
 
 Otherwise don't record anything.

@@ -50,7 +50,7 @@ export async function enrich(slug: string, path: string, release: string, how: s
 if (import.meta.main) {
   const args = Bun.argv.slice(2);
   if (args.length !== 4) {
-    console.error("usage: music:enrich <slug> <path> <release-id> <why>");
+    console.error("usage: enrich <slug> <path> <release-id> <why>");
     process.exit(1);
   }
   const [slug, path, release, how] = args as [string, string, string, string];

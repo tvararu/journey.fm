@@ -1,7 +1,9 @@
 import { Database } from "bun:sqlite";
 import { appendFileSync } from "node:fs";
 
-const NOTES = `${import.meta.dir}/../notes.jsonl`;
+import { META, RECORDS } from "./lib/paths";
+
+const NOTES = `${RECORDS}/notes.jsonl`;
 const args = Bun.argv.slice(2);
 function flag(name: string, fallback: string): string {
   const at = args.indexOf(name);
@@ -11,12 +13,12 @@ const by = flag("--by", "claude");
 const [query, ...rest] = args;
 const text = rest.join(" ").trim();
 if (!(query && text)) {
-  console.error('usage: music:note <album id | slug | text in its path> "<note>" [--by deity]');
+  console.error('usage: note <album id | slug | text in its path> "<note>" [--by deity]');
   process.exit(1);
 }
 
-const editions = (await Bun.file(`${import.meta.dir}/../data/catalogue/editions.json`).json()) as Record<string, { path: string }>;
-const db = new Database(`${import.meta.dir}/../data/inventory/inventory.sqlite`, { readonly: true });
+const editions = (await Bun.file(`${META}/catalogue/editions.json`).json()) as Record<string, { path: string }>;
+const db = new Database(`${META}/inventory/inventory.sqlite`, { readonly: true });
 type Row = { path: string };
 const rows = /^\d+$/.test(query)
   ? db.query<Row, [number]>("select path from albums where id = ?").all(Number(query))

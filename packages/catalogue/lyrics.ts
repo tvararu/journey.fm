@@ -1,12 +1,12 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
 
+import { META } from "./lib/paths";
 import { timestamp } from "./resolve";
 
 type Hit = { id: number; albumName?: string; duration?: number; instrumental?: boolean; syncedLyrics?: string | null; plainLyrics?: string | null };
 type Found = { match: string | null; result: Hit | null; candidates: unknown[] };
 type Rec = { album: { title: { value: string } }; tracks: { file: string; duration: number; fields: Record<string, { value: string }> }[] };
 
-const META = process.env.JOURNEY_DATA ?? `${import.meta.dir}/../data`;
 const UA = "journey.fm/0.1 ( private )";
 
 async function get<T>(path: string, q: Record<string, string>): Promise<T | null> {
@@ -73,7 +73,7 @@ for (const slug of slugs.length ? slugs : all) {
     console.log(slug, f["track"]!.value, f["title"]!.value, "->", kind ?? "missing", match ?? "");
   }
   if (failed) {
-    console.log(slug, `${failed} tracks failed; run music:lyrics ${slug} again to finish`);
+    console.log(slug, `${failed} tracks failed; run lyrics ${slug} again to finish`);
     process.exitCode = 1;
     continue;
   }

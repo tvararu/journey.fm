@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#MISE description="Run read-only SQL against the current inventory: music:sql <query>"
+#MISE description="Run read-only SQL against the current inventory: sql <query>"
 set -euo pipefail
-cd "$MISE_PROJECT_ROOT/hobbies/music/catalogue"
-exec sqlite3 -readonly -header -column data/inventory/inventory.sqlite "$@"
+cd "$MISE_PROJECT_ROOT/packages/catalogue"
+exec sqlite3 -readonly -header -column "$MISE_PROJECT_ROOT/data/inventory/inventory.sqlite" "$@"

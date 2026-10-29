@@ -42,9 +42,9 @@ function run(cmd: string[]): void {
 const capture = (cmd: string[]): Buffer => Bun.spawnSync(cmd, { stdout: "pipe", stderr: "pipe" }).stdout;
 
 function dims(path: string): [number, number] {
-  const out = capture(["sips", "-g", "pixelWidth", "-g", "pixelHeight", path]).toString();
-  const m = [...out.matchAll(/pixel(?:Width|Height): (\d+)/g)].map((x) => Number(x[1]));
-  if (m.length !== 2) throw new Error(`sips could not size ${path}`);
+  const out = capture(["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height", "-of", "csv=p=0", path]).toString();
+  const m = out.trim().split(",").map(Number);
+  if (m.length !== 2 || m.some((x) => !x)) throw new Error(`ffprobe could not size ${path}`);
   return [m[0]!, m[1]!];
 }
 
@@ -187,7 +187,7 @@ function previews(slug: string, cands: Candidate[], outdir: string): void {
   mkdirSync(outdir, { recursive: true });
   cands.forEach((c, n) => {
     if (c.types.includes("Front")) {
-      capture(["sips", "-Z", "700", "-s", "format", "jpeg", `${META}/${c.path}`, "--out", `${outdir}/${slug}-${n}.jpg`]);
+      capture(["ffmpeg", "-nostdin", "-v", "error", "-y", "-i", `${META}/${c.path}`, "-vf", "scale='min(700,iw)':'min(700,ih)':force_original_aspect_ratio=decrease", "-frames:v", "1", "-q:v", "3", `${outdir}/${slug}-${n}.jpg`]);
     }
   });
 }
@@ -301,7 +301,7 @@ if (import.meta.main) {
       });
     }
   } else {
-    console.error("usage: music:covers [slug...] | add <slug> <url> <source> <note> | choose <slug> <candidate-id> <why> [--keep] [--wait]");
+    console.error("usage: covers [slug...] | add <slug> <url> <source> <note> | choose <slug> <candidate-id> <why> [--keep] [--wait]");
     process.exit(1);
   }
 }

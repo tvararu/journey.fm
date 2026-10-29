@@ -220,7 +220,7 @@ export async function edition(slug: string, path: string): Promise<Record<string
 if (import.meta.main) {
   const [slug, path] = Bun.argv.slice(2);
   if (!(slug && path)) {
-    console.error("usage: music:edition <slug> <Music/Artist/Album>");
+    console.error("usage: edition <slug> <Music/Artist/Album>");
     process.exit(1);
   }
   if (process.env["REDACTED_API_KEY"] === undefined) throw new Error("REDACTED_API_KEY is not set");

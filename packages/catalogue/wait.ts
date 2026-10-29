@@ -4,14 +4,14 @@ import { RAW } from "./lib/paths";
 
 const [slug, minutes = "9"] = Bun.argv.slice(2);
 if (!slug) {
-  console.error("usage: music:wait <slug> [minutes]");
+  console.error("usage: wait <slug> [minutes]");
   process.exit(1);
 }
 const marker = `${RAW}/${slug}/prepared.json`;
 const until = Date.now() + Number(minutes) * 60_000;
 while (!existsSync(marker) && Date.now() < until) await Bun.sleep(5000);
 if (!existsSync(marker)) {
-  console.log(`still waiting: ${slug} is not prepared yet; run music:wait ${slug} again`);
+  console.log(`still waiting: ${slug} is not prepared yet; run wait ${slug} again`);
   process.exit(2);
 }
 const m = JSON.parse(readFileSync(marker, "utf8")) as { failed: string | null };

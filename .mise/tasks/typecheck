@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
-#MISE description="Generate Astro types, then type-check the catalogue viewer"
+#MISE description="Generate Astro types, then type-check the viewer, the pipeline and the tagging tools"
 set -euo pipefail
-cd "$MISE_PROJECT_ROOT/hobbies/music/catalogue/web"
-bun --bun run astro sync
-exec bun check
+cd "$MISE_PROJECT_ROOT/apps/web"
+bun --bun run astro sync >/dev/null
+tsc=$PWD/node_modules/.bin/tsc
+for p in apps/web packages/catalogue tools/tagging; do (cd "$MISE_PROJECT_ROOT/$p" && "$tsc" --noEmit -p .); done
+echo "types ok"

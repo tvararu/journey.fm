@@ -1,13 +1,15 @@
 import { Database } from "bun:sqlite";
 import { readdirSync } from "node:fs";
 
+import { META, RECORDS } from "./lib/paths";
+
 type Field = { value: unknown; source: string | null };
 type AlbumRecord = { slug: string; path: string; album: Record<string, Field> };
 
-const DATA = `${import.meta.dir}/../data`;
+const DATA = META;
 const query = Bun.argv.slice(2).join(" ");
 if (!query) {
-  console.error("usage: music:album <id | slug | text in its path>");
+  console.error("usage: album <id | slug | text in its path>");
   process.exit(1);
 }
 
@@ -46,11 +48,11 @@ const tags = db
   .all(a.id);
 
 console.log(`${a.path}  (album ${a.id}, ${files.length} files)  http://localhost:8787/album/${a.id}\n`);
-const notesFile = Bun.file(`${import.meta.dir}/../notes.jsonl`);
+const notesFile = Bun.file(`${RECORDS}/notes.jsonl`);
 const notes = (await notesFile.exists() ? (await notesFile.text()).split("\n").filter(Boolean) : [])
   .map((l) => JSON.parse(l) as { at: string; album: string; by: string; text: string })
   .filter((n) => n.album === a.path);
-const reviewsFile = Bun.file(`${import.meta.dir}/../reviews.jsonl`);
+const reviewsFile = Bun.file(`${RECORDS}/reviews.jsonl`);
 const reviews = (await reviewsFile.exists() ? (await reviewsFile.text()).split("\n").filter(Boolean) : [])
   .map((l) => JSON.parse(l) as { at: string; album: string; by: string; verdict: string; message: string })
   .filter((r) => r.album === a.path)

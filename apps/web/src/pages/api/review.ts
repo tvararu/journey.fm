@@ -1,6 +1,6 @@
 import type { APIRoute } from "astro";
 
-import { ROOT } from "@/lib/paths";
+import { ROOT, SCRIPTS } from "@/lib/paths";
 import { coverChoices, processed } from "@/lib/records";
 import { addReview, fingerprint } from "@/lib/reviews";
 
@@ -23,8 +23,8 @@ export const POST: APIRoute = async ({ request, redirect, cookies }) => {
   const cover = String(form.get("cover") ?? "");
   const current = (await coverChoices())[rec.slug]?.chosen.id;
   if (cover && cover !== current) {
-    run(["scripts/covers.ts", "choose", rec.slug, cover, "Picked as master by deity in review", "--keep"]);
-    run(["scripts/resolve.ts"]);
+    run([`${SCRIPTS}/covers.ts`, "choose", rec.slug, cover, "Picked as master by deity in review", "--keep"]);
+    run([`${SCRIPTS}/resolve.ts`]);
     rec = (await processed()).get(album) ?? rec;
   }
   const at = new Date().toLocaleString("sv-SE", { timeZone: "Europe/London" }).slice(0, 16);

@@ -59,7 +59,7 @@ export async function album(slug: string, path: string, all = prints()): Promise
 if (import.meta.main) {
   const [slug, path] = Bun.argv.slice(2);
   if (!(slug && path)) {
-    console.error("usage: music:acoustid <slug> <Music/Artist/Album>");
+    console.error("usage: acoustid <slug> <Music/Artist/Album>");
     process.exit(1);
   }
   const r = await album(slug, path);

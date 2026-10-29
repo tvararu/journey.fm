@@ -1,14 +1,14 @@
 import { existsSync, readFileSync } from "node:fs";
 
 import { files } from "./lib/inventory";
-import { CATALOGUE, META, RAW } from "./lib/paths";
+import { CATALOGUE, RAW, RECORDS } from "./lib/paths";
 import { squash } from "./lib/py";
 import { load } from "./lib/raw";
 
 type J = any;
 const slug = Bun.argv[2];
 if (!slug) {
-  console.error("usage: music:inspect <slug>");
+  console.error("usage: inspect <slug>");
   process.exit(1);
 }
 const editions = JSON.parse(readFileSync(`${CATALOGUE}/editions.json`, "utf8")) as Record<string, J>;
@@ -74,11 +74,11 @@ const cv = covers[slug];
 line(`COVER master: ${cv ? `${cv.chosen.source} ${cv.chosen.width}x${cv.chosen.height} -> ${cv.master_method}` : "none chosen"}`);
 if (cv) line(`  why: ${cv.why}`);
 const cands = existsSync(`${RAW}/${slug}/covers/candidates.json`) ? (JSON.parse(readFileSync(`${RAW}/${slug}/covers/candidates.json`, "utf8")) as J[]) : [];
-line(`  candidates: ${cands.length} (see music:sheet ${slug} for a picture)`);
+line(`  candidates: ${cands.length} (see sheet ${slug} for a picture)`);
 cands.forEach((c, i) => line(`   ${String(i).padStart(2)} ${c.id === cv?.chosen.id ? "*" : " "} ${c.source} ${c.width}x${c.height} ${c.types.join("+") || "-"}${c.note ? `  ${String(c.note).slice(0, 40)}` : ""}`));
 
-const notes = existsSync(`${META}/../notes.jsonl`)
-  ? readFileSync(`${META}/../notes.jsonl`, "utf8").split("\n").filter(Boolean).map((l) => JSON.parse(l) as J).filter((n) => n.album === choice.path)
+const notes = existsSync(`${RECORDS}/notes.jsonl`)
+  ? readFileSync(`${RECORDS}/notes.jsonl`, "utf8").split("\n").filter(Boolean).map((l) => JSON.parse(l) as J).filter((n) => n.album === choice.path)
   : [];
 if (notes.length) {
   line();
