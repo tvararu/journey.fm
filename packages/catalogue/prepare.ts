@@ -212,7 +212,8 @@ async function cover(a: Album): Promise<void> {
   const usable = cands.filter((c) => COVER_TIERS.includes(c.source) && (c.types.includes("Front") || !c.types.length) && ratio(c) <= 1.2);
   const square = usable.filter((c) => ratio(c) <= 1.05);
   const fronts = square.length ? square : usable;
-  fronts.sort((x, y) => COVER_TIERS.indexOf(x.source) - COVER_TIERS.indexOf(y.source) || y.width * y.height - x.width * x.height);
+  const typed = (c: Cover) => Number(!c.types.includes("Front"));
+  fronts.sort((x, y) => COVER_TIERS.indexOf(x.source) - COVER_TIERS.indexOf(y.source) || typed(x) - typed(y) || y.width * y.height - x.width * x.height);
   const edition = fronts[0];
   if (!edition) {
     say(a, "cover: no front candidate; pick one by hand");

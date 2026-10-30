@@ -134,9 +134,9 @@ export async function edition(slug: string, path: string): Promise<Record<string
     for (const g of await search()) {
       if (tried.has(g.groupId)) continue;
       tried.add(g.groupId);
-      const full = (await red<Group>({ action: "torrentgroup", id: g.groupId }))!;
-      const hit = full.torrents.find((t) => redDirs.includes(unescapeHtml(t.filePath || "")));
-      if (hit) {
+      const full = await red<Group>({ action: "torrentgroup", id: g.groupId });
+      const hit = full?.torrents.find((t) => redDirs.includes(unescapeHtml(t.filePath || "")));
+      if (full && hit) {
         group = save(slug, `red_group_${g.groupId}`, full);
         torrent = hit;
         break;

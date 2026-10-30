@@ -50,6 +50,16 @@ function rymDate(s: string | null | undefined): string | null {
   return [y, ...(mo ? [String(MONTHS[mo]).padStart(2, "0")] : []), ...(d ? [String(Number(d)).padStart(2, "0")] : [])].join("-");
 }
 
+const LRC_HEAD = /^\[(?:ar|al|ti|au|by|re|ve|length|offset|#):[^\]]*\]\s*$\n?/gim;
+const PLACEHOLDER = /^(?:this (?:track|song) is (?:an )?)?instrumental[.!]?$/i;
+function lyric(s: string | null | undefined): string | null {
+  if (!s) return s ?? null;
+  const bare = s.replace(LRC_HEAD, "");
+  const t = bare === s ? s : bare.replace(/^\s+/, "");
+  return t.trim() && !PLACEHOLDER.test(t.replace(/\[[\d:.]+\]\s*/g, "").trim()) ? t : null;
+}
+const placeholder = (s: string | null | undefined) => !!s && !lyric(s) && !!s.replace(LRC_HEAD, "").trim();
+
 const rymName = (slug: string) =>
   (existsSync(`${META}/raw/${slug}`) ? readdirSync(`${META}/raw/${slug}`) : []).filter((n) => /^rym-\d{4}-\d{2}-\d{2}\.json$/.test(n)).sort().at(-1)?.slice(0, -5) ?? "rym-none";
 
@@ -275,18 +285,18 @@ function pairTracks(fs: Inv[], mtracks: [unknown, J, number][], ac: Record<strin
     return d == null || Number(mtracks[j]![0]) === d;
   };
   const lenOk = (t: J, f: Inv) => !t.length || Math.abs(t.length / 1000 - f.duration) <= 3;
+  const heard = (f: Inv) => (ac[f.relpath] ?? []).filter((m) => m.score >= 0.8).flatMap((m) => m.recordings as string[]);
   fs.forEach((f, i) => {
     const rt = ids(f, "MUSICBRAINZ_RELEASETRACKID", "MUSICBRAINZ RELEASE TRACK ID");
-    claim(i, mtracks.findIndex(([, t]) => rt.includes(t.id)));
+    claim(i, mtracks.findIndex(([, t]) => rt.includes(t.id) && lenOk(t, f)));
   });
   fs.forEach((f, i) => {
-    const heard = (ac[f.relpath] ?? []).filter((m) => m.score >= 0.8).flatMap((m) => m.recordings as string[]);
-    const hits = mtracks.map(([, t], j) => (!used.has(j) && sameDisc(f, j) && heard.includes(t.recording?.id) ? j : -1)).filter((j) => j >= 0);
+    const hits = mtracks.map(([, t], j) => (!used.has(j) && sameDisc(f, j) && heard(f).includes(t.recording?.id) ? j : -1)).filter((j) => j >= 0);
     if (hits.length === 1) claim(i, hits[0]!);
   });
   fs.forEach((f, i) => {
     const rec = ids(f, "MUSICBRAINZ_TRACKID", "MUSICBRAINZ TRACK ID");
-    claim(i, mtracks.findIndex(([, t], j) => !used.has(j) && rec.includes(t.recording?.id)));
+    claim(i, mtracks.findIndex(([, t], j) => !used.has(j) && rec.includes(t.recording?.id) && lenOk(t, f)));
   });
   fs.forEach((f, i) => {
     claim(i, mtracks.findIndex(([, t], j) =>
@@ -442,9 +452,9 @@ function resolve(slug: string, choice: J) {
         total_tracks: field({ MusicBrainz: count ? String(count) : null, files: tag(f, "TOTALTRACKS", "TRACKTOTAL") }, ["MusicBrainz", "files"]),
         isrc: field({ MusicBrainz: rec.isrcs?.length ? rec.isrcs : null, files: tag(f, "ISRC") }, ["MusicBrainz", "files"]),
         lyrics: field({
-          "LRCLIB synced": ly?.syncedLyrics ?? null, "LRCLIB plain": ly?.plainLyrics ?? null, files: tag(f, "LYRICS", "UNSYNCEDLYRICS"),
+          "LRCLIB synced": lyric(ly?.syncedLyrics), "LRCLIB plain": lyric(ly?.plainLyrics), files: tag(f, "LYRICS", "UNSYNCEDLYRICS"),
         }, ["LRCLIB synced", "files", "LRCLIB plain"]),
-        instrumental: field({ LRCLIB: ly?.instrumental || null }, ["LRCLIB"]),
+        instrumental: field({ LRCLIB: ly?.instrumental || placeholder(ly?.syncedLyrics) || placeholder(ly?.plainLyrics) || null }, ["LRCLIB"]),
         acoustid: field({ AcoustID: acTop?.id ?? null, files: tag(f, "ACOUSTID_ID") }, ["AcoustID", "files"]),
         ...creditFields(t && cr ? credits(crTracks.get(t.id), cr.relations ?? []) : null, f),
       },
