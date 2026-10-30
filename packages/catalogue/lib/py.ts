@@ -101,7 +101,8 @@ export const squash = (s: string | null | undefined): string =>
   (s ?? "").toLowerCase().normalize("NFKD").replace(/[^a-z0-9]+/g, "");
 
 export function similarTitle(a: string | null | undefined, b: string | null | undefined): boolean {
-  const x = squash(a);
-  const y = squash(b);
+  const vol = (s: string | null | undefined) => (s ?? "").replace(/\bvolume\b/gi, "vol");
+  const x = squash(vol(a));
+  const y = squash(vol(b));
   return x === y || (x.length > 3 && editDistance(x, y) <= Math.max(2, x.length / 10));
 }
