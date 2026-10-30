@@ -1,3 +1,4 @@
+import { yearOf } from "./lib/albums";
 import { mb, REL_INC, redUp } from "./lib/fetch";
 import { discOf, files, type InvFile } from "./lib/inventory";
 import { cachedRed, fetchRed, redCopy, redDirs, type RedMatch, type Torrent } from "./lib/red";
@@ -129,9 +130,12 @@ export async function edition(slug: string, path: string): Promise<Record<string
     const titles = [...new Set([group && unescapeHtml(group.group.name), album].filter((x): x is string => !!x))];
     for (const title of titles) {
       const q = { query: `artist:${quote(artist)} AND releasegroup:${quote(title)}`, limit: 5 };
-      const found = save(slug, "mb_rg_search", await mb<{ "release-groups"?: { id: string; score: number; "primary-type"?: string }[] }>("release-group", q));
-      const album = (g: { "primary-type"?: string }) => Number(g["primary-type"] === "Album");
-      rgids = (found?.["release-groups"] ?? []).filter((g) => g.score >= 90).sort((x, y) => album(y) - album(x)).slice(0, 2).map((g) => g.id);
+      type Hit = { id: string; score: number; "primary-type"?: string; "first-release-date"?: string };
+      const found = save(slug, "mb_rg_search", await mb<{ "release-groups"?: Hit[] }>("release-group", q));
+      const year = yearOf(t0);
+      const album = (g: Hit) => Number(g["primary-type"] === "Album");
+      const away = (g: Hit) => (year && g["first-release-date"] ? Math.abs(Number(g["first-release-date"].slice(0, 4)) - year) : 0);
+      rgids = (found?.["release-groups"] ?? []).filter((g) => g.score >= 90).sort((x, y) => album(y) - album(x) || away(x) - away(y)).slice(0, 2).map((g) => g.id);
       if (rgids.length) break;
     }
     report["rg_search"] = rgids;
