@@ -1,6 +1,7 @@
 import { Database } from "bun:sqlite";
 import { existsSync, readdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 
+import { overrides } from "./lib/overrides";
 import { META, RECORDS } from "./lib/paths";
 import { unescapeHtml } from "./lib/py";
 
@@ -394,6 +395,10 @@ function resolve(slug: string, choice: J) {
     asin: field({ MusicBrainz: rel.asin ?? null, files: tag(f0, "ASIN") }, ["MusicBrainz", "files"]),
     total_discs: field({ MusicBrainz: String(rel.media.length), files: tag(f0, "TOTALDISCS", "DISCTOTAL") }, ["MusicBrainz", "files"]),
   };
+  for (const o of overrides(path).values()) {
+    const f = album[o.field];
+    if (f) album[o.field] = { value: o.value, source: o.by, candidates: { ...f.candidates, [o.by]: o.value } };
+  }
   album.ratings = ratings(slug, choice, rym, rg, dr);
   const front = (caa?.images ?? []).find((i: J) => i.front);
   const embedded = fs.flatMap((f) => f.pictures).find((p) => p.type === 3);

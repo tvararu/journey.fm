@@ -60,7 +60,9 @@ the catalogue" onward.
      resolver; anything else odd, note it. A date that sources disagree
      on (say MusicBrainz's first release against RYM or the files) is
      never a flag: keep the resolved date and note the other in the
-     approval.
+     approval. A field whose source is `deity` was set by hand; never
+     change it. When every source gets a field wrong, set it with
+     `set <slug> <field> <value>... --why "<why>"`, which re-resolves.
    - **Cover.** deity prefers the files' own artwork, or a clean digital
      (iTunes/Deezer) copy, over CAA scans when they show the same art:
      scans often have colour casts or faded edges. Look at the master (`data/catalogue/covers/<slug>/

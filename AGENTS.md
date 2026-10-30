@@ -57,6 +57,11 @@ that cache, fetches uncached albums if RED answers, and otherwise picks
 the edition without RED. When RED is back, run `mise run red`, then
 prepare again the albums `mise run red stale` lists.
 
+Any album field can be set by hand with `mise run set <slug> <field>
+<value>... --by deity [--why "<why>"]` (`--clear` undoes it). It goes to
+`records/overrides.jsonl`, beats every source, and reopens the album for
+triage, which treats a `deity` value as settled.
+
 1. Start `mise run prepare "Music/A/B" ...` in the background. It runs
    each album end to end and prints `PREPARED <slug>` as each lands.
 2. At once, start one `triage` subagent per album, giving each its slug

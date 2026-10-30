@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+#MISE description="Set an album field by hand, overriding every source: set <slug> <field> <value>... [--by deity] [--why reason] | set <slug> <field> --clear"
+set -euo pipefail
+cd "$MISE_PROJECT_ROOT/packages/catalogue"
+exec bun set.ts "$@"

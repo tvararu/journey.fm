@@ -46,7 +46,8 @@ Working directory: the repo root. Use `mise run <task>` for everything.
 - **Fields:** title and artist look right. Sources disagreeing on
   label, edition or dates is NOT a problem when the audio matches; the
   files win for label, and a date that is off between sources is fine.
-  Genre lists always differ between sources; ignore that.
+  Genre lists always differ between sources; ignore that. A field whose
+  source is `deity` was set by hand: it is right, don't question it.
 - **Cover:** the master is the album's front, clean, with no border,
   spine strip, obi, sticker, glare or tray card. If the master is an
   upscale and the sheet shows a larger candidate marked "same art", that
