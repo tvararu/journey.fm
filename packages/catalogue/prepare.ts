@@ -95,14 +95,16 @@ async function solved(env: Record<string, string>): Promise<boolean> {
   return false;
 }
 
-const rymReady = new Map<string, { done: Promise<void>; finish: () => void }>(albums.map((a) => {
-  let finish = () => {};
-  const done = new Promise<void>((r) => (finish = r));
-  return [a.slug, { done, finish }];
+const rymReady = new Map(albums.map((a) => {
+  const { promise: done, resolve: finish } = Promise.withResolvers<void>();
+  return [a.slug, { done, finish, wanted: false }];
 }));
 
 async function rymEach(env: Record<string, string>): Promise<void> {
-  for (const a of albums) {
+  const left = [...albums];
+  while (left.length) {
+    const i = Math.max(0, left.findIndex((x) => rymReady.get(x.slug)!.wanted));
+    const a = left.splice(i, 1)[0]!;
     if (!run([ORCA, "tab", "list", "--json"]).includes(env["ORCA_PAGE"]!)) {
       console.log("RYM: the RYM tab was closed; opening a new one");
       env["ORCA_PAGE"] = openRymTab();
@@ -303,7 +305,11 @@ async function album(a: Album): Promise<boolean> {
       say(a, `lyrics: ${count("synced")} synced, ${count("plain")} plain, ${count("instrumental")} instrumental, ${count("missing")} missing${
         count("failed") ? `, ${count("failed")} failed (rerun lyrics)` : ""}`);
     }));
-    await step("rym wait", () => rymReady.get(a.slug)!.done);
+    await step("rym wait", () => {
+      const r = rymReady.get(a.slug)!;
+      r.wanted = true;
+      return r.done;
+    });
     run(["bun", `${SCRIPTS}/resolve.ts`, a.slug]);
     const rec = JSON.parse(readFileSync(`${CATALOGUE}/${a.slug}.json`, "utf8")) as { tracks: { ids: { acoustid_agrees?: boolean | null } }[] };
     const agree = rec.tracks.map((t) => t.ids.acoustid_agrees);
