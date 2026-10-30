@@ -8,9 +8,25 @@ export type Album = { path: string; slug: string; artist: string; title: string 
 
 export const RYM_SKIP = `${RECORDS}/rym-skip.tsv`;
 
-export function slugOf(path: string): string {
+const shortSlug = (path: string): string => {
   const [, artistDir = "", albumDir = ""] = path.split("/");
   return `${squash(artistDir).slice(0, 12)}-${squash(albumDir).slice(0, 16)}`;
+};
+
+let shared: Set<string> | null = null;
+
+export function slugOf(path: string): string {
+  if (!shared) {
+    const seen = new Set<string>();
+    shared = new Set();
+    for (const p of libraryPaths()) {
+      const s = shortSlug(p);
+      if (seen.has(s)) shared.add(s);
+      seen.add(s);
+    }
+  }
+  const s = shortSlug(path);
+  return shared.has(s) ? `${s}-${new Bun.CryptoHasher("sha1").update(path).digest("hex").slice(0, 4)}` : s;
 }
 
 export function albumOf(path: string): Album {
