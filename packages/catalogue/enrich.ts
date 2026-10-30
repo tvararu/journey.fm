@@ -49,8 +49,8 @@ export async function enrich(slug: string, path: string, release: string, how: s
 
 if (import.meta.main) {
   const args = Bun.argv.slice(2);
-  if (args.length !== 4) {
-    console.error("usage: enrich <slug> <path> <release-id> <why>");
+  if (args.length !== 4 || !/^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/.test(args[2]!)) {
+    console.error("usage: enrich <slug> <path> <release-id (full MusicBrainz UUID)> <why>");
     process.exit(1);
   }
   const [slug, path, release, how] = args as [string, string, string, string];

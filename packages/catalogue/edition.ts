@@ -28,7 +28,7 @@ export type Torrent = {
   remasterRecordLabel?: string | null;
   remasterCatalogueNumber?: string | null;
 };
-type Group = { group: { id: number }; torrents: Torrent[] };
+type Group = { group: { id: number; name: string }; torrents: Torrent[] };
 
 export function decodeLog(b64: string): string {
   const b = Buffer.from(b64, "base64");
@@ -114,15 +114,26 @@ export async function edition(slug: string, path: string): Promise<Record<string
 
   let torrent: Torrent | null = null;
   let group: Group | null = null;
-  if (redDirs.length) {
-    const browse = await red<{ results?: { groupId: number }[] }>({ action: "browse", artistname: artist, groupname: album });
-    let res = browse?.results ?? [];
-    if (!res.length) {
+  const searches: (() => Promise<{ groupId: number }[]>)[] = [
+    async () => (await red<{ results?: { groupId: number }[] }>({ action: "browse", artistname: artist, groupname: album }))?.results ?? [],
+    async () => {
       const words = `${artist ?? ""} ${album ?? ""}`.replace(/[^\p{L}\p{N}]+/gu, " ").trim();
       const loose = await red<{ results?: { groupId: number; groupName: string }[] }>({ action: "browse", searchstr: words });
-      res = (loose?.results ?? []).filter((g) => squash(unescapeHtml(g.groupName)) === squash(album));
-    }
-    for (const g of res) {
+      return (loose?.results ?? []).filter((g) => squash(unescapeHtml(g.groupName)) === squash(album));
+    },
+    ...redDirs.map((d) => async () => {
+      const title = d.replace(/^\d{4}\s*-\s*/, "")
+        .replace(/\s*[[(][^\])]*\b(?:\d{4}|flac|web|cd|vinyl|lossless|24bit|16bit)\b[^\])]*[\])]/gi, "");
+      const words = title.replace(/[^\p{L}\p{N}]+/gu, " ").trim();
+      if (!words) return [];
+      return ((await red<{ results?: { groupId: number }[] }>({ action: "browse", artistname: artist, searchstr: words }))?.results ?? []).slice(0, 3);
+    }),
+  ];
+  const tried = new Set<number>();
+  for (const search of redDirs.length ? searches : []) {
+    for (const g of await search()) {
+      if (tried.has(g.groupId)) continue;
+      tried.add(g.groupId);
       const full = (await red<Group>({ action: "torrentgroup", id: g.groupId }))!;
       const hit = full.torrents.find((t) => redDirs.includes(unescapeHtml(t.filePath || "")));
       if (hit) {
@@ -131,6 +142,7 @@ export async function edition(slug: string, path: string): Promise<Record<string
         break;
       }
     }
+    if (torrent) break;
   }
   let discid: [string, string | null, string | null, string, string | null][] = [];
   if (torrent && group) {
@@ -169,9 +181,13 @@ export async function edition(slug: string, path: string): Promise<Record<string
   let rgids = [t0["MUSICBRAINZ_RELEASEGROUPID"] || t0["MUSICBRAINZ RELEASE GROUP ID"]].filter((x): x is string => !!x);
   if (!rgids.length && !cands.length && artist && album) {
     const quote = (x: string) => `"${x.replace(/["\\]/g, " ")}"`;
-    const q = { query: `artist:${quote(artist)} AND releasegroup:${quote(album)}`, limit: 5 };
-    const found = save(slug, "mb_rg_search", await mb<{ "release-groups"?: { id: string; score: number }[] }>("release-group", q));
-    rgids = (found?.["release-groups"] ?? []).filter((g) => g.score >= 90).slice(0, 2).map((g) => g.id);
+    const titles = [...new Set([group && unescapeHtml(group.group.name), album].filter((x): x is string => !!x))];
+    for (const title of titles) {
+      const q = { query: `artist:${quote(artist)} AND releasegroup:${quote(title)}`, limit: 5 };
+      const found = save(slug, "mb_rg_search", await mb<{ "release-groups"?: { id: string; score: number }[] }>("release-group", q));
+      rgids = (found?.["release-groups"] ?? []).filter((g) => g.score >= 90).slice(0, 2).map((g) => g.id);
+      if (rgids.length) break;
+    }
     report["rg_search"] = rgids;
   }
   for (const rgid of rgids) {
