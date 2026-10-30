@@ -38,9 +38,10 @@ Working directory: the repo root. Use `mise run <task>` for everything.
 - **Tracks:** every file is in the record, no `GAP`, no `AC DIFFERS`.
   A bonus file with no MusicBrainz track is fine if it is the only one.
   `ac ?` on every track is fine when AcoustID simply has no data.
-- **Fields:** title, artist and dates look right. Sources disagreeing on
-  label or edition is NOT a problem when the audio matches; the files
-  win. Genre lists always differ between sources; ignore that.
+- **Fields:** title and artist look right. Sources disagreeing on
+  label, edition or dates is NOT a problem when the audio matches; the
+  files win for label, and a date that is off between sources is fine.
+  Genre lists always differ between sources; ignore that.
 - **Cover:** the master is the album's front, clean, with no border,
   spine strip, sticker, glare or tray card. If the master is an upscale
   and the sheet shows a larger candidate marked "same art", that is

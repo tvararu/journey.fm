@@ -55,7 +55,10 @@ the catalogue" onward.
      can explain it.
    - **Fields.** Title, artist, dates, label, catalogue number, country,
      genres. Placeholders like "none" or "[no label]" are dropped by the
-     resolver; anything else odd, note it.
+     resolver; anything else odd, note it. A date that sources disagree
+     on (say MusicBrainz's first release against RYM or the files) is
+     never a flag: keep the resolved date and note the other in the
+     approval.
    - **Cover.** deity prefers the files' own artwork, or a clean digital
      (iTunes/Deezer) copy, over CAA scans when they show the same art:
      scans often have colour casts or faded edges. Look at the master (`data/catalogue/covers/<slug>/
