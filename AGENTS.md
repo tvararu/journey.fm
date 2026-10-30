@@ -48,8 +48,8 @@ The session coordinates; nothing spawns child agent processes.
 RYM comes first and is deity's job: `mise run rym [count]` names one
 album at a time while deity finds its page in the Orca tab; the page is
 saved once it is open. Albums are not marked In collection.
-`mise run rym auto [count]` does the searching and saving itself, 20 to
-40 s apart, and rings a bell when it needs deity: a security check, a
+`mise run rym auto [count]` does the searching and saving itself, 10 to
+20 s apart, and rings a bell when it needs deity: a security check, a
 lost login, or an album it can't match. When claude runs it, claude
 keeps `mise run rym alert` running beside it; that returns at the next
 call for help, and claude tells deity in the chat. Claude's bell and
