@@ -51,12 +51,17 @@ export function matchLengths(rel: Release, fs: InvFile[]): string {
   }
   const used = new Set<number>();
   const off: number[] = [];
+  let missed = 0;
   for (const t of tr) {
     const j = sorted.findIndex((f, k) => !used.has(k) && similarTitle(t.title, f.tags["TITLE"]) && gap(t, f) <= 3);
-    if (j < 0) return `${tr.length} tracks vs ${fs.length} files, only ${off.length} matched by title`;
+    if (j < 0) {
+      missed++;
+      continue;
+    }
     used.add(j);
     off.push(gap(t, sorted[j]!));
   }
+  if (missed) return `${tr.length} tracks vs ${fs.length} files, only ${off.length} matched by title and length`;
   const extra = fs.length - tr.length;
   return `${tr.length} tracks${extra ? ` (+${extra} extra files)` : ""}, matched by title, worst length gap ${fixed1(Math.max(...off))} s`;
 }
