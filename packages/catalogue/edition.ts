@@ -1,5 +1,5 @@
 import { mb, REL_INC, redUp } from "./lib/fetch";
-import { files, type InvFile } from "./lib/inventory";
+import { discOf, files, type InvFile } from "./lib/inventory";
 import { cachedRed, fetchRed, redCopy, redDirs, type RedMatch, type Torrent } from "./lib/red";
 import { dumps, fixed1, py, similarTitle, unescapeHtml } from "./lib/py";
 import { save } from "./lib/raw";
@@ -28,7 +28,7 @@ const norm = (s: string | null | undefined): string => (s || "").toLowerCase().r
 
 function key(f: InvFile): [number, number, string] {
   const lead = (s: string) => /^\d*/.exec(s)?.[0] ?? "";
-  return [Number(lead(f.tags["DISCNUMBER"] ?? "1") || 1), Number(lead(f.tags["TRACKNUMBER"] ?? "0") || 0), f.relpath];
+  return [discOf(f.relpath, f.tags["DISCNUMBER"]) || 1, Number(lead(f.tags["TRACKNUMBER"] ?? "0") || 0), f.relpath];
 }
 
 function order(a: InvFile, b: InvFile): number {

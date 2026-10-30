@@ -20,3 +20,9 @@ export function files(path: string): InvFile[] {
     tags: Object.fromEntries(tagq.all(r.id).map((t) => [t.k, t.value])),
   }));
 }
+
+export function discOf(relpath: string, tag: string | null | undefined): number | null {
+  const named = /^(\d)[.-]\d{2}[.\s_-]/.exec(relpath.split("/").pop() ?? "")?.[1];
+  const tagged = /^\d+/.exec(tag ?? "")?.[0];
+  return named ? Number(named) : tagged ? Number(tagged) : null;
+}

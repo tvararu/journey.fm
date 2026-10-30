@@ -1,6 +1,7 @@
 import { Database } from "bun:sqlite";
 import { existsSync, readdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 
+import { discOf } from "./lib/inventory";
 import { overrides } from "./lib/overrides";
 import { META, RECORDS } from "./lib/paths";
 import { unescapeHtml } from "./lib/py";
@@ -151,8 +152,8 @@ function tagall(fs: Inv[], ...keys: string[]): string[] {
 
 function trackOrder(a: Inv, b: Inv): number {
   const n = (s: string | null) => Number(s?.match(/^\d*/)?.[0] || 0);
-  const ka = [n(tag(a, "DISCNUMBER")) || 1, n(tag(a, "TRACKNUMBER"))];
-  const kb = [n(tag(b, "DISCNUMBER")) || 1, n(tag(b, "TRACKNUMBER"))];
+  const ka = [discOf(a.relpath, tag(a, "DISCNUMBER")) || 1, n(tag(a, "TRACKNUMBER"))];
+  const kb = [discOf(b.relpath, tag(b, "DISCNUMBER")) || 1, n(tag(b, "TRACKNUMBER"))];
   return ka[0]! - kb[0]! || ka[1]! - kb[1]! || (a.relpath < b.relpath ? -1 : a.relpath > b.relpath ? 1 : 0);
 }
 
@@ -276,13 +277,13 @@ function pairTracks(fs: Inv[], mtracks: [unknown, J, number][], ac: Record<strin
     used.add(j);
   };
   const ids = (f: Inv, ...keys: string[]) => keys.map((k) => tag(f, k)).filter(Boolean);
-  const discOf = (f: Inv): number | null => {
+  const discOfFile = (f: Inv): number | null => {
     const folder = /^(?:cd|disc|disk)\s*#?\s*(\d+)/i.exec(f.relpath.split("/").length > 1 ? f.relpath : "")?.[1];
-    const t = /^\d+/.exec(tag(f, "DISCNUMBER") ?? "")?.[0];
-    return folder ? Number(folder) : t && mtracks.some(([d]) => Number(d) > 1) ? Number(t) : null;
+    const d = discOf(f.relpath, tag(f, "DISCNUMBER"));
+    return folder ? Number(folder) : d && mtracks.some(([n]) => Number(n) > 1) ? d : null;
   };
   const sameDisc = (f: Inv, j: number) => {
-    const d = discOf(f);
+    const d = discOfFile(f);
     return d == null || Number(mtracks[j]![0]) === d;
   };
   const lenOk = (t: J, f: Inv) => !t.length || Math.abs(t.length / 1000 - f.duration) <= 3;
