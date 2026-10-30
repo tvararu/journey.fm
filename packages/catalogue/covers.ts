@@ -118,9 +118,18 @@ async function candidates(slug: string, choice: Choice): Promise<Candidate[]> {
     out.push(candidate(source, path, url, types, note));
 
   const caa = (name: string) => ((load(slug, name) as Caa | null)?.images ?? []).filter((i) => !i.image.endsWith(".pdf"));
+  const fromCaa = async (url: string, dest: string): Promise<string | null> => {
+    try {
+      return await get(url, dest);
+    } catch (e) {
+      if (!/HTTP 5\d\d/.test((e as Error).message)) throw e;
+      console.error(`skipped a Cover Art Archive image that keeps failing: ${(e as Error).message}`);
+      return null;
+    }
+  };
   for (const i of caa(`caa_release_${choice.release}`)) {
-    const p = await get(i.image, `${d}/caa-release-${tail(i.image)}`);
-    add("Cover Art Archive (release)", p, i.image, i.types, i.comment || "");
+    const p = await fromCaa(i.image, `${d}/caa-release-${tail(i.image)}`);
+    if (p) add("Cover Art Archive (release)", p, i.image, i.types, i.comment || "");
   }
   type Sibling = { id: string; evidence: string[]; title: string | null };
   const rep = (load(slug, "edition-report") || {}) as { candidates?: Sibling[] };
@@ -137,17 +146,17 @@ async function candidates(slug: string, choice: Choice): Promise<Candidate[]> {
       }
       for (const i of caa(`caa_release_${sib.id}`)) {
         if (i.front) {
-          const p = await get(i.image, `${d}/caa-sibling-${tail(i.image)}`);
+          const p = await fromCaa(i.image, `${d}/caa-sibling-${tail(i.image)}`);
           const note = `release ${sib.id.slice(0, 8)} ${py(sib.title)}`;
-          add("Cover Art Archive (same catalogue number)", p, i.image, i.types, note);
+          if (p) add("Cover Art Archive (same catalogue number)", p, i.image, i.types, note);
         }
       }
     }
   }
   for (const i of caa(`caa_rg_${choice.release_group}`)) {
     if (i.front && !out.some((c) => c.url === i.image)) {
-      const p = await get(i.image, `${d}/caa-rg-${tail(i.image)}`);
-      add("Cover Art Archive (release group)", p, i.image, i.types, i.comment || "");
+      const p = await fromCaa(i.image, `${d}/caa-rg-${tail(i.image)}`);
+      if (p) add("Cover Art Archive (release group)", p, i.image, i.types, i.comment || "");
     }
   }
   if (!existsSync(`${RAW}/${slug}/itunes.json`) || !existsSync(`${RAW}/${slug}/deezer.json`)) await stores(slug, choice);
