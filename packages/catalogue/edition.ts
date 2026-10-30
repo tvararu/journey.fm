@@ -129,8 +129,9 @@ export async function edition(slug: string, path: string): Promise<Record<string
     const titles = [...new Set([group && unescapeHtml(group.group.name), album].filter((x): x is string => !!x))];
     for (const title of titles) {
       const q = { query: `artist:${quote(artist)} AND releasegroup:${quote(title)}`, limit: 5 };
-      const found = save(slug, "mb_rg_search", await mb<{ "release-groups"?: { id: string; score: number }[] }>("release-group", q));
-      rgids = (found?.["release-groups"] ?? []).filter((g) => g.score >= 90).slice(0, 2).map((g) => g.id);
+      const found = save(slug, "mb_rg_search", await mb<{ "release-groups"?: { id: string; score: number; "primary-type"?: string }[] }>("release-group", q));
+      const album = (g: { "primary-type"?: string }) => Number(g["primary-type"] === "Album");
+      rgids = (found?.["release-groups"] ?? []).filter((g) => g.score >= 90).sort((x, y) => album(y) - album(x)).slice(0, 2).map((g) => g.id);
       if (rgids.length) break;
     }
     report["rg_search"] = rgids;

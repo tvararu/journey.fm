@@ -102,7 +102,11 @@ async function edition(a: Album): Promise<boolean> {
         best.id === tagged ? "the files' MusicBrainz tag" : best.how === "discid" ? "disc ID order" : "RED year"
       }`
     : "";
-  const why = `auto-picked: ${best.ev.join(", ") || "no evidence"}; ${best.lengths}${breaker}`;
+  if (!best.ev.length) {
+    say(a, `edition: no candidate has track-length or AcoustID evidence (best ${best.id.slice(0, 8)}: ${best.lengths}); needs a release picked by hand`);
+    return false;
+  }
+  const why = `auto-picked: ${best.ev.join(", ")}; ${best.lengths}${breaker}`;
   await enrich(a.slug, a.path, best.id, why);
   say(a, `edition: ${best.id} (${best.date ?? "?"}) ${why}`);
   return true;
