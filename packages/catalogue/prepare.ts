@@ -3,7 +3,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { album as lookupAcoustid, prints } from "./acoustid";
 import { edition as runEdition } from "./edition";
 import { enrich } from "./enrich";
-import { albumOf, rymGrabbed, rymSkipped, type Album as Base } from "./lib/albums";
+import { albumOf, rymGrabbed, rymSkipped, yearOf, type Album as Base } from "./lib/albums";
 import { files } from "./lib/inventory";
 import { CATALOGUE, META, PREVIEWS, RAW, SCRIPTS, TAGGING } from "./lib/paths";
 import { load } from "./lib/raw";
@@ -90,17 +90,23 @@ async function edition(a: Album): Promise<boolean> {
     const heard = c.evidence.includes("track lengths") || (of > 0 && hit === of);
     return { ...c, ev, hit, of, official: release?.status === "Official", cd: heard && !vinyl };
   });
-  const tagged = files(a.path)[0]!.tags["MUSICBRAINZ_ALBUMID"];
-  const rank = (c: (typeof scored)[number]) =>
-    [Number(c.official), Number(c.cd), c.ev.length, c.hit, Number(c.id === tagged), Number(c.how === "discid"), Number(c.ev.includes("RED year"))];
+  const t0 = files(a.path)[0]!.tags;
+  const tagged = t0["MUSICBRAINZ_ALBUMID"];
+  const fileYear = yearOf(t0);
+  const day = (c: Candidate) => Number((c.date ?? "").replace(/-/g, "").padEnd(8, "9")) || 99999999;
+  const rank = (c: (typeof scored)[number]) => [
+    Number(c.official), Number(c.cd), c.ev.length, c.hit,
+    Number(c.id === tagged), Number(c.how === "discid"), Number(c.ev.includes("RED year")),
+    Number(!!fileYear && Number((c.date ?? "").slice(0, 4)) === fileYear), -day(c),
+  ];
+  const BREAKERS = ["the files' MusicBrainz tag", "disc ID order", "RED year", "the files' year", "earliest date"];
   const cmp = (x: number[], y: number[]) => x.reduce((d, v, i) => d || y[i]! - v, 0);
   scored.sort((x, y) => cmp(rank(x), rank(y)));
   const best = scored[0]!;
   const tied = scored.filter((c) => c !== best && c.official === best.official && c.cd === best.cd && c.ev.length === best.ev.length && c.hit === best.hit);
+  const decided = tied.length ? rank(best).slice(4).findIndex((v, i) => v !== rank(scored[1]!).slice(4)[i]) : -1;
   const breaker = tied.length
-    ? `; tied on evidence with ${tied.map((c) => `${c.id.slice(0, 8)} (${c.date ?? "?"})`).join(", ")}, broken by ${
-        best.id === tagged ? "the files' MusicBrainz tag" : best.how === "discid" ? "disc ID order" : "RED year"
-      }`
+    ? `; tied on evidence with ${tied.map((c) => `${c.id.slice(0, 8)} (${c.date ?? "?"})`).join(", ")}, broken by ${BREAKERS[decided] ?? "MusicBrainz order"}`
     : "";
   if (!best.ev.length) {
     say(a, `edition: no candidate has track-length or AcoustID evidence (best ${best.id.slice(0, 8)}: ${best.lengths}); needs a release picked by hand`);
