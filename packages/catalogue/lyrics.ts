@@ -1,9 +1,10 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
 
 import { META } from "./lib/paths";
+import { similarTitle } from "./lib/py";
 import { timestamp } from "./resolve";
 
-type Hit = { id: number; albumName?: string; duration?: number; instrumental?: boolean; syncedLyrics?: string | null; plainLyrics?: string | null };
+type Hit = { id: number; trackName?: string; albumName?: string; duration?: number; instrumental?: boolean; syncedLyrics?: string | null; plainLyrics?: string | null };
 type Found = { match: string | null; result: Hit | null; candidates: unknown[] };
 type Rec = { album: { title: { value: string } }; tracks: { file: string; duration: number; fields: Record<string, { value: string }> }[] };
 
@@ -36,13 +37,14 @@ async function lookup(artist: string, title: string, album: string, duration: nu
   const hit = await get<Hit>("get-cached", { artist_name: artist, track_name: title, album_name: album, duration: String(Math.round(duration)) });
   if (hit) return { match: "exact", result: hit, candidates: [] };
   const all = (await get<Hit[]>("search", { artist_name: artist, track_name: title })) ?? [];
-  const near = all.filter((h) => Math.abs((h.duration ?? 0) - duration) <= 2);
+  const near = all.filter((h) => Math.abs((h.duration ?? 0) - duration) <= 2 && similarTitle(h.trackName, title));
   const keyed = near.map((h) => [rank(h, album, duration), h] as const)
     .sort(([a], [b]) => a.reduce((d, x, i) => d || x - b[i]!, 0));
   const candidates = all.map((h) => ({ id: h.id, album: h.albumName ?? null, duration: h.duration ?? null, synced: !!h.syncedLyrics, instrumental: !!h.instrumental }));
   return { match: keyed[0] ? "search" : null, result: keyed[0]?.[1] ?? null, candidates };
 }
 
+const PLACEHOLDER = /^\[(untitled|unknown|silence|no title)\]$/i;
 const slugs = Bun.argv.slice(2);
 const all = Object.keys(JSON.parse(readFileSync(`${META}/catalogue/editions.json`, "utf8")));
 for (const slug of slugs.length ? slugs : all) {
@@ -59,7 +61,9 @@ for (const slug of slugs.length ? slugs : all) {
     const f = t.fields;
     if (!out[t.file]) {
       try {
-        const found = await lookup(f["artist"]!.value, f["title"]!.value, rec.album.title.value, t.duration);
+        const found = PLACEHOLDER.test(f["title"]!.value)
+          ? { match: null, result: null, candidates: [] }
+          : await lookup(f["artist"]!.value, f["title"]!.value, rec.album.title.value, t.duration);
         out[t.file] = instrumental && !found.result ? { ...found, match: "RYM instrumental", result: { id: 0, instrumental: true } } : found;
         writeFileSync(partial, JSON.stringify(out));
       } catch (e) {
