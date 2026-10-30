@@ -38,7 +38,7 @@ export async function fetchJson<T>(url: string, gap: number, headers: Record<str
 }
 
 export const mb = <T>(path: string, q: Record<string, unknown> = {}): Promise<T | null> =>
-  fetchJson<T>(`https://musicbrainz.org/ws/2/${path}?${urlencode({ ...q, fmt: "json" })}`, 1.1);
+  fetchJson<T>(`https://musicbrainz.org/ws/2/${path}?${urlencode({ ...q, fmt: "json" })}`, 1.1, {}, true);
 
 const redKey = () => ({ Authorization: process.env["REDACTED_API_KEY"] ?? "" });
 
