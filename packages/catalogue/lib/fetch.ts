@@ -18,7 +18,7 @@ const quotePlus = (s: string): string =>
 export const urlencode = (q: Record<string, unknown>): string =>
   Object.entries(q).map(([k, v]) => `${quotePlus(k)}=${quotePlus(py(v))}`).join("&");
 
-export async function fetchJson<T>(url: string, gap: number, headers: Record<string, string> = {}): Promise<T | null> {
+export async function fetchJson<T>(url: string, gap: number, headers: Record<string, string> = {}, strict = false): Promise<T | null> {
   const host = new URL(url).host;
   for (let attempt = 0; attempt < 4; attempt++) {
     await slot(host, gap * 1000);
@@ -32,6 +32,7 @@ export async function fetchJson<T>(url: string, gap: number, headers: Record<str
     if (!RETRY.has(r.status)) throw new Error(`HTTP ${r.status} ${r.statusText} for ${url}`);
     await Bun.sleep(3000 * (attempt + 1));
   }
+  if (strict) throw new Error(`no answer from ${host}`);
   console.error("gave up on", url);
   return null;
 }
@@ -39,8 +40,14 @@ export async function fetchJson<T>(url: string, gap: number, headers: Record<str
 export const mb = <T>(path: string, q: Record<string, unknown> = {}): Promise<T | null> =>
   fetchJson<T>(`https://musicbrainz.org/ws/2/${path}?${urlencode({ ...q, fmt: "json" })}`, 1.1);
 
+const redKey = () => ({ Authorization: process.env["REDACTED_API_KEY"] ?? "" });
+
 export async function red<T>(q: Record<string, unknown>): Promise<T | null> {
-  const key = process.env["REDACTED_API_KEY"] ?? "";
-  const r = await fetchJson<{ response?: T }>(`https://redacted.sh/ajax.php?${urlencode(q)}`, 2.3, { Authorization: key });
+  const r = await fetchJson<{ response?: T }>(`https://redacted.sh/ajax.php?${urlencode(q)}`, 2.3, redKey(), true);
   return r ? (r.response ?? null) : null;
 }
+
+let probe: Promise<boolean> | null = null;
+export const redUp = (): Promise<boolean> =>
+  (probe ??= fetch("https://redacted.sh/ajax.php?action=index", { headers: redKey(), signal: AbortSignal.timeout(20_000) })
+    .then((r) => r.ok, () => false));

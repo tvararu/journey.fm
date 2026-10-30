@@ -1,9 +1,7 @@
-import { readFileSync, writeFileSync } from "node:fs";
-
-import { mb, red, REL_INC } from "./lib/fetch";
+import { mb, REL_INC, redUp } from "./lib/fetch";
 import { files, type InvFile } from "./lib/inventory";
-import { INV, RAW } from "./lib/paths";
-import { basename, dumps, fixed1, py, similarTitle, unescapeHtml } from "./lib/py";
+import { cachedRed, fetchRed, redCopy, redDirs, type RedMatch, type Torrent } from "./lib/red";
+import { dumps, fixed1, py, similarTitle, unescapeHtml } from "./lib/py";
 import { save } from "./lib/raw";
 
 type LabelInfo = { label?: { name?: string | null } | null; "catalog-number"?: string | null };
@@ -18,24 +16,6 @@ export type Release = {
   "label-info"?: LabelInfo[];
   "release-group": { id: string };
 };
-export type Torrent = {
-  id: number;
-  media: string;
-  encoding: string;
-  filePath?: string | null;
-  remasterYear?: number | null;
-  remasterTitle?: string | null;
-  remasterRecordLabel?: string | null;
-  remasterCatalogueNumber?: string | null;
-};
-type Group = { group: { id: number; name: string }; torrents: Torrent[] };
-
-export function decodeLog(b64: string): string {
-  const b = Buffer.from(b64, "base64");
-  if (b[0] === 0xff && b[1] === 0xfe) return new TextDecoder("utf-16le").decode(b);
-  if (b[0] === 0xfe && b[1] === 0xff) return new TextDecoder("utf-16be").decode(b);
-  return new TextDecoder("utf-8", { ignoreBOM: true }).decode(b);
-}
 
 export function toc(log: string): number[] | null {
   const rows = [...log.matchAll(/^\s*(\d+)\s*\|\s*[\d:.]+\s*\|\s*[\d:.]+\s*\|\s*(\d+)\s*\|\s*(\d+)\s*$/gm)];
@@ -99,55 +79,26 @@ export function evidence(rel: Release, fs: InvFile[], torrent: Torrent | null): 
 const labels = (r: { "label-info"?: LabelInfo[] }): string =>
   (r["label-info"] ?? []).map((l) => `${py(l.label?.name)} ${py(l["catalog-number"])}`).join(", ");
 
-const squash = (s: string | null | undefined) => (s ?? "").toLowerCase().normalize("NFKD").replace(/[^a-z0-9]+/g, "");
-
 export async function edition(slug: string, path: string): Promise<Record<string, unknown>> {
   const fs = files(path);
-  const redMap = JSON.parse(readFileSync(`${INV}/music-red.json`, "utf8")) as Record<string, string[]>;
-  const redDirs = (redMap[path] ?? []).map(basename);
   const f0 = fs[0];
   if (!f0) throw new Error(`no files for ${path}`);
   const t0 = f0.tags;
   const artist = (t0["ALBUMARTIST"] || t0["ARTIST"]) ?? null;
   const album = t0["ALBUM"] ?? null;
-  const report: Record<string, unknown> = { path, red_dirs: redDirs };
+  const dirs = redDirs(path);
+  const report: Record<string, unknown> = { path, red_dirs: dirs };
 
-  let torrent: Torrent | null = null;
-  let group: Group | null = null;
-  const searches: (() => Promise<{ groupId: number }[]>)[] = [
-    async () => (await red<{ results?: { groupId: number }[] }>({ action: "browse", artistname: artist, groupname: album }))?.results ?? [],
-    async () => {
-      const words = `${artist ?? ""} ${album ?? ""}`.replace(/[^\p{L}\p{N}]+/gu, " ").trim();
-      const loose = await red<{ results?: { groupId: number; groupName: string }[] }>({ action: "browse", searchstr: words });
-      return (loose?.results ?? []).filter((g) => squash(unescapeHtml(g.groupName)) === squash(album));
-    },
-    ...redDirs.map((d) => async () => {
-      const title = d.replace(/^\d{4}\s*-\s*/, "")
-        .replace(/\s*[[(][^\])]*\b(?:\d{4}|flac|web|cd|vinyl|lossless|24bit|16bit)\b[^\])]*[\])]/gi, "");
-      const words = title.replace(/[^\p{L}\p{N}]+/gu, " ").trim();
-      if (!words) return [];
-      return ((await red<{ results?: { groupId: number }[] }>({ action: "browse", artistname: artist, searchstr: words }))?.results ?? []).slice(0, 3);
-    }),
-  ];
-  const tried = new Set<number>();
-  for (const search of redDirs.length ? searches : []) {
-    for (const g of await search()) {
-      if (tried.has(g.groupId)) continue;
-      tried.add(g.groupId);
-      const full = await red<Group>({ action: "torrentgroup", id: g.groupId });
-      const hit = full?.torrents.find((t) => redDirs.includes(unescapeHtml(t.filePath || "")));
-      if (full && hit) {
-        group = save(slug, `red_group_${g.groupId}`, full);
-        torrent = hit;
-        break;
-      }
-    }
-    if (torrent) break;
-  }
+  let match: RedMatch | null = cachedRed(slug, path);
+  if (!match && (!dirs.length || (await redUp()))) match = await fetchRed(slug, path).catch(() => null);
+  report["red_status"] = !match ? "unavailable" : match.torrent ? "matched" : dirs.length ? "no match" : "not on RED";
+  const copy = match && redCopy(slug, match);
+  const torrent: Torrent | null = copy?.torrent ?? null;
+  const group = copy?.group ?? null;
   let discid: [string, string | null, string | null, string, string | null][] = [];
-  if (torrent && group) {
+  if (copy && torrent) {
     report["red"] = {
-      group: group.group.id,
+      group: copy.group.group.id,
       torrent: torrent.id,
       media: torrent.media,
       year: torrent.remasterYear ?? null,
@@ -156,13 +107,7 @@ export async function edition(slug: string, path: string): Promise<Record<string
       catno: torrent.remasterCatalogueNumber ?? null,
       encoding: torrent.encoding,
     };
-    const info = await red<{ torrent?: { ripLogIds?: number[] } }>({ action: "torrent", id: torrent.id });
-    const detail = save(slug, `red_torrent_${torrent.id}`, info);
-    for (const lid of detail?.torrent?.ripLogIds ?? []) {
-      const riplog = await red<{ log?: string }>({ action: "riplog", id: torrent.id, logid: lid });
-      const lg = save(slug, `red_riplog_${torrent.id}_${lid}`, riplog);
-      const text = decodeLog(lg?.log ?? "");
-      writeFileSync(`${RAW}/${slug}/red_riplog_${torrent.id}_${lid}.log`, text);
+    for (const text of copy.logs) {
       const t = toc(text);
       if (t) {
         report["toc"] = t;

@@ -45,14 +45,6 @@ if (noRym.length) {
   console.error(`no RYM page and not marked "not on RYM"; run mise run rym first:\n${noRym.map((a) => `  ${a.path}`).join("\n")}`);
   process.exit(1);
 }
-const redUp = await fetch("https://redacted.sh/ajax.php?action=index", {
-  headers: { Authorization: process.env["REDACTED_API_KEY"] ?? "" },
-  signal: AbortSignal.timeout(20_000),
-}).then((r) => r.ok, () => false);
-if (!redUp) {
-  console.error("RED is not answering; editions need it, so try again later");
-  process.exit(1);
-}
 const say = (a: Album, line: string) => {
   a.log.push(line);
   console.log(`${a.slug}: ${line}`);
@@ -83,7 +75,8 @@ function acoustidHits(slug: string, rid: string): [number, number] {
 async function edition(a: Album): Promise<boolean> {
   const [, looked] = await Promise.all([runEdition(a.slug, a.path), lookupAcoustid(a.slug, a.path)]);
   if (looked.missing.length) say(a, `AcoustID: no fingerprint for ${looked.missing.length} files`);
-  const report = load(a.slug, "edition-report") as { candidates: Candidate[]; red?: { year?: number } } | null;
+  const report = load(a.slug, "edition-report") as { candidates: Candidate[]; red?: { year?: number }; red_status?: string } | null;
+  if (report?.red_status === "unavailable") say(a, "RED: not answering; edition picked without it (mise run red, then prepare again)");
   const cands = report?.candidates ?? [];
   if (!cands.length) {
     say(a, "edition: no candidates; needs a release picked by hand");

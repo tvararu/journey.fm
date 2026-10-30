@@ -51,6 +51,12 @@ In collection; the page is then saved. `s` marks an album not on RYM
 (`records/rym-skip.tsv`). Batches take only albums listed by
 `mise run rym ready`, and `prepare` refuses any others.
 
+RED is optional. While it is up, `mise run red` caches every album's
+RED match in the background (about 2.3 s per request). `prepare` reads
+that cache, fetches uncached albums if RED answers, and otherwise picks
+the edition without RED. When RED is back, run `mise run red`, then
+prepare again the albums `mise run red stale` lists.
+
 1. Start `mise run prepare "Music/A/B" ...` in the background. It runs
    each album end to end and prints `PREPARED <slug>` as each lands.
 2. At once, start one `triage` subagent per album, giving each its slug
