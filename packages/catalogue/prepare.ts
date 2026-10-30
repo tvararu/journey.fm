@@ -3,15 +3,15 @@ import { existsSync, readFileSync } from "node:fs";
 import { album as lookupAcoustid, prints } from "./acoustid";
 import { edition as runEdition } from "./edition";
 import { enrich } from "./enrich";
+import { albumOf, rymGrabbed, rymSkipped, type Album as Base } from "./lib/albums";
 import { files } from "./lib/inventory";
-import { CATALOGUE, META, ORCA, PREVIEWS, RAW, SCRIPTS, TAGGING } from "./lib/paths";
-import { squash } from "./lib/py";
+import { CATALOGUE, META, PREVIEWS, RAW, SCRIPTS, TAGGING } from "./lib/paths";
 import { load } from "./lib/raw";
 
 type Candidate = { how: string; id: string; date: string | null; evidence: string[]; lengths: string };
 type Cover = { id: string; source: string; types: string[]; width: number; height: number; path: string };
 type Release = { media: { tracks?: { recording?: { id: string } }[] }[] };
-type Album = { path: string; slug: string; artist: string; title: string; log: string[] };
+type Album = Base & { log: string[] };
 
 const HERE = SCRIPTS;
 const SOL_BUN = "/home/user/.local/share/mise/installs/bun/latest/bin/bun";
@@ -38,19 +38,13 @@ async function runAsync(cmd: string[], cwd = HERE, env: Record<string, string> =
   return { code, out: out + err };
 }
 
-const albums: Album[] = paths.map((path) => {
-  const [, artistDir = "", albumDir = ""] = path.split("/");
-  const fs = files(path);
-  if (!fs.length) throw new Error(`no files in the inventory for ${path}`);
-  const t = fs[0]!.tags;
-  return {
-    artist: t["ALBUMARTIST"] || t["ARTIST"] || artistDir,
-    log: [],
-    path,
-    slug: `${squash(artistDir).slice(0, 12)}-${squash(albumDir).slice(0, 16)}`,
-    title: t["ALBUM"] || albumDir,
-  };
-});
+const albums: Album[] = paths.map((path) => ({ ...albumOf(path), log: [] }));
+const skipped = rymSkipped();
+const noRym = albums.filter((a) => !rymGrabbed(a.slug) && !skipped.has(a.path));
+if (noRym.length) {
+  console.error(`no RYM page and not marked "not on RYM"; run mise run rym first:\n${noRym.map((a) => `  ${a.path}`).join("\n")}`);
+  process.exit(1);
+}
 const say = (a: Album, line: string) => {
   a.log.push(line);
   console.log(`${a.slug}: ${line}`);
@@ -67,78 +61,6 @@ function fingerprints(): void {
   const p = Bun.spawnSync(["ssh", "sol", "bash", "-s"], { stdin: Buffer.from(script), stderr: "pipe", stdout: "pipe" });
   if (p.exitCode !== 0) throw new Error(`fingerprinting on sol failed: ${p.stderr.toString().slice(-400)}`);
   run(["rsync", "-a", "sol:/mnt/pool/music-meta/fingerprints/", `${META}/fingerprints/`]);
-}
-
-function openRymTab(): string {
-  const tab = JSON.parse(run([ORCA, "tab", "create", "--url", "https://rateyourmusic.com/", "--json"])) as { result?: { browserPageId?: string } };
-  const page = tab.result?.browserPageId;
-  if (!page) throw new Error("could not open an Orca tab for RYM");
-  return page;
-}
-
-async function rym(): Promise<void> {
-  const env = { ORCA_PAGE: openRymTab() };
-  try {
-    await rymEach(env);
-  } finally {
-    run([ORCA, "tab", "close", "--page", env.ORCA_PAGE, "--json"]);
-  }
-}
-
-async function solved(env: Record<string, string>): Promise<boolean> {
-  console.log("RYM: security check in the RYM tab; waiting up to 15 min for it to be solved");
-  for (let i = 0; i < 60; i++) {
-    await Bun.sleep(15_000);
-    const r = await runAsync([ORCA, "eval", "--page", env["ORCA_PAGE"]!, "--expression", "document.title", "--json"]);
-    if (!r.out.includes("Security check")) return true;
-  }
-  return false;
-}
-
-const rymReady = new Map(albums.map((a) => {
-  const { promise: done, resolve: finish } = Promise.withResolvers<void>();
-  return [a.slug, { done, finish, wanted: false }];
-}));
-
-async function rymEach(env: Record<string, string>): Promise<void> {
-  const left = [...albums];
-  while (left.length) {
-    const i = Math.max(0, left.findIndex((x) => rymReady.get(x.slug)!.wanted));
-    const a = left.splice(i, 1)[0]!;
-    if (!run([ORCA, "tab", "list", "--json"]).includes(env["ORCA_PAGE"]!)) {
-      console.log("RYM: the RYM tab was closed; opening a new one");
-      env["ORCA_PAGE"] = openRymTab();
-    }
-    await rymOne(a, env);
-    rymReady.get(a.slug)!.finish();
-  }
-}
-
-async function rymOne(a: Album, env: Record<string, string>): Promise<void> {
-  {
-    for (let attempt = 0; attempt < 3; attempt++) {
-      const found = await runAsync(["bun", `${TAGGING}/rym-find.ts`, a.artist, a.title], HERE, env);
-      const r = JSON.parse(found.out.trim().split("\n").at(-1) || "{}") as { url?: string | null; how?: string | null; challenge?: boolean };
-      if (r.challenge) {
-        if (await solved(env)) continue;
-        say(a, "RYM: security check not solved; grab it by hand");
-        break;
-      }
-      if (!r.url) {
-        say(a, `RYM: no match for "${a.artist} - ${a.title}"; grab it by hand`);
-        break;
-      }
-      const grab = await runAsync(["bash", `${TAGGING}/rym-album.sh`, a.slug, r.url], HERE, env);
-      if (grab.out.includes("CHALLENGE")) {
-        if (await solved(env)) continue;
-        say(a, "RYM: security check not solved; grab it by hand");
-        break;
-      }
-      const owned = /collection now: ([^"]*)/.exec(grab.out)?.[1] ?? (grab.out.includes('"catalog_state":"catalog_o"') ? "already in collection" : "collection not marked");
-      say(a, `RYM: ${r.url}${r.how && r.how !== "exact" ? ` (${r.how})` : ""}${grab.out.includes("NOT LOGGED IN") ? ", NOT LOGGED IN" : ""}; ${owned}`);
-      break;
-    }
-  }
 }
 
 function acoustidHits(slug: string, rid: string): [number, number] {
@@ -309,11 +231,7 @@ async function album(a: Album): Promise<boolean> {
       say(a, `lyrics: ${count("synced")} synced, ${count("plain")} plain, ${count("instrumental")} instrumental, ${count("missing")} missing${
         count("failed") ? `, ${count("failed")} failed (rerun lyrics)` : ""}`);
     }));
-    await step("rym wait", () => {
-      const r = rymReady.get(a.slug)!;
-      r.wanted = true;
-      return r.done;
-    });
+    say(a, skipped.has(a.path) ? "RYM: not on RYM" : "RYM: page grabbed");
     run(["bun", `${SCRIPTS}/resolve.ts`, a.slug]);
     const rec = JSON.parse(readFileSync(`${CATALOGUE}/${a.slug}.json`, "utf8")) as { tracks: { ids: { acoustid_agrees?: boolean | null } }[] };
     const agree = rec.tracks.map((t) => t.ids.acoustid_agrees);
@@ -334,10 +252,5 @@ async function album(a: Album): Promise<boolean> {
 const started = Date.now();
 for (const a of albums) if (existsSync(`${RAW}/${a.slug}/prepared.json`)) Bun.spawnSync(["mv", `${RAW}/${a.slug}/prepared.json`, `${RAW}/${a.slug}/prepared.previous.json`]);
 fingerprints();
-const rymDone = rym().catch((e: Error) => {
-  console.log(`RYM step failed: ${e.message}`);
-  for (const r of rymReady.values()) r.finish();
-});
 const results = await Promise.all(albums.map(album));
-await rymDone;
 console.log(`\nprepared ${results.filter(Boolean).length} of ${albums.length} in ${Math.round((Date.now() - started) / 1000)} s`);

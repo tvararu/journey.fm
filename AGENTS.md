@@ -45,10 +45,14 @@ and later written back as tags. `docs/library.md` holds the agreed rules.
 
 The session coordinates; nothing spawns child agent processes.
 
+RYM comes first and is deity's job: `mise run rym [count]` names one
+album at a time while deity finds its page in the Orca tab and marks it
+In collection; the page is then saved. `s` marks an album not on RYM
+(`records/rym-skip.tsv`). Batches take only albums listed by
+`mise run rym ready`, and `prepare` refuses any others.
+
 1. Start `mise run prepare "Music/A/B" ...` in the background. It runs
-   each album end to end and prints `PREPARED <slug>` as each lands. RYM
-   runs serially in its own Orca tab; if it stalls on a security check,
-   tell deity.
+   each album end to end and prints `PREPARED <slug>` as each lands.
 2. At once, start one `triage` subagent per album, giving each its slug
    and path. Each waits for its own album, then approves it (the final
    accept) or returns `needs_work` with reasons.
