@@ -286,9 +286,9 @@ if (import.meta.main) {
     choose(rest[0]!, rest[1]!, rest[2]!, rest.includes("--keep"), rest.includes("--wait"));
   } else if (cmd === "add" && rest.length >= 4) {
     await addCover(rest[0]!, rest[1]!, rest[2]!, rest[3]!);
-  } else if (cmd && cmd !== "choose" && cmd !== "add") {
+  } else if (cmd && cmd !== "choose" && cmd !== "add" && rest.length) {
     const ch = readJson<Record<string, Choice>>(`${CATALOGUE}/editions.json`);
-    for (const slug of rest.length ? rest : Object.keys(ch)) {
+    for (const slug of rest) {
       const choice = ch[slug];
       if (!choice) throw new Error(`no edition chosen for ${slug}`);
       const cs = await candidates(slug, choice);
@@ -301,7 +301,7 @@ if (import.meta.main) {
       });
     }
   } else {
-    console.error("usage: covers [slug...] | add <slug> <url> <source> <note> | choose <slug> <candidate-id> <why> [--keep] [--wait]");
+    console.error("usage: covers <slug>... | add <slug> <url> <source> <note> | choose <slug> <candidate-id> <why> [--keep] [--wait]");
     process.exit(1);
   }
 }

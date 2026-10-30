@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#MISE description="Gather cover candidates: covers [slug...]; covers add <slug> <url> <source> <note>; covers choose <slug> <candidate-id> <why>"
+#MISE description="Gather cover candidates: covers <slug>...; covers add <slug> <url> <source> <note>; covers choose <slug> <candidate-id> <why>"
 set -euo pipefail
 cd "$MISE_PROJECT_ROOT/packages/catalogue"
 if [ "${1:-}" = choose ] || [ "${1:-}" = add ]; then exec bun covers.ts "$@"; fi
