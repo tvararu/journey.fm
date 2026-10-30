@@ -23,10 +23,9 @@ disagreeing with a pairing, audio that doesn't match any release, or a
 step that keeps failing.
 
 Never flag a disagreement between sources about which edition or label
-the album is when the audio is the same: default to what the files say
-(their MusicBrainz release ID, label and catalogue number) and note it in
-the approval. The resolver already prefers the files' label when RED
-disagrees with them.
+the album is when the audio is the same: pick by the rules below and
+note the alternative in the approval. The resolver already prefers the
+files' label when RED disagrees with them.
 
 Working directory: the repo root. Use `mise run <task>` for everything;
 they load the secrets. Agreed rules: `docs/library.md` from "### Next:
@@ -42,8 +41,11 @@ the catalogue" onward.
 2. Check, and fix where you can:
    - **Edition.** Was the pick right? The `why` in `editions.json` says
      how it was chosen. A tie between releases with identical audio is
-     normal: keep the pick, preferring the release the files are tagged
-     with, then an official release over a bootleg. To switch, run `enrich <slug>
+     normal. Prefer, in order: an official release over a bootleg or
+     promo; a CD or digital release over vinyl (deity almost never has
+     vinyl rips, even when the files' tags name a vinyl release); then
+     the release RED lists, then the one the files are tagged with. To
+     switch, run `enrich <slug>
      <path> <release> "<why>"`, then `covers <slug>`, `covers
      choose ...`, `resolve`, `lyrics <slug>` and
      `resolve` again.

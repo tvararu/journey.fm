@@ -162,18 +162,18 @@ async function edition(a: Album): Promise<boolean> {
   const scored = cands.map((c) => {
     const [hit, of] = acoustidHits(a.slug, c.id);
     const ev = [...c.evidence, ...(of && hit === of ? [`AcoustID ${hit}/${of}`] : [])];
-    const status = (load(a.slug, `mb_release_${c.id}`) as { status?: string } | null)?.status ?? null;
-    return { ...c, ev, hit, of, official: status === "Official" };
+    const release = load(a.slug, `mb_release_${c.id}`) as { status?: string; media?: { format?: string }[] } | null;
+    const vinyl = (release?.media ?? []).some((m) => /vinyl/i.test(m.format ?? ""));
+    const heard = c.evidence.includes("track lengths") || (of > 0 && hit === of);
+    return { ...c, ev, hit, of, official: release?.status === "Official", cd: heard && !vinyl };
   });
   const tagged = files(a.path)[0]!.tags["MUSICBRAINZ_ALBUMID"];
-  const filesAgree = (c: (typeof scored)[number]) =>
-    c.ev.includes("track lengths") && (c.id === tagged || c.ev.some((e) => e.startsWith("file "))) && c.hit === c.of;
   const rank = (c: (typeof scored)[number]) =>
-    [Number(c.official), Number(filesAgree(c)), c.ev.length, c.hit, Number(c.id === tagged), Number(c.how === "discid"), Number(c.ev.includes("RED year"))];
+    [Number(c.official), Number(c.cd), c.ev.length, c.hit, Number(c.id === tagged), Number(c.how === "discid"), Number(c.ev.includes("RED year"))];
   const cmp = (x: number[], y: number[]) => x.reduce((d, v, i) => d || y[i]! - v, 0);
   scored.sort((x, y) => cmp(rank(x), rank(y)));
   const best = scored[0]!;
-  const tied = scored.filter((c) => c !== best && c.official === best.official && filesAgree(c) === filesAgree(best) && c.ev.length === best.ev.length && c.hit === best.hit);
+  const tied = scored.filter((c) => c !== best && c.official === best.official && c.cd === best.cd && c.ev.length === best.ev.length && c.hit === best.hit);
   const breaker = tied.length
     ? `; tied on evidence with ${tied.map((c) => `${c.id.slice(0, 8)} (${c.date ?? "?"})`).join(", ")}, broken by ${
         best.id === tagged ? "the files' MusicBrainz tag" : best.how === "discid" ? "disc ID order" : "RED year"

@@ -37,7 +37,8 @@ Working directory: the repo root. Use `mise run <task>` for everything.
   fine; don't send an album on for a tie. A pick matched by the files'
   own catalogue number, barcode or MusicBrainz tag with AcoustID on
   every track is also fine without track-length evidence, as long as no
-  track is more than 3 s off.
+  track is more than 3 s off. A vinyl pick is `needs_work` when a CD or
+  digital release in the inspect page matches the track lengths too.
 - **Tracks:** every file is in the record, no `AC DIFFERS`, and no
   `GAP` over 3 s. A bonus file with no MusicBrainz track is fine if it
   is the only one. `ac ?` on every track is fine when AcoustID simply
