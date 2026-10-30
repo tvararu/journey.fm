@@ -34,20 +34,25 @@ Working directory: the repo root. Use `mise run <task>` for everything.
   every track, a disc ID, or the files' MusicBrainz tag. It's an official
   release. Ties between releases with the same audio are normal, and
   however the tie was broken (files' tag, disc ID order, RED year) is
-  fine; don't send an album on for a tie.
-- **Tracks:** every file is in the record, no `GAP`, no `AC DIFFERS`.
-  A bonus file with no MusicBrainz track is fine if it is the only one.
-  `ac ?` on every track is fine when AcoustID simply has no data.
+  fine; don't send an album on for a tie. A pick matched by the files'
+  own catalogue number, barcode or MusicBrainz tag with AcoustID on
+  every track is also fine without track-length evidence, as long as no
+  track is more than 3 s off.
+- **Tracks:** every file is in the record, no `AC DIFFERS`, and no
+  `GAP` over 3 s. A bonus file with no MusicBrainz track is fine if it
+  is the only one. `ac ?` on every track is fine when AcoustID simply
+  has no data.
 - **Fields:** title and artist look right. Sources disagreeing on
   label, edition or dates is NOT a problem when the audio matches; the
   files win for label, and a date that is off between sources is fine.
   Genre lists always differ between sources; ignore that.
 - **Cover:** the master is the album's front, clean, with no border,
-  spine strip, sticker, glare or tray card. If the master is an upscale
-  and the sheet shows a larger candidate marked "same art", that is
-  `needs_work`, unless the master comes from the files' own image (the
-  cover `why` says so): deity prefers that art to scans, which often have
-  colour casts.
+  spine strip, obi, sticker, glare or tray card. If the master is an
+  upscale and the sheet shows a larger candidate marked "same art", that
+  is `needs_work` only when the larger one is from iTunes, Deezer or the
+  files. A larger Cover Art Archive scan of the same art is not a reason:
+  deity prefers the files' art and digital copies to scans, which often
+  have colour casts.
 - **Lyrics:** nothing obviously wrong, such as an instrumental track
   with words, or two tracks with the same text. Missing lyrics are fine.
 

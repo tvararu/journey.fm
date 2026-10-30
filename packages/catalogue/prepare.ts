@@ -166,12 +166,14 @@ async function edition(a: Album): Promise<boolean> {
     return { ...c, ev, hit, of, official: status === "Official" };
   });
   const tagged = files(a.path)[0]!.tags["MUSICBRAINZ_ALBUMID"];
+  const filesAgree = (c: (typeof scored)[number]) =>
+    c.ev.includes("track lengths") && (c.id === tagged || c.ev.some((e) => e.startsWith("file "))) && c.hit === c.of;
   const rank = (c: (typeof scored)[number]) =>
-    [Number(c.official), c.ev.length, c.hit, Number(c.id === tagged), Number(c.how === "discid"), Number(c.ev.includes("RED year"))];
+    [Number(c.official), Number(filesAgree(c)), c.ev.length, c.hit, Number(c.id === tagged), Number(c.how === "discid"), Number(c.ev.includes("RED year"))];
   const cmp = (x: number[], y: number[]) => x.reduce((d, v, i) => d || y[i]! - v, 0);
   scored.sort((x, y) => cmp(rank(x), rank(y)));
   const best = scored[0]!;
-  const tied = scored.filter((c) => c !== best && c.official === best.official && c.ev.length === best.ev.length && c.hit === best.hit);
+  const tied = scored.filter((c) => c !== best && c.official === best.official && filesAgree(c) === filesAgree(best) && c.ev.length === best.ev.length && c.hit === best.hit);
   const breaker = tied.length
     ? `; tied on evidence with ${tied.map((c) => `${c.id.slice(0, 8)} (${c.date ?? "?"})`).join(", ")}, broken by ${
         best.id === tagged ? "the files' MusicBrainz tag" : best.how === "discid" ? "disc ID order" : "RED year"
@@ -206,9 +208,10 @@ function difference(a: Uint8Array, b: Uint8Array): number {
 
 async function cover(a: Album): Promise<void> {
   const cands = JSON.parse(readFileSync(`${RAW}/${a.slug}/covers/candidates.json`, "utf8")) as Cover[];
-  const fronts = cands.filter((c) =>
-    COVER_TIERS.includes(c.source) && (c.types.includes("Front") || !c.types.length) &&
-    Math.max(c.width, c.height) / Math.min(c.width, c.height) <= 1.2);
+  const ratio = (c: Cover) => Math.max(c.width, c.height) / Math.min(c.width, c.height);
+  const usable = cands.filter((c) => COVER_TIERS.includes(c.source) && (c.types.includes("Front") || !c.types.length) && ratio(c) <= 1.2);
+  const square = usable.filter((c) => ratio(c) <= 1.05);
+  const fronts = square.length ? square : usable;
   fronts.sort((x, y) => COVER_TIERS.indexOf(x.source) - COVER_TIERS.indexOf(y.source) || y.width * y.height - x.width * x.height);
   const edition = fronts[0];
   if (!edition) {
