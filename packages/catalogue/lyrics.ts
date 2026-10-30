@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
 
 import { META } from "./lib/paths";
-import { similarTitle } from "./lib/py";
+import { similarTitle, squash } from "./lib/py";
 import { timestamp } from "./resolve";
 
 type Hit = { id: number; trackName?: string; albumName?: string; duration?: number; instrumental?: boolean; syncedLyrics?: string | null; plainLyrics?: string | null };
@@ -33,11 +33,16 @@ function rank(h: Hit, album: string, duration: number): number[] {
   return [Number(!h.syncedLyrics), Number(LIVE.test(h.albumName ?? "")), Number(!same), Math.abs((h.duration ?? 0) - duration)];
 }
 
+function sameTrack(found: string | undefined, title: string): boolean {
+  const [x, y] = [squash(found), squash(title)];
+  return similarTitle(found, title) || (Math.min(x.length, y.length) >= 3 && (x.includes(y) || y.includes(x)));
+}
+
 async function lookup(artist: string, title: string, album: string, duration: number): Promise<Found> {
   const hit = await get<Hit>("get-cached", { artist_name: artist, track_name: title, album_name: album, duration: String(Math.round(duration)) });
   if (hit) return { match: "exact", result: hit, candidates: [] };
   const all = (await get<Hit[]>("search", { artist_name: artist, track_name: title })) ?? [];
-  const near = all.filter((h) => Math.abs((h.duration ?? 0) - duration) <= 2 && similarTitle(h.trackName, title));
+  const near = all.filter((h) => Math.abs((h.duration ?? 0) - duration) <= 2 && sameTrack(h.trackName, title));
   const keyed = near.map((h) => [rank(h, album, duration), h] as const)
     .sort(([a], [b]) => a.reduce((d, x, i) => d || x - b[i]!, 0));
   const candidates = all.map((h) => ({ id: h.id, album: h.albumName ?? null, duration: h.duration ?? null, synced: !!h.syncedLyrics, instrumental: !!h.instrumental }));
