@@ -50,9 +50,12 @@ album at a time while deity finds its page in the Orca tab and marks it
 In collection; the page is then saved. `mise run rym auto [count]` does
 the searching, marking and saving itself, 20 to 40 s apart, and rings a
 bell when it needs deity: a security check, a lost login, or an album
-it can't match. `s` marks an album not on RYM (`records/rym-skip.tsv`).
-Batches take only albums listed by `mise run rym ready`, and `prepare`
-refuses any others.
+it can't match. When claude runs it, claude keeps `mise run rym alert`
+running beside it; that returns at the next call for help, and claude
+tells deity in the chat. Claude's bell and desktop notification go to
+t1, not to deity. `s` marks an album not on RYM
+(`records/rym-skip.tsv`). Batches take only albums listed by
+`mise run rym ready`, and `prepare` refuses any others.
 
 RED is optional. While it is up, `mise run red` caches every album's
 RED match in the background (about 2.3 s per request). `prepare` reads
