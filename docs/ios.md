@@ -52,6 +52,10 @@ database in `apps/ios/build/cli`.
 | `cli …` | The `journey` command |
 | `testflight` | Archive, upload, and wait until App Store Connect has processed the build |
 
+Day to day, changes go to the phone with `device` (Developer Mode is on,
+the phone is registered with the team). TestFlight isn't part of the
+loop.
+
 Debug builds sign in on their own when launched with `JELLYFIN_URL`,
 `JELLYFIN_USERNAME` and `JELLYFIN_PASSWORD`, which `sim` and `device`
 pass from mise; release builds never read them. On the simulator, Orca
