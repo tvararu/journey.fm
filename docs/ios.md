@@ -30,31 +30,47 @@ The app icon is a placeholder: SF Symbols' `music.note`, which Apple's
 licence does not allow in app icons. Replace it before anything goes
 beyond internal TestFlight.
 
-## Dependencies (1 Nov)
+## Structure and dependencies (1 Nov)
 
-Vanilla Swift and Apple frameworks. A package only when it does
-something specific that would be annoying to do ourselves. So far
-nothing qualifies:
+Everything but the screens lives in `apps/ios/JourneyKit`, a local Swift
+package: the Jellyfin client, the library database and sync, the art
+cache and the Keychain session. The app target holds only
+`AppModel.swift` and `Views/`. The package also builds `journey`, a
+command for testing against the real server without the simulator:
+`mise run ios cli sync [--full] | stats | art <album id>`, with its
+database in `apps/ios/build/cli`. `mise run ios test` runs the package
+tests.
+
+Vanilla Swift and Apple frameworks, plus a package only when it does
+something specific that would be annoying to do ourselves:
 
 - Jellyfin: `URLSession` and `Codable`, no SDK
-- Database and search: SQLite through the system `SQLite3` module
-  (FTS5 for search, if the system build has it), or SwiftData
+- Database: GRDB 7 over SQLite, for migrations, batch writes, FTS5 for
+  search and `ValueObservation`, which keeps the screens current
 - Audio: Core Audio decodes FLAC natively (`AVAudioFile` opened a FLAC
   made with `afconvert` on 1 Nov), so `AVAudioEngine` with an
   `AVAudioPlayerNode` scheduling tracks back to back replaces Dorsal's
   SFBAudioEngine. It stays the fallback if play-while-downloading
   (step 6) proves annoying with the system APIs
 
+Sync pages through `/Items` 1,000 at a time with
+`EnableTotalRecordCount=false`: Jellyfin takes about 13 s to count 1,000
+tracks and 1 s without the count. A full sync of 678 albums and 7,706
+tracks takes about 20 s; it runs on first sign-in and then once a day,
+and is the only way deletions are noticed. Between full syncs, a delta
+asks for items with `MinDateLastSaved` an hour before the last sync. A
+track whose album isn't stored yet waits for the next sync.
+
 ## Roadmap
 
 1. **Ship to the phone.** Done 1 Nov: builds go to TestFlight with
    `mise run ios testflight`.
-2. **Sign in and sync.** Jellyfin sign-in (sol's Jellyfin 12.4 at
-   `JELLYFIN_URL`, https://jellyfin.example; the account is in
-   `JELLYFIN_USERNAME` and `JELLYFIN_PASSWORD`), a local database of the
-   whole library, a full sync then deltas (`MinDateLastSaved` on albums
-   and tracks, parents of changed tracks, a periodic full ID list for
-   deletions), art cached and refreshed by `ImageTags`.
+2. **Sign in and sync.** Done 1 Nov: sign-in to sol's Jellyfin
+   (`JELLYFIN_URL`, https://jellyfin.example; the account is
+   in `JELLYFIN_USERNAME` and `JELLYFIN_PASSWORD`), the session in the
+   Keychain, full and delta sync into the local database, album art
+   cached by `ImageTags`. A stand-in screen shows the counts and the
+   albums added most recently.
 3. **Browse and search offline.** The three tabs, album and artist
    pages, search against the local database only.
 4. **Play.** `AVAudioEngine` with gapless playback, lock screen and

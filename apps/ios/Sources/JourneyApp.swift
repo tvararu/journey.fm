@@ -2,14 +2,18 @@ import SwiftUI
 
 @main
 struct JourneyApp: App {
+    @State private var model = AppModel()
+
     var body: some Scene {
         WindowGroup {
-            VStack(spacing: 12) {
-                Image(systemName: "music.note")
-                    .font(.system(size: 64))
-                Text("journey.fm")
-                    .font(.largeTitle)
+            Group {
+                if model.session == nil {
+                    SignInView()
+                } else {
+                    LibraryView()
+                }
             }
+            .environment(model)
         }
     }
 }

@@ -5,3 +5,5 @@ apps/web/.astro/
 apps/ios/Journey.xcodeproj/
 apps/ios/Info.plist
 apps/ios/build/
+apps/ios/JourneyKit/.build/
+apps/ios/JourneyKit/.swiftpm/

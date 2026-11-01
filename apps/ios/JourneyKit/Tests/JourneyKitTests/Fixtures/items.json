@@ -1,0 +1,51 @@
+{
+  "Items": [
+    {
+      "Name": "...Into the Exam Room",
+      "ServerId": "8bd1c21393a345ac9882ff7540c339fb",
+      "Id": "8d63a42f65372324af2a4e98ca8d13f6",
+      "DateCreated": "2023-04-09T10:39:43.6816589Z",
+      "SortName": "   into exam room",
+      "PremiereDate": "2007-10-26T00:00:00.0000000Z",
+      "ChannelId": null,
+      "Genres": ["Stoner", "Desert", "Doom"],
+      "RunTimeTicks": 26265466880,
+      "ProductionYear": 2007,
+      "IsFolder": true,
+      "Type": "MusicAlbum",
+      "ChildCount": 12,
+      "Artists": ["Hermano"],
+      "ArtistItems": [{ "Name": "Hermano", "Id": "313d9a8b16dac37f3e0b5b83068b7d9e" }],
+      "AlbumArtist": "Hermano",
+      "AlbumArtists": [{ "Name": "Hermano", "Id": "313d9a8b16dac37f3e0b5b83068b7d9e" }],
+      "ImageTags": { "Primary": "b0d07923eabbcc4310e0a929d8d1234e" },
+      "BackdropImageTags": [],
+      "LocationType": "FileSystem",
+      "MediaType": "Unknown"
+    },
+    {
+      "Name": "The Real Song for the Deaf",
+      "ServerId": "8bd1c21393a345ac9882ff7540c339fb",
+      "Id": "dc42ca27b35c7181fd3f7e58564b60f4",
+      "HasLyrics": false,
+      "Container": "flac",
+      "PremiereDate": "2002-01-01T00:00:00.0000000Z",
+      "ChannelId": null,
+      "RunTimeTicks": 930266670,
+      "ProductionYear": 2002,
+      "IndexNumber": 0,
+      "ParentIndexNumber": 1,
+      "IsFolder": false,
+      "Type": "Audio",
+      "Artists": ["Queens of the Stone Age"],
+      "ArtistItems": [{ "Name": "Queens of the Stone Age", "Id": "d02e957558bc8489232d7b015de2777a" }],
+      "Album": "Songs for the Deaf",
+      "AlbumId": "27f894018bc3ab93f92c732995a8fa52",
+      "AlbumPrimaryImageTag": "f7e966233898322c1b2d4d732b8e5616",
+      "AlbumArtist": "Queens of the Stone Age",
+      "AlbumArtists": [{ "Name": "Queens of the Stone Age", "Id": "d02e957558bc8489232d7b015de2777a" }],
+      "LocationType": "FileSystem",
+      "MediaType": "Audio"
+    }
+  ]
+}

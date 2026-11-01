@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#MISE description="Build the iOS app: ios sim (run on the booted simulator) | ios testflight (upload a build)"
+#MISE description="Build the iOS app: ios sim | testflight | test | cli <args> (JourneyKit's journey command)"
 set -euo pipefail
 cd "$MISE_PROJECT_ROOT/apps/ios"
 command -v xcodegen >/dev/null || { echo "xcodegen is missing: brew install xcodegen" >&2; exit 1; }
@@ -10,9 +10,19 @@ sim)
   udid=$(xcrun simctl list devices booted --json | jq -r '[.devices[][]][0].udid // empty')
   [ -n "$udid" ] || { echo "No simulator is booted" >&2; exit 1; }
   xcodebuild -project Journey.xcodeproj -scheme Journey -destination "id=$udid" \
-    -derivedDataPath build/sim -quiet build CODE_SIGNING_ALLOWED=NO
+    -derivedDataPath build/sim -quiet build CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY=- \
+    DEVELOPMENT_TEAM= PROVISIONING_PROFILE_SPECIFIER=
   xcrun simctl install "$udid" build/sim/Build/Products/Debug-iphonesimulator/Journey.app
   xcrun simctl launch "$udid" fm.journey.app
+  ;;
+test)
+  swift test --package-path JourneyKit
+  ;;
+cli)
+  shift
+  mkdir -p build/cli
+  swift build --package-path JourneyKit --product journey -q
+  JOURNEY_HOME=build/cli JourneyKit/.build/debug/journey "$@"
   ;;
 testflight)
   for name in ASC_KEY_ID ASC_ISSUER_ID ASC_KEY_P8; do
@@ -39,7 +49,7 @@ testflight)
   echo "Uploaded build $build to TestFlight"
   ;;
 *)
-  echo "usage: mise run ios sim | testflight" >&2
+  echo "usage: mise run ios sim | testflight | test | cli <args>" >&2
   exit 1
   ;;
 esac
