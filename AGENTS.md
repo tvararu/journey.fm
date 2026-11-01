@@ -9,7 +9,8 @@ and later written back as tags. `docs/library.md` holds the agreed rules.
 - `apps/web`: the catalogue viewer (Astro on Bun, port 8786)
 - `apps/ios`: the iOS player (SwiftUI, XcodeGen `project.yml`, bundle
   `fm.journey.app`); `mise run ios sim` runs it on the booted simulator,
-  `mise run ios testflight` uploads a build to TestFlight
+  `mise run ios testflight` uploads a build to TestFlight; vision, UX
+  and roadmap in `docs/ios.md`
 - `packages/catalogue`: the pipeline and reviewer tools
 - `tools/tagging`: scripts that run on sol, plus the RYM grabbers
 - `records/`: reviews, verdicts, notes and RYM IDs (committed)
