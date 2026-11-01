@@ -120,6 +120,101 @@ and is the only way deletions are noticed. Between full syncs, a delta
 asks for items with `MinDateLastSaved` an hour before the last sync. A
 track whose album isn't stored yet waits for the next sync.
 
+## Screens (1 Nov)
+
+Artboards for every step, drawn by Claude Design from the docs above,
+are in `data/design/ios-board.zip` (gitignored; backed up to sol with
+`mise run push`). Each artboard names the SwiftUI component for every
+element; `renders/` has the PNGs, `renders/Main.png` the flow and
+`renders/o-decisions.png` the decisions. What follows is what was agreed
+from it.
+
+Navigation:
+
+- Launch goes to Sign in without a session, then First sync, then the
+  tabs. First sync is its own screen, showing phases with running
+  counts rather than a percentage.
+- Home's toolbar has only a gear, which opens Settings as a sheet:
+  account, library counts, last sync, Sync Now, Sign Out, storage and
+  downloads later. Library's toolbar holds sort and layout.
+- Sync status is the `navigationSubtitle` on Home and Library: "Synced
+  5 min ago", "Syncing…", "Couldn't sync · Synced yesterday",
+  "Offline · Synced 3 h ago". Failures never block browsing; the detail
+  is in Settings. A 401 signs out with a message on the sign-in screen.
+  Pull to refresh runs a delta sync.
+
+Step 3:
+
+- Home: Recently Added (pushes the full list) and twelve Random Albums,
+  reshuffled on pull to refresh. `tabBarMinimizeBehavior` is `.never`
+  on Home, `.onScrollDown` on Library.
+- Library: Albums and Artists as capsule buttons (Downloaded joins them
+  as a toggle in step 5), a sort Menu (Title, Artist, Year, Recently
+  Added; default Artist, then year within an artist), a list/grid
+  toggle and a `.searchable` filter for this screen only, all kept in
+  `@AppStorage`. The grid has two columns of covers with title and
+  artist below. Lists get an A–Z index from Jellyfin's sort names (`#`
+  for digits, decades when sorted by year, none for Recently Added).
+- Where title and artist repeat (Celldweller's five End of an Empire),
+  the subtitle adds the track count.
+- Album page: no title in the bar; cover, title (never truncated),
+  artist (pushes the artist), "1982 · Punk" then "13 tracks · 44 min"
+  from the synced tracks, Play and Shuffle, tracks. Disc headings only
+  on multi-disc albums; a track's artist only when it differs from the
+  album's; More by the artist only when there is more.
+- Artist page: image, name, "16 albums · 1972–2013", Play and Shuffle,
+  then every album as a row, oldest first, the same for one album or
+  sixteen.
+- Search tab: `.searchable` on the Search tab's own stack, local FTS5
+  with word-prefix matching, results grouped Artists, Albums, Tracks
+  with a few of each and See All. A track result opens its album (and
+  plays from it in step 4). Recent searches fill the empty state.
+  Matching ignores hyphen variants (Bong-Ra is tagged with both U+2010
+  and an ASCII hyphen).
+- Context menus on every album tile and track row: Go to Artist now;
+  Play, Shuffle, Play Next and Add to Queue in step 4; Download or
+  Remove Download in step 5.
+- Artists with no albums are hidden: Jellyfin returns five empty
+  duplicates (Septicflesh, Various Artists and others), leaving 295.
+- Covers are fetched into Application Support during sync, so browsing
+  offline shows art; Caches can be purged by iOS.
+
+Step 4:
+
+- Mini player: `tabViewBottomAccessory(isEnabled:)`, hidden until
+  something is queued. Expanded: art, title, artist, play/pause, next.
+  Inline (`tabViewBottomAccessoryPlacement`): art, title, play/pause.
+  Tapping it opens now playing.
+- Now playing: a full-height sheet with art, title, "artist · album",
+  scrubber with elapsed and remaining, previous (restarts after 3 s),
+  play/pause, next, shuffle, repeat (off, all, one), AirPlay
+  (`AVRoutePickerView`, the one UIKit wrapper) and the queue. A More
+  menu goes to the album or artist. No volume slider.
+- Queue: a second sheet with medium and large detents; now playing
+  fixed at the top, Up Next below with Play Next items marked; swipe to
+  remove, Edit to reorder, Clear empties Up Next.
+- "Played" on a track row means already played in the current queue,
+  shown as secondary text. Home gains Recently Played.
+
+Steps 5 to 8:
+
+- Download progress is linear: a bar under the album header, a state
+  per row (saved, downloading, waiting), a badge on covers when an album
+  is complete. Settings shows storage and Remove All Downloads.
+- Offline, tracks not on the phone are dimmed, not hidden or disabled;
+  tapping one offers Download When Online. A queue that reaches a
+  missing track offline skips it and marks it.
+- Seeking past what has downloaded uses an HTTP range request.
+- Download All shows one progress row in Settings, with each pause
+  named (Low Power Mode, waiting for Wi-Fi, storage full). When it
+  finishes, Download New Albums turns on.
+- Lyrics replace the art in now playing; the current line is bold,
+  tapping a line seeks. Step 8 metadata appears only where it exists.
+
+Left for the catalogue: Celldweller's five albums want distinct titles,
+and the hyphen variants want one spelling, both written back to the tags
+rather than patched on the phone.
+
 ## Roadmap
 
 1. **Ship to the phone.** Done 1 Nov: builds go to TestFlight with
@@ -131,7 +226,8 @@ track whose album isn't stored yet waits for the next sync.
    cached by `ImageTags`. A stand-in screen shows the counts and the
    albums added most recently.
 3. **Browse and search offline.** The three tabs, album and artist
-   pages, search against the local database only.
+   pages, search against the local database only, covers kept on the
+   phone; as in Screens above.
 4. **Play.** `AVAudioEngine` with gapless playback, lock screen and
    remote controls, interruptions and route changes, the mini player
    and now playing sheet, resume where playback stopped.

@@ -14,8 +14,8 @@ and later written back as tags. `docs/library.md` holds the agreed rules.
 - `packages/catalogue`: the pipeline and reviewer tools
 - `tools/tagging`: scripts that run on sol, plus the RYM grabbers
 - `records/`: reviews, verdicts, notes and RYM IDs (committed)
-- `data/`: raw responses, covers, catalogue (gitignored, backed up to
-  sol with `mise run push`)
+- `data/`: raw responses, covers, catalogue, design boards in
+  `data/design` (gitignored, backed up to sol with `mise run push`)
 - `.omp/agents`: the triage and fixer subagents
 
 ## Where things run
