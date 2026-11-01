@@ -62,10 +62,11 @@ saved once it is open. Albums are not marked In collection.
 `mise run rym auto [count]` does the searching and saving itself, 10 to
 20 s apart, and rings a bell when it needs deity: a security check, a
 lost login, or an album it can't match. When claude runs it, claude
-keeps `mise run rym alert` running beside it; that returns at the next
-call for help, and claude asks deity with the ask tool, which shows a
-blocking question in Orca. Claude's bell and desktop notification go to
-t1, not to deity. `s` marks an album not on RYM
+starts it as a pty service so it can send keys to it, and keeps `mise
+run rym alert` running beside it; that returns at the next call for
+help, and claude asks deity with the ask tool, which shows a blocking
+question in Orca. Claude's bell and desktop notification go to t1, not
+to deity. `s` marks an album not on RYM
 (`records/rym-skip.tsv`). Batches take only albums listed by `mise run
 rym ready`, and `prepare` refuses any others.
 
