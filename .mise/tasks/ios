@@ -24,13 +24,18 @@ testflight)
   printf %s "$ASC_KEY_P8" | base64 -d >"$key"
   auth=(-allowProvisioningUpdates -authenticationKeyPath "$key"
     -authenticationKeyID "$ASC_KEY_ID" -authenticationKeyIssuerID "$ASC_ISSUER_ID")
+  redact() { sed -e "s/$ASC_KEY_ID/<key>/g" -e "s/$ASC_ISSUER_ID/<issuer>/g"; }
   build=$(date -u +%y%m%d%H%M)
   rm -rf build/Journey.xcarchive build/export
   xcodebuild -project Journey.xcodeproj -scheme Journey -configuration Release \
     -destination generic/platform=iOS -archivePath build/Journey.xcarchive \
-    CURRENT_PROJECT_VERSION="$build" "${auth[@]}" -quiet archive
+    CURRENT_PROJECT_VERSION="$build" "${auth[@]}" -quiet archive 2>&1 | redact
   xcodebuild -exportArchive -archivePath build/Journey.xcarchive \
-    -exportOptionsPlist ExportOptions.plist -exportPath build/export "${auth[@]}" -quiet
+    -exportOptionsPlist ExportOptions.plist -exportPath build/export \
+    "${auth[@]}" -quiet 2>&1 | redact
+  API_PRIVATE_KEYS_DIR="$keys" xcrun altool --upload-app -t ios \
+    -f build/export/Journey.ipa --apiKey "$ASC_KEY_ID" \
+    --apiIssuer "$ASC_ISSUER_ID" 2>&1 | redact
   echo "Uploaded build $build to TestFlight"
   ;;
 *)

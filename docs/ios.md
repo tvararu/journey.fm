@@ -43,8 +43,8 @@ nothing qualifies:
 
 ## Roadmap
 
-1. **Ship to the phone.** Paid membership, App Store Connect app, API
-   key, first `mise run ios testflight` (the to-do in `AGENTS.md`).
+1. **Ship to the phone.** Done 1 Nov: builds go to TestFlight with
+   `mise run ios testflight`.
 2. **Sign in and sync.** Jellyfin sign-in, a local database of the whole
    library, a full sync then deltas (`MinDateLastSaved` on albums and
    tracks, parents of changed tracks, a periodic full ID list for

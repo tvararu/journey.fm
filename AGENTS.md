@@ -27,13 +27,13 @@ and later written back as tags. `docs/library.md` holds the agreed rules.
   `journey-web` on 127.0.0.1:8786 (rebuild and restart to update), and
   is published as the Tailscale Service `svc:journey`
   (`journey.example`).
-- The Mac builds the iOS app (Xcode, XcodeGen from Homebrew). TestFlight
-  uploads sign through an App Store Connect API key: `ASC_KEY_ID`,
-  `ASC_ISSUER_ID` and `ASC_KEY_P8` (the `.p8` file, base64-encoded).
-  The paid team is ABCDE12345 (active 1 Nov 2026 to 1 Nov 2027). Still
-  to do: create the App Store Connect app for `fm.journey.app`, create
-  an Admin API key and set the three secrets, add deity to an internal
-  TestFlight group, then run `mise run ios testflight`.
+- The Mac builds the iOS app (Xcode, XcodeGen from Homebrew), team
+  ABCDE12345 (paid until 1 Nov 2027). `mise run ios testflight` signs
+  and exports with an App Store Connect API key (`ASC_KEY_ID`,
+  `ASC_ISSUER_ID`, `ASC_KEY_P8` as the base64 `.p8`) and uploads with
+  `altool`, since `xcodebuild`'s own upload rejects the key's JWT. The
+  App Store Connect app is `journey.fm` (0000000000); its internal
+  TestFlight group `deity` gets every build.
 
 ## Rules
 
