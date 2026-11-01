@@ -53,6 +53,7 @@ public final class Library: Sendable {
             try Album.deleteAll(db)
             try Artist.deleteAll(db)
             try SyncState.deleteAll(db)
+            try db.execute(sql: "DELETE FROM playback; DELETE FROM played")
         }
     }
 
@@ -149,6 +150,17 @@ public final class Library: Sendable {
                     DELETE FROM albumArtist WHERE rowid NOT IN
                         (SELECT min(rowid) FROM albumArtist GROUP BY albumId, artistId)
                     """)
+        }
+        migrator.registerMigration("playback") { db in
+            try db.create(table: "playback") { t in
+                t.primaryKey("id", .integer)
+                t.column("queue", .blob).notNull()
+                t.column("position", .double).notNull()
+            }
+            try db.create(table: "played") { t in
+                t.primaryKey("albumId", .text)
+                t.column("playedAt", .datetime).notNull().indexed()
+            }
         }
         return migrator
     }

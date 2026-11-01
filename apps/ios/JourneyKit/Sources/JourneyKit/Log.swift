@@ -5,4 +5,5 @@ public enum Log {
     public static let session = Logger(subsystem: subsystem, category: "session")
     public static let sync = Logger(subsystem: subsystem, category: "sync")
     public static let art = Logger(subsystem: subsystem, category: "art")
+    public static let audio = Logger(subsystem: subsystem, category: "audio")
 }

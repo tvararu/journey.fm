@@ -4,7 +4,7 @@ import SwiftUI
 struct SearchView: View {
     @Environment(AppModel.self) private var model
     @AppStorage("search.recent") private var recentText = ""
-    @State private var path: [Route] = []
+    @Binding var path: [Route]
     @State private var query = ""
     @State private var results = SearchResults()
 
@@ -12,7 +12,10 @@ struct SearchView: View {
         TabStack(path: $path) {
             content
                 .navigationTitle("Search")
-                .searchable(text: $query, prompt: "Artists, Albums and Tracks")
+                .searchable(
+                    text: $query, placement: .navigationBarDrawer(displayMode: .always),
+                    prompt: "Artists, Albums and Tracks"
+                )
                 .task(id: query) {
                     try? await Task.sleep(for: .milliseconds(150))
                     guard !Task.isCancelled else { return }

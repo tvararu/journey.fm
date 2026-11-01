@@ -3,6 +3,7 @@ import SwiftUI
 
 struct AlbumView: View {
     @Environment(AppModel.self) private var model
+    @Environment(Player.self) private var player
     @Environment(\.navigate) private var navigate
     let id: String
     @State private var detail: AlbumDetail?
@@ -24,6 +25,12 @@ struct AlbumView: View {
     private func content(_ detail: AlbumDetail) -> some View {
         let album = detail.album
         let discs = Dictionary(grouping: detail.tracks) { $0.disc ?? 1 }
+        let hits = detail.tracks.map { TrackHit(track: $0, album: album) }
+        let row = { (track: Track) in
+            TrackRow(track: track, album: album) {
+                player.play(hits, from: hits.firstIndex { $0.track.id == track.id })
+            }
+        }
         return List {
             VStack(spacing: 4) {
                 ArtView(item: album.art, size: 270)
@@ -40,17 +47,21 @@ struct AlbumView: View {
             }
             .frame(maxWidth: .infinity)
             .listRowSeparator(.hidden)
+            PlayButtons(
+                play: { player.play(hits) }, shuffle: { player.play(hits, shuffled: true) }
+            )
+            .listRowSeparator(.hidden)
             if discs.count > 1 {
                 ForEach(discs.keys.sorted(), id: \.self) { disc in
                     Section {
-                        ForEach(discs[disc] ?? []) { TrackRow(track: $0, album: album) }
+                        ForEach(discs[disc] ?? []) { row($0) }
                     } header: {
                         Label("Disc \(disc)", systemImage: "opticaldisc")
                     }
                 }
             } else {
                 Section {
-                    ForEach(detail.tracks) { TrackRow(track: $0, album: album) }
+                    ForEach(detail.tracks) { row($0) }
                 }
             }
             if let artist = detail.artists.first, !detail.more.isEmpty {
@@ -98,32 +109,88 @@ struct AlbumView: View {
     }
 }
 
-struct TrackRow: View {
-    let track: Track
-    let album: Album
+struct PlayButtons: View {
+    let play: () -> Void
+    let shuffle: () -> Void
 
     var body: some View {
-        HStack(alignment: .firstTextBaseline, spacing: 12) {
-            Text(track.number.map(String.init) ?? "")
-                .monospacedDigit()
-                .foregroundStyle(.secondary)
-                .frame(minWidth: 22, alignment: .trailing)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(track.name).lineLimit(2)
-                if !track.artistName.isEmpty && track.artistName != album.artistName {
-                    Text(track.artistName)
-                        .font(.subheadline).foregroundStyle(.secondary).lineLimit(1)
-                }
+        HStack(spacing: 12) {
+            Button(action: play) {
+                Label("Play", systemImage: "play.fill").frame(maxWidth: .infinity)
             }
-            Spacer()
-            Text(timeText(track.duration)).monospacedDigit().foregroundStyle(.secondary)
+            .buttonStyle(.glassProminent)
+            Button(action: shuffle) {
+                Label("Shuffle", systemImage: "shuffle").frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.glass)
         }
+        .controlSize(.large)
+        .buttonBorderShape(.capsule)
+    }
+}
+
+struct TrackRow: View {
+    @Environment(Player.self) private var player
+    let track: Track
+    let album: Album
+    let play: () -> Void
+
+    var body: some View {
+        let playing = player.current?.track.id == track.id
+        let played = !playing && player.queue.played.contains(track.id)
+        Button(action: play) {
+            HStack(alignment: .firstTextBaseline, spacing: 12) {
+                Group {
+                    if playing {
+                        Image(systemName: "speaker.wave.2.fill")
+                            .symbolEffect(.variableColor.iterative, isActive: player.isPlaying)
+                            .foregroundStyle(.tint)
+                    } else {
+                        Text(track.number.map(String.init) ?? "")
+                            .monospacedDigit()
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .frame(minWidth: 22, alignment: .trailing)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(track.name).lineLimit(2)
+                        .foregroundStyle(
+                            playing
+                                ? AnyShapeStyle(.tint)
+                                : AnyShapeStyle(played ? .secondary : .primary))
+                    if !track.artistName.isEmpty && track.artistName != album.artistName {
+                        Text(track.artistName)
+                            .font(.subheadline).foregroundStyle(.secondary).lineLimit(1)
+                    }
+                }
+                Spacer()
+                Text(timeText(track.duration)).monospacedDigit().foregroundStyle(.secondary)
+            }
+            .contentShape(.rect)
+        }
+        .buttonStyle(.plain)
+        .swipeActions(edge: .leading) {
+            Button("Play Next", systemImage: "text.line.first.and.arrowtriangle.forward") {
+                player.playNext([TrackHit(track: track, album: album)])
+            }
+            .tint(.accentColor)
+        }
+        .swipeActions(edge: .trailing) {
+            Button("Add to Queue", systemImage: "text.line.last.and.arrowtriangle.forward") {
+                player.add([TrackHit(track: track, album: album)])
+            }
+            .tint(.indigo)
+        }
+        .contextMenu { TrackActions(hit: TrackHit(track: track, album: album)) }
         .accessibilityElement(children: .combine)
+        .accessibilityValue(playing ? "Now playing" : played ? "Played" : "")
+        .accessibilityIdentifier("track-\(track.id)")
     }
 }
 
 struct ArtistView: View {
     @Environment(AppModel.self) private var model
+    @Environment(Player.self) private var player
     let id: String
     @State private var detail: ArtistDetail?
 
@@ -155,6 +222,10 @@ struct ArtistView: View {
             }
             .frame(maxWidth: .infinity)
             .listRowSeparator(.hidden)
+            PlayButtons(
+                play: { load(shuffled: false) }, shuffle: { load(shuffled: true) }
+            )
+            .listRowSeparator(.hidden)
             Section(detail.albums.count == 1 ? "Album" : "Albums") {
                 ForEach(detail.albums) { album in
                     AlbumRow(
@@ -166,5 +237,12 @@ struct ArtistView: View {
             }
         }
         .listStyle(.plain)
+    }
+
+    private func load(shuffled: Bool) {
+        guard let detail else { return }
+        Task {
+            player.play(await model.albumTracks(detail.albums.map(\.id)), shuffled: shuffled)
+        }
     }
 }

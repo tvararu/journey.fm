@@ -3,7 +3,8 @@ import SwiftUI
 
 struct HomeView: View {
     @Environment(AppModel.self) private var model
-    @State private var path: [Route] = []
+    @Binding var path: [Route]
+    @State private var played: [Album] = []
     @State private var recent: [Album] = []
     @State private var random: [Album] = []
     @State private var showSettings = false
@@ -12,6 +13,9 @@ struct HomeView: View {
         TabStack(path: $path) {
             ScrollView {
                 VStack(alignment: .leading, spacing: 28) {
+                    if !played.isEmpty {
+                        Shelf(title: "Recently Played", albums: played, route: .recentlyPlayed)
+                    }
                     Shelf(title: "Recently Added", albums: recent, route: .recentlyAdded)
                     Shelf(title: "Random Albums", albums: random, route: nil)
                 }
@@ -30,6 +34,7 @@ struct HomeView: View {
                 await reroll()
                 await model.sync()
             }
+            .task { await watch(model.library.observeRecentlyPlayed(limit: 20)) { played = $0 } }
             .task { await watch(model.library.observeRecentAlbums(limit: 20)) { recent = $0 } }
             .task(id: model.stats.albums) { if random.isEmpty { await reroll() } }
         }
@@ -90,6 +95,17 @@ struct RecentlyAddedView: View {
         AlbumGrid(albums: albums) { EmptyView() }
             .navigationTitle("Recently Added")
             .task { await watch(model.library.observeAlbums(sort: .added)) { albums = $0 } }
+    }
+}
+
+struct RecentlyPlayedView: View {
+    @Environment(AppModel.self) private var model
+    @State private var albums: [Album] = []
+
+    var body: some View {
+        AlbumGrid(albums: albums) { EmptyView() }
+            .navigationTitle("Recently Played")
+            .task { await watch(model.library.observeRecentlyPlayed(limit: 200)) { albums = $0 } }
     }
 }
 

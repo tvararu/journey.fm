@@ -5,6 +5,7 @@ enum Route: Hashable {
     case album(String)
     case artist(String)
     case recentlyAdded
+    case recentlyPlayed
     case searchArtists(String)
     case searchAlbums(String)
     case searchTracks(String)
@@ -33,6 +34,7 @@ struct TabStack<Content: View>: View {
                 case .album(let id): AlbumView(id: id)
                 case .artist(let id): ArtistView(id: id)
                 case .recentlyAdded: RecentlyAddedView()
+                case .recentlyPlayed: RecentlyPlayedView()
                 case .searchArtists(let query): SearchAllView(query: query, kind: .artists)
                 case .searchAlbums(let query): SearchAllView(query: query, kind: .albums)
                 case .searchTracks(let query): SearchAllView(query: query, kind: .tracks)
@@ -195,8 +197,48 @@ struct AlbumMenu: ViewModifier {
 
     func body(content: Content) -> some View {
         content.contextMenu {
+            PlayActions(albumIds: [album.id])
             if artistMenu, let artistId = album.artistId {
                 Button("Go to Artist", systemImage: "music.mic") { navigate(.artist(artistId)) }
+            }
+        }
+    }
+}
+
+struct PlayActions: View {
+    @Environment(AppModel.self) private var model
+    @Environment(Player.self) private var player
+    let albumIds: [String]
+
+    var body: some View {
+        Section {
+            Button("Play", systemImage: "play") { load { player.play($0) } }
+            Button("Shuffle", systemImage: "shuffle") { load { player.play($0, shuffled: true) } }
+            Button("Play Next", systemImage: "text.line.first.and.arrowtriangle.forward") {
+                load { player.playNext($0) }
+            }
+            Button("Add to Queue", systemImage: "text.line.last.and.arrowtriangle.forward") {
+                load { player.add($0) }
+            }
+        }
+    }
+
+    private func load(_ action: @escaping @MainActor ([TrackHit]) -> Void) {
+        Task { action(await model.albumTracks(albumIds)) }
+    }
+}
+
+struct TrackActions: View {
+    @Environment(Player.self) private var player
+    let hit: TrackHit
+
+    var body: some View {
+        Section {
+            Button("Play Next", systemImage: "text.line.first.and.arrowtriangle.forward") {
+                player.playNext([hit])
+            }
+            Button("Add to Queue", systemImage: "text.line.last.and.arrowtriangle.forward") {
+                player.add([hit])
             }
         }
     }
@@ -262,11 +304,19 @@ struct ArtistRow: View {
 }
 
 struct TrackHitRow: View {
+    @Environment(AppModel.self) private var model
     @Environment(\.navigate) private var navigate
+    @Environment(Player.self) private var player
     let hit: TrackHit
 
     var body: some View {
-        NavigationLink(value: Route.album(hit.album.id)) {
+        Button {
+            navigate(.album(hit.album.id))
+            Task {
+                let hits = await model.albumTracks([hit.album.id])
+                player.play(hits, from: hits.firstIndex { $0.track.id == hit.track.id })
+            }
+        } label: {
             HStack(spacing: 12) {
                 ArtView(item: hit.album.art, size: 48)
                 VStack(alignment: .leading, spacing: 2) {
@@ -277,8 +327,11 @@ struct TrackHitRow: View {
                 Spacer()
                 Text(timeText(hit.track.duration)).monospacedDigit().foregroundStyle(.secondary)
             }
+            .contentShape(.rect)
         }
+        .buttonStyle(.plain)
         .contextMenu {
+            TrackActions(hit: hit)
             Button("Go to Album", systemImage: "square.stack") { navigate(.album(hit.album.id)) }
             if let artistId = hit.album.artistId {
                 Button("Go to Artist", systemImage: "music.mic") { navigate(.artist(artistId)) }

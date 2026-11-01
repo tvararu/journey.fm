@@ -1,3 +1,4 @@
+import AVFoundation
 import Foundation
 import JourneyKit
 
@@ -58,7 +59,41 @@ case "search":
     for artist in results.artists { print("artist  \(artist.name) (\(artist.albumCount))") }
     for album in results.albums { print("album   \(album.name) · \(album.artistName)") }
     for hit in results.tracks { print("track   \(hit.track.name) · \(hit.album.name)") }
+case "play":
+    guard
+        let hit = try await library.search(arguments.dropFirst().joined(separator: " ")).tracks
+            .first
+    else { exit(1) }
+    let output = Output()
+    output.engine.mainMixerNode.outputVolume = 0
+    let player = Player(library: library, output: output)
+    player.connect(AudioCache(directory: home.appending(path: "audio"), client: try await client()))
+    let album = try await library.tracks(albumIds: [hit.album.id])
+    let start = Date.now
+    func report(_ note: String = "") {
+        print(
+            "\(start.distance(to: .now).formatted(.number.precision(.fractionLength(1)))) s  \(player.current?.track.name ?? "-")  \(player.position.formatted(.number.precision(.fractionLength(2)))) of \(player.duration.formatted(.number.precision(.fractionLength(0))))  \(player.isPlaying ? "playing" : "paused") \(player.failure ?? "") \(note)"
+        )
+    }
+    player.play(album, from: album.firstIndex { $0.id == hit.id })
+    for _ in 0..<4 {
+        try await Task.sleep(for: .seconds(0.5))
+        report()
+    }
+    player.seek(to: player.duration - 3)
+    report("seek")
+    for _ in 0..<14 {
+        try await Task.sleep(for: .seconds(0.5))
+        report()
+    }
+    player.pause()
+    report("pause")
+    try await Task.sleep(for: .seconds(1))
+    report()
+    player.resume()
+    try await Task.sleep(for: .seconds(1))
+    report("resumed")
 default:
-    print("usage: journey sync [--full] | stats | art | search <words>")
+    print("usage: journey sync [--full] | stats | art | search <words> | play <words>")
     exit(1)
 }

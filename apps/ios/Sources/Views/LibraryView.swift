@@ -10,7 +10,7 @@ struct LibraryView: View {
     @AppStorage("library.kind") private var kind = LibraryKind.albums
     @AppStorage("library.sort") private var sort = AlbumSort.artist
     @AppStorage("library.grid") private var grid = true
-    @State private var path: [Route] = []
+    @Binding var path: [Route]
     @State private var filter = ""
     @State private var albums: [Album] = []
     @State private var artists: [ArtistSummary] = []

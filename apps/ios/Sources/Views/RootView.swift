@@ -6,15 +6,37 @@ enum AppTab: Hashable {
 }
 
 struct RootView: View {
+    @Environment(Player.self) private var player
     @State private var tab = AppTab.home
+    @State private var paths: [AppTab: [Route]] = [:]
+    @State private var showPlayer = false
 
     var body: some View {
         TabView(selection: $tab) {
-            Tab("Home", systemImage: "house", value: AppTab.home) { HomeView() }
-            Tab("Library", systemImage: "square.stack", value: AppTab.library) { LibraryView() }
-            Tab(value: AppTab.search, role: .search) { SearchView() }
+            Tab("Home", systemImage: "house", value: AppTab.home) { HomeView(path: path(.home)) }
+            Tab("Library", systemImage: "square.stack", value: AppTab.library) {
+                LibraryView(path: path(.library))
+            }
+            Tab(value: AppTab.search, role: .search) { SearchView(path: path(.search)) }
         }
         .tabBarMinimizeBehavior(tab == .library ? .onScrollDown : .never)
+        .tabViewBottomAccessory(isEnabled: player.current != nil) {
+            MiniPlayer { showPlayer = true }
+        }
+        .sheet(isPresented: $showPlayer) {
+            NowPlayingView { route in
+                showPlayer = false
+                paths[tab, default: []].append(route)
+            }
+        }
+    }
+
+    private func path(_ tab: AppTab) -> Binding<[Route]> {
+        Binding {
+            paths[tab] ?? []
+        } set: {
+            paths[tab] = $0
+        }
     }
 }
 

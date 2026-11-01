@@ -91,6 +91,20 @@ public struct JellyfinClient: LibrarySource {
         return data
     }
 
+    public func audioURL(trackId: String) -> URL {
+        session.server.appending(path: "Audio/\(trackId)/stream").appending(queryItems: [
+            .init(name: "static", value: "true")
+        ])
+    }
+
+    public func download(from url: URL, to destination: URL) async throws {
+        let (temporary, response) = try await urlSession.download(for: request(url))
+        defer { try? FileManager.default.removeItem(at: temporary) }
+        try Self.check(response)
+        try? FileManager.default.removeItem(at: destination)
+        try FileManager.default.moveItem(at: temporary, to: destination)
+    }
+
     func items(type: String, fields: String, images: Bool, since: Date?) async throws -> [BaseItem]
     {
         var all: [BaseItem] = []

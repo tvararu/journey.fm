@@ -31,6 +31,11 @@ public struct TrackHit: Sendable, Equatable, Identifiable {
     public var track: Track
     public var album: Album
     public var id: String { track.id }
+
+    public init(track: Track, album: Album) {
+        self.track = track
+        self.album = album
+    }
 }
 
 public struct SearchResults: Sendable, Equatable {

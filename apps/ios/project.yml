@@ -2,7 +2,7 @@ name: Journey
 options:
   bundleIdPrefix: fm.journey
   deploymentTarget:
-    iOS: "26.0"
+    iOS: "26.1"
   generateEmptyDirectories: true
 settings:
   base:
@@ -35,4 +35,5 @@ targets:
         ITSAppUsesNonExemptEncryption: false
         LSRequiresIPhoneOS: true
         UILaunchScreen: {}
+        UIBackgroundModes: [audio]
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]

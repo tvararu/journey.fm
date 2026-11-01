@@ -22,7 +22,10 @@ final class AppModel {
     var error: String?
     var clock = Date.now
     private(set) var art: ArtCache?
+    private var audio: AudioCache?
     let library: Library
+    let player: Player
+    private var system: SystemAudio?
 
     init() {
         let path = URL.applicationSupportDirectory.appending(path: "library.sqlite")
@@ -31,8 +34,25 @@ final class AppModel {
         } catch {
             fatalError("Cannot open the library database: \(error)")
         }
+        player = Player(library: library)
         session = SessionStore.load()
         art = session.map(Self.artCache)
+        connectAudio()
+        system = SystemAudio(player: player) { [weak self] in self?.art }
+        Task { await player.restore() }
+    }
+
+    func albumTracks(_ albumIds: [String]) async -> [TrackHit] {
+        (try? await library.tracks(albumIds: albumIds)) ?? []
+    }
+
+    private func connectAudio() {
+        audio = session.map {
+            AudioCache(
+                directory: .cachesDirectory.appending(path: "audio"),
+                client: JellyfinClient(session: $0), keep: 10)
+        }
+        player.connect(audio)
     }
 
     var needsFirstSync: Bool { statsLoaded && stats.lastSync == nil }
@@ -70,6 +90,7 @@ final class AppModel {
             error = nil
             art = Self.artCache(session)
             self.session = session
+            connectAudio()
         } catch {
             Log.session.error("Sign-in failed: \(String(describing: error), privacy: .public)")
             self.error = error.localizedDescription
@@ -139,12 +160,15 @@ final class AppModel {
 
     func signOut() async {
         SessionStore.clear()
+        player.connect(nil)
+        audio?.clear()
         try? await art?.clear()
         try? await library.erase()
         art = nil
         syncError = nil
         offline = false
         session = nil
+        connectAudio()
     }
 
     func watchStats() async {

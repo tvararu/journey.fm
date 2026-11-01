@@ -12,7 +12,8 @@ better than Apple Music's, and build it entirely from stock iOS parts:
 
 - `TabView` for the tabs: Home, Library, then Search as a trailing
   `Tab(role: .search)`, as in Apple Music. The mini player is the tab
-  bar's bottom accessory (`tabViewBottomAccessory`, iOS 26)
+  bar's bottom accessory (`tabViewBottomAccessory(isEnabled:)`, which
+  needs iOS 26.1, the app's minimum)
 - `NavigationStack` with the system navigation bar, large titles and
   back swipe
 - `List` and `LazyVGrid` for shelves and track lists; `.searchable` for
@@ -68,8 +69,10 @@ package: the Jellyfin client, the library database and sync, the art
 cache and the Keychain session. The app target holds only
 `AppModel.swift` and `Views/`. The package also builds `journey`, a
 command for testing against the real server without the simulator:
-`mise run ios cli sync [--full] | stats | art | search <words>`, with its
-database and covers in `apps/ios/build/cli`.
+`mise run ios cli sync [--full] | stats | art | search <words> | play
+<words>`, with its database, covers and audio in `apps/ios/build/cli`.
+`play` plays the album of the first matching track muted, seeks near the
+end of the track and prints the hand-over to the next one.
 
 ### Commands
 
@@ -108,11 +111,18 @@ something specific that would be annoying to do ourselves:
 - Jellyfin: `URLSession` and `Codable`, no SDK
 - Database: GRDB 7 over SQLite, for migrations, batch writes, FTS5 for
   search and `ValueObservation`, which keeps the screens current
-- Audio: Core Audio decodes FLAC natively (`AVAudioFile` opened a FLAC
-  made with `afconvert` on 1 Nov), so `AVAudioEngine` with an
-  `AVAudioPlayerNode` scheduling tracks back to back replaces Dorsal's
-  SFBAudioEngine. It stays the fallback if play-while-downloading
-  (step 6) proves annoying with the system APIs
+- Audio: Core Audio decodes FLAC natively, so `AVAudioEngine` with one
+  `AVAudioPlayerNode` replaces Dorsal's SFBAudioEngine. Tracks stream
+  from `/Audio/{id}/stream?static=true` (the original file) into
+  Caches, which keeps the last ten. The decoder is `ExtAudioFile` over
+  `AudioFileOpenWithCallbacks`, whose read callback waits for bytes that
+  haven't arrived, so playback starts about half a second after Play
+  rather than after the 30 to 50 s a whole track takes at the 7 to 12
+  Mbit/s measured from sol. A feeder thread keeps five seconds decoded
+  ahead and schedules the next track's buffers straight after the
+  current one's, which makes playback gapless; a test renders two tracks
+  offline and checks the second starts on the sample after the first
+  ends. A next track in another format is resampled to the current one.
 
 Sync pages through `/Items` 1,000 at a time with
 `EnableTotalRecordCount=false`: Jellyfin takes about 13 s to count 1,000
@@ -161,21 +171,25 @@ Step 3:
   the subtitle adds the track count.
 - Album page: no title in the bar; cover, title (never truncated),
   artist (pushes the artist), "1982 · Punk" then "13 tracks · 44 min"
-  from the synced tracks, Play and Shuffle (from step 4), tracks. Disc
-  headings only on multi-disc albums; a track's artist only when it
-  differs from the album's; More by the artist only when there is more.
+  from the synced tracks, Play and Shuffle, tracks (tap plays the album
+  from that track). Disc headings only on multi-disc albums; a track's
+  artist only when it differs from the album's; More by the artist only
+  when there is more.
 - Artist page: image, name, "16 albums · 1972–2013", Play and Shuffle
-  (from step 4), then every album as a row, oldest first, the same for
-  one album or sixteen.
-- Search tab: `.searchable` on the Search tab's own stack, local FTS5
-  with word-prefix matching, results grouped Artists, Albums, Tracks
-  with a few of each and See All. A track result opens its album (and
-  plays from it in step 4). Recent searches fill the empty state.
+  (every album, oldest first), then every album as a row, oldest first,
+  the same for one album or sixteen.
+- Search tab: `.searchable` on the Search tab's own stack, its field
+  always shown (`.navigationBarDrawer(displayMode: .always)`; otherwise
+  it hides under the title once recent searches make the page scroll),
+  local FTS5 with word-prefix matching, results grouped Artists, Albums,
+  Tracks with a few of each and See All. A track result opens its album
+  and plays from it. Recent searches fill the empty state.
   Matching ignores hyphen variants (Bong-Ra is tagged with both U+2010
   and an ASCII hyphen).
-- Context menus on every album tile and track row: Go to Artist now;
-  Play, Shuffle, Play Next and Add to Queue in step 4; Download or
-  Remove Download in step 5.
+- Context menus on every album tile and track row: Play, Shuffle, Play
+  Next and Add to Queue (tracks: Play Next and Add to Queue, also on the
+  row's swipe actions), Go to Album or Artist; Download or Remove
+  Download in step 5.
 - Artists with no albums are hidden: Jellyfin returns five empty
   duplicates (Septicflesh, Various Artists and others), leaving 295.
 - Covers are fetched into Application Support after each sync, four at
@@ -202,8 +216,14 @@ Step 4:
 - Queue: a second sheet with medium and large detents; now playing
   fixed at the top, Up Next below with Play Next items marked; swipe to
   remove, Edit to reorder, Clear empties Up Next.
-- "Played" on a track row means already played in the current queue,
-  shown as secondary text. Home gains Recently Played.
+- "Played" on a track row means it became the current track earlier in
+  this queue, shown as secondary text; starting an album at track 3 does
+  not mark tracks 1 and 2. Home gains Recently Played, the first shelf,
+  newest play first.
+- The queue and position are saved on every change, on pause and every
+  ten seconds while playing; after a relaunch the mini player shows the
+  last track, paused where it stopped. Previous restarts the track after
+  three seconds. Repeat One still lets Next move on.
 
 Steps 5 to 8:
 
@@ -213,7 +233,8 @@ Steps 5 to 8:
 - Offline, tracks not on the phone are dimmed, not hidden or disabled;
   tapping one offers Download When Online. A queue that reaches a
   missing track offline skips it and marks it.
-- Seeking past what has downloaded uses an HTTP range request.
+- Seeking past what has downloaded waits for the stream to get there;
+  step 6 makes it jump with an HTTP range request.
 - Download All shows one progress row in Settings, with each pause
   named (Low Power Mode, waiting for Wi-Fi, storage full). When it
   finishes, Download New Albums turns on.
@@ -237,14 +258,17 @@ rather than patched on the phone.
 3. **Browse and search offline.** Done 1 Nov: the three tabs, album
    and artist pages, search against the local database only, covers
    kept on the phone; as in Screens above.
-4. **Play.** `AVAudioEngine` with gapless playback, lock screen and
-   remote controls, interruptions and route changes, the mini player
-   and now playing sheet, resume where playback stopped.
+4. **Play.** Done 1 Nov: gapless `AVAudioEngine` playback streamed from
+   Jellyfin, lock screen and remote controls, interruptions and route
+   changes, the mini player, now playing and queue sheets, Play, Shuffle,
+   Play Next and Add to Queue, Recently Played, resume where playback
+   stopped.
 5. **Save offline.** Save tracks or albums through a background
    `URLSession` into Application Support, checking the HTTP status;
    played tracks stay cached; re-download when an item's audio changes.
-6. **Play while downloading.** Decode a file that is still being
-   written, with the system APIs, or SFBAudioEngine if they fight it.
+6. **Seek while streaming.** Streaming playback arrived in step 4; what
+   is left is a range request for a seek past the downloaded part, and
+   playing a track that step 5 is still saving from its partial file.
 7. **Download everything.** Hand every task to the system up front so
    it carries on with the phone locked and the app killed.
 8. **Lyrics and metadata.** Synced lyrics from `/Audio/{id}/Lyrics`,
