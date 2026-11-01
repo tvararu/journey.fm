@@ -7,6 +7,7 @@ struct AlbumView: View {
     @Environment(\.navigate) private var navigate
     let id: String
     @State private var detail: AlbumDetail?
+    @State private var confirmRemove = false
 
     var body: some View {
         Group {
@@ -14,6 +15,29 @@ struct AlbumView: View {
                 content(detail)
             } else {
                 ProgressView()
+            }
+        }
+        .toolbar {
+            if let downloads = model.downloads, let detail {
+                ToolbarItem {
+                    if detail.tracks.allSatisfy({ downloads.state(of: $0.id) != nil }) {
+                        Button("Remove Download", systemImage: "arrow.down.circle.fill") {
+                            confirmRemove = true
+                        }
+                        .confirmationDialog(
+                            "Remove the download of \(detail.album.name)?",
+                            isPresented: $confirmRemove, titleVisibility: .visible
+                        ) {
+                            Button("Remove Download", role: .destructive) {
+                                Task { await downloads.remove(albumIds: [id]) }
+                            }
+                        }
+                    } else {
+                        Button("Download", systemImage: "arrow.down.circle") {
+                            Task { await downloads.save(albumIds: [id]) }
+                        }
+                    }
+                }
             }
         }
         .navigationTitle(detail?.album.name ?? "")
@@ -47,6 +71,18 @@ struct AlbumView: View {
             }
             .frame(maxWidth: .infinity)
             .listRowSeparator(.hidden)
+            if let downloads = model.downloads,
+                let fraction = downloads.albumProgress(detail.tracks.map(\.id))
+            {
+                let wanted = detail.tracks.filter { downloads.state(of: $0.id) != nil }
+                let saved = wanted.filter { downloads.state(of: $0.id) == .saved }
+                ProgressView(value: fraction) {
+                    Text("Downloading \(saved.count) of \(wanted.count)")
+                        .font(.subheadline).foregroundStyle(.secondary)
+                }
+                .listRowSeparator(.hidden)
+                .accessibilityIdentifier("album-download-progress")
+            }
             PlayButtons(
                 play: { player.play(hits) }, shuffle: { player.play(hits, shuffled: true) }
             )
@@ -124,21 +160,28 @@ struct PlayButtons: View {
             }
             .buttonStyle(.glass)
         }
+        .labelStyle(.titleAndIcon)
         .controlSize(.large)
         .buttonBorderShape(.capsule)
     }
 }
 
 struct TrackRow: View {
+    @Environment(AppModel.self) private var model
     @Environment(Player.self) private var player
     let track: Track
     let album: Album
     let play: () -> Void
+    @State private var offerDownload = false
 
     var body: some View {
         let playing = player.current?.track.id == track.id
         let played = !playing && player.queue.played.contains(track.id)
-        Button(action: play) {
+        let state = model.downloads?.state(of: track.id)
+        let away = model.offline && state != .saved && !model.isOnPhone(track)
+        Button {
+            if away { offerDownload = true } else { play() }
+        } label: {
             HStack(alignment: .firstTextBaseline, spacing: 12) {
                 Group {
                     if playing {
@@ -157,18 +200,30 @@ struct TrackRow: View {
                         .foregroundStyle(
                             playing
                                 ? AnyShapeStyle(.tint)
-                                : AnyShapeStyle(played ? .secondary : .primary))
+                                : away
+                                    ? AnyShapeStyle(.tertiary)
+                                    : AnyShapeStyle(played ? .secondary : .primary))
                     if !track.artistName.isEmpty && track.artistName != album.artistName {
                         Text(track.artistName)
                             .font(.subheadline).foregroundStyle(.secondary).lineLimit(1)
                     }
                 }
                 Spacer()
-                Text(timeText(track.duration)).monospacedDigit().foregroundStyle(.secondary)
+                DownloadIndicator(state: state)
+                Text(timeText(track.duration)).monospacedDigit()
+                    .foregroundStyle(away ? .tertiary : .secondary)
             }
             .contentShape(.rect)
         }
         .buttonStyle(.plain)
+        .confirmationDialog(
+            "\(track.name) isn't on this iPhone.", isPresented: $offerDownload,
+            titleVisibility: .visible
+        ) {
+            Button("Download When Online") {
+                Task { await model.downloads?.save(trackIds: [track.id]) }
+            }
+        }
         .swipeActions(edge: .leading) {
             Button("Play Next", systemImage: "text.line.first.and.arrowtriangle.forward") {
                 player.playNext([TrackHit(track: track, album: album)])
@@ -183,7 +238,12 @@ struct TrackRow: View {
         }
         .contextMenu { TrackActions(hit: TrackHit(track: track, album: album)) }
         .accessibilityElement(children: .combine)
-        .accessibilityValue(playing ? "Now playing" : played ? "Played" : "")
+        .accessibilityValue(
+            [
+                playing ? "Now playing" : played ? "Played" : nil,
+                DownloadIndicator.text(state), away ? "Not on this iPhone" : nil,
+            ].compactMap(\.self).joined(separator: ", ")
+        )
         .accessibilityIdentifier("track-\(track.id)")
     }
 }

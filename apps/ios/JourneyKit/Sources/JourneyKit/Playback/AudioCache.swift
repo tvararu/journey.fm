@@ -4,21 +4,37 @@ public final class AudioCache: @unchecked Sendable {
     let directory: URL
     let client: JellyfinClient
     let keep: Int
-    let session = URLSession(configuration: .default)
+    let saved: SavedFiles?
+    let session: URLSession
     let lock = NSLock()
     var downloads: [String: StreamDownload] = [:]
 
-    public init(directory: URL, client: JellyfinClient, keep: Int = 30) {
+    public init(
+        directory: URL, client: JellyfinClient, keep: Int = 30, saved: SavedFiles? = nil,
+        configuration: URLSessionConfiguration = .default
+    ) {
         self.directory = directory
         self.client = client
         self.keep = keep
+        self.saved = saved
+        session = URLSession(configuration: configuration)
+    }
+
+    public func isOnPhone(_ track: Track) -> Bool {
+        saved?.file(for: track) != nil
+            || FileManager.default.fileExists(atPath: cached(track).path(percentEncoded: false))
+    }
+
+    func cached(_ track: Track) -> URL {
+        directory.appending(path: SavedFiles.name(track))
     }
 
     public func source(for track: Track) throws -> ByteSource {
         try lock.withLock {
             if let download = downloads[track.id] { return download.source }
+            if let file = saved?.file(for: track) { return try ByteSource(complete: file) }
             let manager = FileManager.default
-            let destination = directory.appending(path: "\(track.id).\(track.container ?? "flac")")
+            let destination = cached(track)
             if manager.fileExists(atPath: destination.path(percentEncoded: false)) {
                 try? manager.setAttributes(
                     [.modificationDate: Date.now],
@@ -35,6 +51,7 @@ public final class AudioCache: @unchecked Sendable {
                 Log.audio.info(
                     "Fetch of \(track.id, privacy: .public) \(complete ? "finished" : "stopped") after \(start.distance(to: .now), format: .fixed(precision: 1)) s"
                 )
+                if complete, let saved = self?.saved { _ = saved.adopt(track, from: destination) }
                 self?.finished(track.id)
             }
             downloads[track.id] = download

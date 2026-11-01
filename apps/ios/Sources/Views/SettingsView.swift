@@ -5,6 +5,7 @@ struct SettingsView: View {
     @Environment(AppModel.self) private var model
     @Environment(\.dismiss) private var dismiss
     @State private var confirmSignOut = false
+    @State private var confirmRemoveAll = false
 
     var body: some View {
         NavigationStack {
@@ -49,6 +50,9 @@ struct SettingsView: View {
                         )
                     }
                 }
+                if let downloads = model.downloads {
+                    downloadSection(downloads)
+                }
                 Section {
                     Button("Sign Out", role: .destructive) { confirmSignOut = true }
                         .frame(maxWidth: .infinity)
@@ -73,8 +77,64 @@ struct SettingsView: View {
                     Task { await model.signOut() }
                 }
             } message: {
-                Text("This removes the library and covers from this iPhone.")
+                Text("This removes the library, covers and downloads from this iPhone.")
             }
+            .confirmationDialog(
+                "Remove all downloads?", isPresented: $confirmRemoveAll, titleVisibility: .visible
+            ) {
+                Button("Remove All Downloads", role: .destructive) {
+                    Task { await model.removeAllDownloads() }
+                }
+            } message: {
+                Text("Downloaded tracks will play again only when online.")
+            }
+        }
+    }
+
+    private func downloadSection(_ downloads: Downloads) -> some View {
+        let summary = downloads.summary
+        return Section {
+            LabeledContent("Downloaded") {
+                Text(
+                    summary.saved.isEmpty
+                        ? "None"
+                        : "\(tracksText(summary.saved.count)) · \(summary.bytes.formatted(.byteCount(style: .file)))"
+                )
+            }
+            .accessibilityIdentifier("downloaded")
+            if let free = model.freeSpace {
+                LabeledContent("Available", value: free.formatted(.byteCount(style: .file)))
+            }
+            if model.downloadingEverything {
+                VStack(alignment: .leading, spacing: 6) {
+                    ProgressView(
+                        value: Double(summary.saved.count), total: Double(max(summary.tracks, 1))
+                    ) {
+                        Text("Downloading Everything")
+                    } currentValueLabel: {
+                        Text("\(summary.saved.count.formatted()) of \(tracksText(summary.tracks))")
+                    }
+                    if let pause = model.downloadPause {
+                        Text(pause).font(.footnote).foregroundStyle(.secondary)
+                    }
+                }
+                .accessibilityElement(children: .combine)
+                .accessibilityIdentifier("download-everything-progress")
+            } else if !summary.everything {
+                Button("Download All") { Task { await model.downloadEverything() } }
+                    .accessibilityIdentifier("download-all")
+            }
+            Toggle("Download New Albums", isOn: Bindable(model).downloadNew)
+            if summary.wanted > 0 {
+                Button("Remove All Downloads", role: .destructive) { confirmRemoveAll = true }
+                    .accessibilityIdentifier("remove-all-downloads")
+            }
+        } header: {
+            Text("Downloads")
+        } footer: {
+            Text(
+                "Download All saves every track, on Wi-Fi only, and carries on with the app closed. When it finishes, Download New Albums turns on and saves each album added later."
+            )
         }
     }
 

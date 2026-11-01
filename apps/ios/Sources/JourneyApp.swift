@@ -1,11 +1,24 @@
 import SwiftUI
 
+@MainActor
+final class AppDelegate: NSObject, UIApplicationDelegate {
+    let model = AppModel()
+
+    func application(
+        _ application: UIApplication, handleEventsForBackgroundURLSession identifier: String,
+        completionHandler: @escaping () -> Void
+    ) {
+        model.downloads?.finishedEvents = completionHandler
+    }
+}
+
 @main
 struct JourneyApp: App {
+    @UIApplicationDelegateAdaptor private var delegate: AppDelegate
     @Environment(\.scenePhase) private var scenePhase
-    @State private var model = AppModel()
 
     var body: some Scene {
+        let model = delegate.model
         WindowGroup {
             Group {
                 if model.session == nil {

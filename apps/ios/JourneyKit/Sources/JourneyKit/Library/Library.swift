@@ -53,7 +53,7 @@ public final class Library: Sendable {
             try Album.deleteAll(db)
             try Artist.deleteAll(db)
             try SyncState.deleteAll(db)
-            try db.execute(sql: "DELETE FROM playback; DELETE FROM played")
+            try db.execute(sql: "DELETE FROM playback; DELETE FROM played; DELETE FROM download")
         }
     }
 
@@ -160,6 +160,16 @@ public final class Library: Sendable {
             try db.create(table: "played") { t in
                 t.primaryKey("albumId", .text)
                 t.column("playedAt", .datetime).notNull().indexed()
+            }
+        }
+        migrator.registerMigration("downloads") { db in
+            try db.create(table: "download") { t in
+                t.primaryKey("trackId", .text).references("track", onDelete: .cascade)
+                t.column("albumId", .text).notNull().indexed()
+                t.column("version", .text).notNull()
+                t.column("wifiOnly", .boolean).notNull()
+                t.column("bytes", .integer)
+                t.column("savedAt", .datetime)
             }
         }
         return migrator

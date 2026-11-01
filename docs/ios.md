@@ -123,6 +123,16 @@ something specific that would be annoying to do ourselves:
   current one's, which makes playback gapless; a test renders two tracks
   offline and checks the second starts on the sample after the first
   ends. A next track in another format is resampled to the current one.
+- Downloads: a background `URLSession` (`fm.journey.app.downloads`, four
+  connections) into `Application Support/audio`, excluded from backup.
+  The `download` table holds what is wanted; a row is saved once the
+  file is in place after a 2xx response. The audio's version is the
+  container and duration to the tick, so a re-ripped track downloads
+  again while a tag rewrite, which keeps both, doesn't. On launch, on
+  sync and when the network returns, files and rows are reconciled and
+  every waiting track is handed to the system. A track streamed while
+  waiting to be saved is saved from the stream and its download
+  cancelled.
 
 Sync pages through `/Items` 1,000 at a time with
 `EnableTotalRecordCount=false`: Jellyfin takes about 13 s to count 1,000
@@ -188,8 +198,8 @@ Step 3:
   and an ASCII hyphen).
 - Context menus on every album tile and track row: Play, Shuffle, Play
   Next and Add to Queue (tracks: Play Next and Add to Queue, also on the
-  row's swipe actions), Go to Album or Artist; Download or Remove
-  Download in step 5.
+  row's swipe actions), Download or Remove Download, Go to Album or
+  Artist. Now playing's More menu also has Download.
 - Artists with no albums are hidden: Jellyfin returns five empty
   duplicates (Septicflesh, Various Artists and others), leaving 295.
 - Covers are fetched into Application Support after each sync, four at
@@ -225,14 +235,24 @@ Step 4:
   last track, paused where it stopped. Previous restarts the track after
   three seconds. Repeat One still lets Next move on.
 
-Steps 5 to 8:
+Step 5:
 
-- Download progress is linear: a bar under the album header, a state
-  per row (saved, downloading, waiting), a badge on covers when an album
-  is complete. Settings shows storage and Remove All Downloads.
-- Offline, tracks not on the phone are dimmed, not hidden or disabled;
-  tapping one offers Download When Online. A queue that reaches a
-  missing track offline skips it and marks it.
+- The album page's toolbar has Download, or Remove Download (confirmed)
+  once every track is wanted. Download progress is linear: a bar under
+  the album header ("Downloading 3 of 13"), a state per row (saved,
+  downloading with a ring, waiting), a badge on covers when an album is
+  complete. Settings shows the space downloads take and what is free,
+  and Remove All Downloads (confirmed).
+- Offline (no network, or the last sync couldn't reach the server),
+  tracks not on the phone are dimmed, not hidden or disabled; tapping one
+  offers Download When Online. A queue that reaches a missing track
+  offline skips it and marks it "Skipped: not on this iPhone". Played
+  tracks still in the stream cache count as on the phone.
+- Downloads pause while less than 2 GB is free, and resume when space
+  returns.
+
+Steps 6 to 8:
+
 - Seeking past what has downloaded waits for the stream to get there;
   step 6 makes it jump with an HTTP range request.
 - Download All shows one progress row in Settings, with each pause
@@ -263,9 +283,11 @@ rather than patched on the phone.
    changes, the mini player, now playing and queue sheets, Play, Shuffle,
    Play Next and Add to Queue, Recently Played, resume where playback
    stopped.
-5. **Save offline.** Save tracks or albums through a background
-   `URLSession` into Application Support, checking the HTTP status;
-   played tracks stay cached; re-download when an item's audio changes.
+5. **Save offline.** Done 1 Nov: Download and Remove Download on
+   albums and tracks through a background `URLSession` into Application
+   Support, checking the HTTP status; download states on album pages,
+   rows and covers; offline dimming and skipping; storage and Remove All
+   Downloads in Settings; re-download when a track's audio changes.
 6. **Seek while streaming.** Streaming playback arrived in step 4; what
    is left is a range request for a seek past the downloaded part, and
    playing a track that step 5 is still saving from its partial file.

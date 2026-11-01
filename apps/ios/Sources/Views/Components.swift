@@ -198,6 +198,7 @@ struct AlbumMenu: ViewModifier {
     func body(content: Content) -> some View {
         content.contextMenu {
             PlayActions(albumIds: [album.id])
+            AlbumDownloadActions(album: album)
             if artistMenu, let artistId = album.artistId {
                 Button("Go to Artist", systemImage: "music.mic") { navigate(.artist(artistId)) }
             }
@@ -241,6 +242,102 @@ struct TrackActions: View {
                 player.add([hit])
             }
         }
+        TrackDownloadActions(track: hit.track)
+    }
+}
+
+struct TrackDownloadActions: View {
+    @Environment(AppModel.self) private var model
+    let track: Track
+
+    var body: some View {
+        if let downloads = model.downloads {
+            Section {
+                if downloads.state(of: track.id) == nil {
+                    Button("Download", systemImage: "arrow.down.circle") {
+                        Task { await downloads.save(trackIds: [track.id]) }
+                    }
+                } else {
+                    Button("Remove Download", systemImage: "trash", role: .destructive) {
+                        Task { await downloads.remove(trackIds: [track.id]) }
+                    }
+                }
+            }
+        }
+    }
+}
+
+struct AlbumDownloadActions: View {
+    @Environment(AppModel.self) private var model
+    let album: Album
+
+    var body: some View {
+        if let downloads = model.downloads {
+            Section {
+                if !downloads.summary.completeAlbums.contains(album.id) {
+                    Button("Download", systemImage: "arrow.down.circle") {
+                        Task { await downloads.save(albumIds: [album.id]) }
+                    }
+                }
+                if downloads.summary.albums.contains(album.id) {
+                    Button("Remove Download", systemImage: "trash", role: .destructive) {
+                        Task { await downloads.remove(albumIds: [album.id]) }
+                    }
+                }
+            }
+        }
+    }
+}
+
+struct SavedBadge: ViewModifier {
+    @Environment(AppModel.self) private var model
+    let album: Album
+
+    func body(content: Content) -> some View {
+        let saved = model.downloads?.summary.completeAlbums.contains(album.id) == true
+        content
+            .overlay(alignment: .bottomTrailing) {
+                if saved {
+                    Image(systemName: "arrow.down.circle.fill")
+                        .symbolRenderingMode(.palette)
+                        .foregroundStyle(.white, .black.opacity(0.6))
+                        .font(.body)
+                        .padding(4)
+                        .accessibilityLabel("Downloaded")
+                }
+            }
+    }
+}
+
+struct DownloadIndicator: View {
+    let state: DownloadState?
+
+    var body: some View {
+        switch state {
+        case .saved:
+            Image(systemName: "arrow.down.circle.fill").foregroundStyle(.secondary)
+        case .downloading(let fraction):
+            ZStack {
+                Circle().stroke(.quaternary, lineWidth: 2)
+                Circle().trim(from: 0, to: fraction)
+                    .stroke(.tint, style: StrokeStyle(lineWidth: 2, lineCap: .round))
+                    .rotationEffect(.degrees(-90))
+            }
+            .frame(width: 14, height: 14)
+        case .waiting:
+            Image(systemName: "arrow.down.circle.dotted").foregroundStyle(.secondary)
+        case nil:
+            EmptyView()
+        }
+    }
+
+    static func text(_ state: DownloadState?) -> String? {
+        switch state {
+        case .saved: "Downloaded"
+        case .downloading(let fraction): "Downloading, \(Int(fraction * 100))%"
+        case .waiting: "Waiting to download"
+        case nil: nil
+        }
     }
 }
 
@@ -253,6 +350,7 @@ struct AlbumTile: View {
         NavigationLink(value: Route.album(album.id)) {
             VStack(alignment: .leading, spacing: 2) {
                 ArtView(item: album.art, size: size)
+                    .modifier(SavedBadge(album: album))
                     .padding(.bottom, 6)
                 Text(album.name).lineLimit(1)
                 Text(subtitle).font(.subheadline).foregroundStyle(.secondary).lineLimit(1)
@@ -275,6 +373,7 @@ struct AlbumRow: View {
         NavigationLink(value: Route.album(album.id)) {
             HStack(spacing: 12) {
                 ArtView(item: album.art, size: 56)
+                    .modifier(SavedBadge(album: album))
                 VStack(alignment: .leading, spacing: 2) {
                     Text(album.name).lineLimit(1)
                     Text(subtitle).font(.subheadline).foregroundStyle(.secondary).lineLimit(1)

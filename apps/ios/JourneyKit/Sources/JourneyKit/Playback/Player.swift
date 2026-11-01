@@ -8,6 +8,7 @@ public final class Player {
     public private(set) var isPlaying = false
     public private(set) var position: Double = 0
     public private(set) var failure: String?
+    public var offline = false
 
     @ObservationIgnored public var activate: () -> Void = {}
     @ObservationIgnored public var changed: () -> Void = {}
@@ -150,7 +151,17 @@ public final class Player {
     }
 
     func begin(at time: Double, play: Bool) {
-        guard let entry = queue.current, let cache else { return }
+        guard let cache, !queue.isEmpty else { return }
+        guard queue.skipUnavailable(available()) else {
+            output.stop()
+            isPlaying = false
+            prepared = false
+            failure = "Nothing left in the queue is on this iPhone."
+            save(force: true)
+            changed()
+            return
+        }
+        guard let entry = queue.current else { return }
         if play { activate() }
         position = time
         failure = nil
@@ -160,8 +171,7 @@ public final class Player {
                 following: following(), play: play)
             prepared = true
             isPlaying = play
-            cache.cancel(
-                except: Set([entry.track.id, queue.following?.track.id].compactMap { $0 }))
+            cache.cancel(except: wanted(entry))
             if play { record(entry) }
             startLoop()
         } catch {
@@ -177,18 +187,27 @@ public final class Player {
             return
         }
         if let cache, let entry = queue.current {
-            cache.cancel(
-                except: Set([entry.track.id, queue.following?.track.id].compactMap { $0 }))
+            cache.cancel(except: wanted(entry))
         }
         save(force: true)
         changed()
     }
 
     func following() -> Output.Item? {
-        guard let entry = queue.following, let cache,
+        guard let entry = queue.following(where: available()), let cache,
             let source = try? cache.source(for: entry.track)
         else { return nil }
         return Output.Item(entry: entry.id, source: source)
+    }
+
+    func available() -> (Track) -> Bool {
+        let cache = cache
+        let offline = offline
+        return { !offline || cache?.isOnPhone($0) == true }
+    }
+
+    func wanted(_ entry: QueueEntry) -> Set<String> {
+        Set([entry.track.id, queue.following(where: available())?.track.id].compactMap { $0 })
     }
 
     func finish() {
@@ -227,7 +246,10 @@ public final class Player {
         for event in events {
             switch event {
             case .started(let id):
-                if id != queue.current?.id { queue.jump(to: id) }
+                if id != queue.current?.id {
+                    queue.markMissing(before: id)
+                    queue.jump(to: id)
+                }
                 if let entry = queue.current { record(entry) }
                 edited()
             case .ended:

@@ -10,11 +10,22 @@ public struct QueueEntry: Codable, Sendable, Equatable, Identifiable {
     public var album: Album
     public var playNext = false
     public var started = false
+    public var missing = false
 
     public init(_ hit: TrackHit, playNext: Bool = false) {
         track = hit.track
         album = hit.album
         self.playNext = playNext
+    }
+
+    public init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        track = try container.decode(Track.self, forKey: .track)
+        album = try container.decode(Album.self, forKey: .album)
+        playNext = try container.decodeIfPresent(Bool.self, forKey: .playNext) ?? false
+        started = try container.decodeIfPresent(Bool.self, forKey: .started) ?? false
+        missing = try container.decodeIfPresent(Bool.self, forKey: .missing) ?? false
     }
 }
 
@@ -32,14 +43,49 @@ public struct PlayQueue: Codable, Sendable, Equatable {
         entries.isEmpty ? [] : entries[(index + 1)...]
     }
     public var played: Set<String> {
-        Set(entries.prefix(index).filter(\.started).map(\.track.id))
+        Set(entries.prefix(index).filter { $0.started && !$0.missing }.map(\.track.id))
     }
     public var isEmpty: Bool { entries.isEmpty }
 
-    public var following: QueueEntry? {
-        if repeatMode == .one { return current }
-        if index + 1 < entries.count { return entries[index + 1] }
-        return repeatMode == .all ? entries.first : nil
+    public var following: QueueEntry? { following { _ in true } }
+
+    public func following(where available: (Track) -> Bool) -> QueueEntry? {
+        if repeatMode == .one { return current.flatMap { available($0.track) ? $0 : nil } }
+        var position = index
+        for _ in entries.indices {
+            position += 1
+            if position == entries.count {
+                guard repeatMode == .all else { return nil }
+                position = 0
+            }
+            if available(entries[position].track) { return entries[position] }
+        }
+        return nil
+    }
+
+    @discardableResult
+    public mutating func skipUnavailable(_ available: (Track) -> Bool) -> Bool {
+        for _ in entries.indices {
+            guard let current, !available(current.track) else { return current != nil }
+            entries[index].missing = true
+            guard skip() else { return false }
+        }
+        return false
+    }
+
+    public mutating func markMissing(before id: UUID) {
+        guard let target = entries.firstIndex(where: { $0.id == id }) else { return }
+        var position = index + 1
+        while position != target && position < entries.count {
+            entries[position].missing = true
+            position += 1
+        }
+        guard position != target else { return }
+        position = 0
+        while position < target {
+            entries[position].missing = true
+            position += 1
+        }
     }
 
     public mutating func play(
@@ -176,5 +222,6 @@ public struct PlayQueue: Codable, Sendable, Equatable {
         guard entries.indices.contains(index) else { return }
         entries[index].playNext = false
         entries[index].started = true
+        entries[index].missing = false
     }
 }

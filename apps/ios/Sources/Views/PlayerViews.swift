@@ -86,6 +86,7 @@ struct NowPlayingView: View {
                     if let artistId = entry.album.artistId {
                         Button("Go to Artist", systemImage: "music.mic") { open(.artist(artistId)) }
                     }
+                    TrackDownloadActions(track: entry.track)
                 }
                 .labelStyle(.iconOnly)
                 .buttonStyle(.glass)
@@ -252,22 +253,28 @@ struct QueueView: View {
 }
 
 struct QueueRow: View {
+    @Environment(AppModel.self) private var model
     @Environment(Player.self) private var player
     let entry: QueueEntry
     let playing: Bool
 
     var body: some View {
+        let away = model.offline && !model.isOnPhone(entry.track)
         HStack(spacing: 12) {
             ArtView(item: entry.album.art, size: 44)
+                .opacity(away ? 0.4 : 1)
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 6) {
                     Text(entry.track.name).lineLimit(1)
-                        .foregroundStyle(playing ? AnyShapeStyle(.tint) : AnyShapeStyle(.primary))
+                        .foregroundStyle(
+                            playing
+                                ? AnyShapeStyle(.tint)
+                                : AnyShapeStyle(away ? .tertiary : .primary))
                     if entry.playNext {
                         Text("Play Next").font(.caption.weight(.medium)).foregroundStyle(.tint)
                     }
                 }
-                Text(entry.track.artistName)
+                Text(entry.missing ? "Skipped: not on this iPhone" : entry.track.artistName)
                     .font(.subheadline).foregroundStyle(.secondary).lineLimit(1)
             }
             Spacer()
@@ -281,6 +288,7 @@ struct QueueRow: View {
         }
         .contentShape(.rect)
         .accessibilityElement(children: .combine)
+        .accessibilityValue(away ? "Not on this iPhone" : "")
         .accessibilityIdentifier("queue-\(entry.track.id)")
     }
 }

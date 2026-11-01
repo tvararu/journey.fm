@@ -122,6 +122,33 @@ struct Seeded: RandomNumberGenerator {
     #expect(!moved && queue.current?.track.id == "a")
 }
 
+@Test func offlineTheQueueSkipsAndMarksTracksThatAreNotOnThePhone() {
+    let onPhone: Set<String> = ["a", "d"]
+    let available = { (track: Track) in onPhone.contains(track.id) }
+    var queue = PlayQueue()
+    queue.play(hits("a", "b", "c", "d", "e"))
+    #expect(queue.following(where: available)?.track.id == "d")
+
+    let d = queue.entries[3].id
+    queue.markMissing(before: d)
+    queue.jump(to: d)
+    #expect(queue.entries.filter(\.missing).map(\.track.id) == ["b", "c"])
+    #expect(queue.played == ["a"])
+    #expect(queue.following(where: available) == nil)
+
+    queue.skip()
+    let landed = queue.skipUnavailable(available)
+    #expect(!landed)
+    #expect(queue.entries.filter(\.missing).map(\.track.id) == ["b", "c", "e"])
+
+    queue.repeatMode = .all
+    queue.jump(to: queue.entries[1].id)
+    let wrapped = queue.skipUnavailable(available)
+    #expect(wrapped)
+    #expect(queue.current?.track.id == "d")
+    #expect(queue.following(where: available)?.track.id == "a")
+}
+
 @Test func upNextCanBeRemovedReorderedAndCleared() {
     var queue = PlayQueue()
     queue.play(hits("a", "b", "c", "d", "e"), from: 1)
