@@ -93,7 +93,9 @@ func repeated(_ albums: [Album]) -> Set<String> {
     return repeats
 }
 
-func tracksText(_ count: Int) -> String { count == 1 ? "1 track" : "\(count) tracks" }
+func tracksText(_ count: Int) -> String {
+    count == 1 ? "1 track" : "\(count.formatted()) tracks"
+}
 
 func lengthText(_ seconds: Double) -> String {
     Duration.seconds(seconds.rounded()).formatted(

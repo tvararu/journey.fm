@@ -13,6 +13,8 @@ final class Stub: @unchecked Sendable {
     var chunk = Int.max
     var delay: TimeInterval = 0
     var ranges: [String?] = []
+    var active = 0
+    var mostActive = 0
 
     init(body: Data) {
         self.body = body
@@ -42,6 +44,14 @@ final class Stub: @unchecked Sendable {
 final class StubProtocol: URLProtocol, @unchecked Sendable {
     var timer: Timer?
     var remaining = Data()
+    var stub: Stub?
+    var ended = false
+
+    func end() {
+        guard !ended, let stub else { return }
+        ended = true
+        stub.lock.withLock { stub.active -= 1 }
+    }
 
     override class func canInit(with request: URLRequest) -> Bool { Stub.find(request) != nil }
     override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
@@ -49,7 +59,10 @@ final class StubProtocol: URLProtocol, @unchecked Sendable {
     override func startLoading() {
         guard let stub = Stub.find(request), let url = request.url else { return }
         let range = request.value(forHTTPHeaderField: "Range")
+        self.stub = stub
         let (body, status, chunk, delay) = stub.lock.withLock {
+            stub.active += 1
+            stub.mostActive = max(stub.mostActive, stub.active)
             stub.ranges.append(range)
             return (stub.body, stub.status, stub.chunk, stub.delay)
         }
@@ -72,6 +85,7 @@ final class StubProtocol: URLProtocol, @unchecked Sendable {
             cacheStoragePolicy: .notAllowed)
         guard delay > 0 else {
             client?.urlProtocol(self, didLoad: remaining)
+            end()
             client?.urlProtocolDidFinishLoading(self)
             return
         }
@@ -82,6 +96,7 @@ final class StubProtocol: URLProtocol, @unchecked Sendable {
             self.client?.urlProtocol(self, didLoad: Data(piece))
             if self.remaining.isEmpty {
                 timer.invalidate()
+                self.end()
                 self.client?.urlProtocolDidFinishLoading(self)
             }
         }
@@ -92,6 +107,7 @@ final class StubProtocol: URLProtocol, @unchecked Sendable {
     override func stopLoading() {
         timer?.invalidate()
         timer = nil
+        end()
     }
 }
 

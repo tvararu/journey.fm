@@ -1,9 +1,11 @@
 import Foundation
 import Observation
 
-public final class SavedFiles: Sendable {
+public final class SavedFiles: @unchecked Sendable {
     public let directory: URL
     let library: Library
+    let lock = NSLock()
+    var adopted: (@Sendable (String) -> Void)?
 
     init(directory: URL, library: Library) {
         self.directory = directory
@@ -16,7 +18,11 @@ public final class SavedFiles: Sendable {
     }
 
     func adopt(_ track: Track, from file: URL) -> Bool {
-        library.isWaiting(trackId: track.id) && store(file, as: Self.name(track), trackId: track.id)
+        guard library.isWaiting(trackId: track.id),
+            store(file, as: Self.name(track), trackId: track.id)
+        else { return false }
+        lock.withLock { adopted }?(track.id)
+        return true
     }
 
     func store(_ file: URL, as name: String, trackId: String) -> Bool {
@@ -124,15 +130,18 @@ public final class Downloads {
     @ObservationIgnored let library: Library
     @ObservationIgnored let client: JellyfinClient
     @ObservationIgnored let session: URLSession
+    @ObservationIgnored let window: Int
     @ObservationIgnored var tasks: [String: URLSessionDownloadTask] = [:]
     @ObservationIgnored var watching: Task<Void, Never>?
     @ObservationIgnored var resuming: Task<Void, Never>?
     @ObservationIgnored var again = false
+    @ObservationIgnored var failedAt: [String: Date] = [:]
 
     public init(
         library: Library, client: JellyfinClient, directory: URL,
-        configuration: URLSessionConfiguration
+        configuration: URLSessionConfiguration, window: Int = 4
     ) {
+        self.window = window
         self.library = library
         self.client = client
         let files = SavedFiles(directory: directory, library: library)
@@ -144,12 +153,19 @@ public final class Downloads {
                 Task { @MainActor in self?.handle(event) }
             }
         }
+        files.lock.withLock {
+            files.adopted = { [weak self] id in
+                Task { @MainActor in
+                    self?.tasks.removeValue(forKey: id)?.cancel()
+                    self?.progress[id] = nil
+                }
+            }
+        }
         watching = Task { [weak self, library] in
             do {
                 for try await summary in library.observeDownloads() {
                     guard let self else { return }
                     self.summary = summary
-                    self.dropFinished()
                     self.changed(summary)
                 }
             } catch {
@@ -199,19 +215,21 @@ public final class Downloads {
         await remove()
     }
 
-    public func resume() async {
-        guard resuming == nil else {
+    public func resume(retry: Bool = true) async {
+        if retry { failedAt = [:] }
+        if let resuming {
             again = true
-            while let resuming { await resuming.value }
-            return
+            return await resuming.value
         }
-        repeat {
-            again = false
-            let task = Task { await reconcile() }
-            resuming = task
-            await task.value
-        } while again
-        resuming = nil
+        let task = Task {
+            repeat {
+                again = false
+                await reconcile()
+            } while again
+            resuming = nil
+        }
+        resuming = task
+        await task.value
     }
 
     public func invalidate() {
@@ -254,7 +272,15 @@ public final class Downloads {
                 }
             }
             guard !paused else { return }
+            let wifiOnly = Set(pending.filter(\.wifiOnly).map(\.trackId))
+            var running = [false: 0, true: 0]
+            for id in tasks.keys { running[wifiOnly.contains(id), default: 0] += 1 }
+            let recent = Date.now.addingTimeInterval(-Self.backoff)
             for item in pending where tasks[item.trackId] == nil {
+                guard running[item.wifiOnly, default: 0] < window,
+                    failedAt[item.trackId].map({ $0 < recent }) ?? true
+                else { continue }
+                running[item.wifiOnly, default: 0] += 1
                 var request = client.request(client.audioURL(trackId: item.trackId))
                 request.allowsExpensiveNetworkAccess = !item.wifiOnly
                 request.allowsConstrainedNetworkAccess = !item.wifiOnly
@@ -276,20 +302,17 @@ public final class Downloads {
             guard tasks[id] != nil, abs((progress[id] ?? 0) - fraction) >= 0.01 || fraction == 1
             else { return }
             progress[id] = fraction
-        case .done(let id, _):
+        case .done(let id, let saved):
             tasks[id] = nil
             progress[id] = nil
+            if !saved { failedAt[id] = .now }
+            Task { await resume(retry: false) }
         case .finishedEvents:
-            finishedEvents?()
-            finishedEvents = nil
-        }
-    }
-
-    func dropFinished() {
-        for (id, task) in tasks where summary.saved.contains(id) {
-            task.cancel()
-            tasks[id] = nil
-            progress[id] = nil
+            Task {
+                await resume()
+                finishedEvents?()
+                finishedEvents = nil
+            }
         }
     }
 
@@ -301,6 +324,8 @@ public final class Downloads {
             progress[id] = nil
         }
     }
+
+    static let backoff: TimeInterval = 5 * 60
 
     nonisolated static func trackId(_ file: String) -> String {
         String(file.prefix { $0 != "." })

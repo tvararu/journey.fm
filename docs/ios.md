@@ -138,10 +138,16 @@ something specific that would be annoying to do ourselves:
   file is in place after a 2xx response. The audio's version is the
   container and duration to the tick, so a re-ripped track downloads
   again while a tag rewrite, which keeps both, doesn't. On launch, on
-  sync and when the network returns, files and rows are reconciled and
-  every waiting track is handed to the system. A track streamed while
-  waiting to be saved is saved from the stream and its download
-  cancelled.
+  sync and when the network returns, files and rows are reconciled. The
+  system gets at most four tracks you saved and four from Download All
+  at a time, and each finished task hands it the next, also when iOS
+  wakes the app in the background to deliver results. Handing it all
+  7,706 at once (1 Nov) made nsurlsessiond open every request together,
+  thousands against Jellyfin, because HTTP/2 doesn't count streams
+  against the connection limit. A failed track waits five minutes before
+  the next attempt, or until launch, sync or the network returning. A
+  track streamed while waiting to be saved is saved from the stream and
+  its download cancelled.
 
 Sync pages through `/Items` 1,000 at a time with
 `EnableTotalRecordCount=false`: Jellyfin takes about 13 s to count 1,000
@@ -270,11 +276,18 @@ Step 6:
   background download, whose bytes stay private until it finishes; when
   the stream completes, its file is saved and the download cancelled.
 
-Steps 7 and 8:
+Step 7:
 
-- Download All shows one progress row in Settings, with each pause
-  named (Low Power Mode, waiting for Wi-Fi, storage full). When it
-  finishes, Download New Albums turns on.
+- Download All shows one progress row in Settings ("1,234 of 7,706
+  tracks"), with each pause named: no network, waiting for Wi-Fi (Download
+  All never uses cellular or Low Data Mode; tracks you save do), Low
+  Power Mode, or out of space (less than 2 GB free). When every track is
+  saved, Download New Albums turns on; after each sync it saves the
+  albums Jellyfin added since the last one. Remove All Downloads turns
+  both off.
+
+Step 8:
+
 - Lyrics replace the art in now playing; the current line is bold,
   tapping a line seeks. Step 8 metadata appears only where it exists.
 
@@ -308,7 +321,8 @@ rather than patched on the phone.
 6. **Seek while streaming.** Done 1 Nov: range requests for a seek past
    the downloaded part, starting the decoder at the nearest FLAC seek
    point; a track that step 5 is still saving plays from the stream.
-7. **Download everything.** Hand every task to the system up front so
-   it carries on with the phone locked and the app killed.
+7. **Download everything.** Done 1 Nov: Download All and Download New
+   Albums, carried on by the system's background session a few tracks at
+   a time, with the app woken to queue the next ones.
 8. **Lyrics and metadata.** Synced lyrics from `/Audio/{id}/Lyrics`,
    genres and the rest once tags are written back to the FLACs.

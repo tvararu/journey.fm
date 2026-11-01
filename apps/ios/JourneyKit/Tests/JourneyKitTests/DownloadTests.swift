@@ -98,4 +98,39 @@ struct DownloadTests {
         #expect(downloads.files.file(for: track("x1", album: "x")) != nil)
         #expect(cache.isOnPhone(track("x1", album: "x")))
     }
+
+    @Test func downloadEverythingKeepsOnlyAWindowOfRequestsOpen() async throws {
+        let stub = Stub(body: pattern(64 * 1024))
+        stub.chunk = 16 * 1024
+        stub.delay = 0.01
+        let tracks = (1...6).map { track("x\($0)", album: "x") } + [track("y1", album: "y")]
+        let (_, downloads) = try await setUp(stub, tracks: tracks)
+        let windowed = Downloads(
+            library: downloads.library, client: stub.client, directory: directory,
+            configuration: stub.configuration, window: 2)
+        downloads.invalidate()
+
+        await windowed.saveEverything()
+        #expect(windowed.tasks.count == 2)
+        await windowed.save(trackIds: ["y1"])
+        #expect(windowed.tasks.count == 3)
+        #expect(await eventually(10) { windowed.summary.saved.count == 7 })
+        #expect(windowed.summary.everything)
+        #expect(stub.lock.withLock { stub.mostActive } <= 3)
+    }
+
+    @Test func downloadNewAlbumsOnlyWantsAlbumsAddedAfterTheCutoff() async throws {
+        let stub = Stub(body: pattern(100))
+        let (library, downloads) = try await setUp(
+            stub, tracks: [track("x1", album: "x"), track("y1", album: "y")])
+        downloads.paused = true
+        try await library.db.write { db in
+            try db.execute(
+                sql: "UPDATE album SET dateCreated = '2026-10-01T00:00:00.0000000Z' WHERE id = 'x'")
+            try db.execute(
+                sql: "UPDATE album SET dateCreated = '2026-11-01T12:00:00.0000000Z' WHERE id = 'y'")
+        }
+        await downloads.saveEverything(createdAfter: "2026-11-01T00:00:00Z")
+        #expect(await eventually { downloads.summary.waiting == ["y1"] })
+    }
 }

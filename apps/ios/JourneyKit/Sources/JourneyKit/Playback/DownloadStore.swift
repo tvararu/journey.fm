@@ -90,7 +90,7 @@ extension Library {
                 sql: """
                     SELECT download.trackId, \(Self.file) AS file, download.wifiOnly FROM download
                     JOIN track ON track.id = download.trackId WHERE download.savedAt IS NULL
-                    ORDER BY track.albumId, track.disc, track.number
+                    ORDER BY download.wifiOnly, track.albumId, track.disc, track.number
                     """
             ).map {
                 PendingDownload(trackId: $0["trackId"], file: $0["file"], wifiOnly: $0["wifiOnly"])
