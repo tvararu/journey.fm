@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
-#MISE description="Back up raw responses and the catalogue to sol's music-meta (adds and updates, never deletes)"
+#MISE description="Back up raw responses, the catalogue and design boards to sol's music-meta (adds and updates, never deletes)"
 set -euo pipefail
 
 data="$MISE_PROJECT_ROOT/data"
-rsync -au "$data/raw/" sol:/mnt/pool/music-meta/raw/
-rsync -au "$data/catalogue" sol:/mnt/pool/music-meta/
-echo "pushed raw/ and catalogue/ to sol"
+for dir in raw catalogue design; do
+  [ -d "$data/$dir" ] || continue
+  rsync -au "$data/$dir" sol:/mnt/pool/music-meta/
+  echo "pushed $dir/ to sol"
+done
