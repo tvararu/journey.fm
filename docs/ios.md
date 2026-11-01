@@ -1,15 +1,18 @@
 # iOS app
 
 The player for the library, in `apps/ios`. `docs/library.md` has the end
-state and the player design (28 Oct); `docs/dorsal.md` has the prior art.
+state and the player design (28 Oct); `docs/dorsal.md` has the prior art
+from Dorsal, and `docs/ios-prior-art/` the research into other music
+apps (1 Nov).
 
 ## UX (1 Nov)
 
 As simple as it can be. Take Spotify's structure, which looks a bit
 better than Apple Music's, and build it entirely from stock iOS parts:
 
-- `TabView` for the tabs (Home, Search, Library), with the mini player
-  as the tab bar's bottom accessory (`tabViewBottomAccessory`, iOS 26)
+- `TabView` for the tabs: Home, Library, then Search as a trailing
+  `Tab(role: .search)`, as in Apple Music. The mini player is the tab
+  bar's bottom accessory (`tabViewBottomAccessory`, iOS 26)
 - `NavigationStack` with the system navigation bar, large titles and
   back swipe
 - `List` and `LazyVGrid` for shelves and track lists; `.searchable` for
