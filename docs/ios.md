@@ -54,8 +54,9 @@ Not available yet, so any screen that needs it waits for a later step:
   are written back to the FLACs, step 8
 - Playlists and favourites: in Jellyfin, but not synced
 
-The library is about 680 albums by 300 album artists, mostly one album
-per artist, so artist pages are often a single album.
+The library is about 680 albums by 300 album artists. 181 artists have
+one album and 48 have two, while a few have ten or more (up to 16), so
+artist pages must look right with a single album.
 
 ## Structure and dependencies (1 Nov)
 
