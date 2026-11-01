@@ -16,6 +16,14 @@ public struct SyncReport: Sendable, Equatable {
     public var deferred = 0
 }
 
+public struct SyncProgress: Sendable, Equatable {
+    public var artists: Int?
+    public var albums: Int?
+    public var tracks: Int?
+
+    public init() {}
+}
+
 public struct Sync: Sendable {
     public static let fullSyncInterval: TimeInterval = 24 * 60 * 60
     static let overlap: TimeInterval = 60 * 60
@@ -28,16 +36,27 @@ public struct Sync: Sendable {
         self.library = library
     }
 
-    public func run(full forceFull: Bool = false, now: Date = .now) async throws -> SyncReport {
+    public func run(
+        full forceFull: Bool = false, now: Date = .now,
+        progress: @Sendable (SyncProgress) -> Void = { _ in }
+    ) async throws -> SyncReport {
         let state = try await library.db.read { try SyncState.fetchOne($0) } ?? SyncState()
         let full =
             forceFull || state.lastSync == nil
             || state.lastFullSync.map { now.timeIntervalSince($0) > Self.fullSyncInterval } ?? true
         let since = full ? nil : state.lastSync?.addingTimeInterval(-Self.overlap)
 
+        var step = SyncProgress()
+        progress(step)
         let artists = try await source.artists()
+        step.artists = artists.count
+        progress(step)
         let albums = try await source.albums(since: since)
+        step.albums = albums.count
+        progress(step)
         let tracks = try await source.tracks(since: since)
+        step.tracks = tracks.count
+        progress(step)
 
         let report = try await library.db.write { db in
             var report = SyncReport(
@@ -47,7 +66,9 @@ public struct Sync: Sendable {
             for synced in albums {
                 try synced.album.upsert(db)
                 try AlbumArtist.filter(Column("albumId") == synced.album.id).deleteAll(db)
-                for (position, artistId) in synced.artistIds.enumerated() {
+                var seen = Set<String>()
+                let artistIds = synced.artistIds.filter { seen.insert($0).inserted }
+                for (position, artistId) in artistIds.enumerated() {
                     try AlbumArtist(
                         albumId: synced.album.id, artistId: artistId, position: position
                     )
@@ -71,6 +92,7 @@ public struct Sync: Sendable {
                     .deleteAll(db)
             }
 
+            try Library.refreshDerived(db)
             try SyncState(lastSync: now, lastFullSync: full ? now : state.lastFullSync).upsert(db)
             return report
         }

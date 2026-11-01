@@ -42,16 +42,23 @@ case "stats":
         "\(stats.artists) artists, \(stats.albums) albums, \(stats.tracks) tracks, last sync \(stats.lastSync?.formatted() ?? "never")"
     )
 case "art":
-    guard arguments.count == 2, let album = try await library.album(id: arguments[1]),
-        let tag = album.imageTag
-    else {
-        print("usage: journey art <album id with art>")
-        exit(1)
-    }
-    let cache = ArtCache(directory: home.appending(path: "art"), client: try await client())
-    let data = try await cache.image(itemId: album.id, tag: tag, maxWidth: 300)
-    print("\(album.name): \(data.count) bytes")
+    let directory = home.appending(path: "art")
+    let cache = ArtCache(directory: directory, client: try await client())
+    let items = try await library.artItems()
+    let start = Date.now
+    let failed = await cache.prefetch(items)
+    let bytes = try FileManager.default.contentsOfDirectory(
+        at: directory, includingPropertiesForKeys: [.fileSizeKey]
+    ).reduce(0) { $0 + (try $1.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0) }
+    print(
+        "\(items.count) covers, \(failed) failed, \(bytes.formatted(.byteCount(style: .file))) in \(start.distance(to: .now).formatted(.number.precision(.fractionLength(1)))) s"
+    )
+case "search":
+    let results = try await library.search(arguments.dropFirst().joined(separator: " "))
+    for artist in results.artists { print("artist  \(artist.name) (\(artist.albumCount))") }
+    for album in results.albums { print("album   \(album.name) · \(album.artistName)") }
+    for hit in results.tracks { print("track   \(hit.track.name) · \(hit.album.name)") }
 default:
-    print("usage: journey sync [--full] | stats | art <album id>")
+    print("usage: journey sync [--full] | stats | art | search <words>")
     exit(1)
 }

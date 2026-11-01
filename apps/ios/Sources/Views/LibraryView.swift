@@ -1,85 +1,141 @@
 import JourneyKit
 import SwiftUI
 
-struct LibraryView: View {
-    @Environment(AppModel.self) private var model
-
-    var body: some View {
-        NavigationStack {
-            List {
-                Section("Library") {
-                    LabeledContent("Albums", value: model.stats.albums.formatted())
-                    LabeledContent("Artists", value: model.stats.artists.formatted())
-                    LabeledContent("Tracks", value: model.stats.tracks.formatted())
-                    LabeledContent("Last sync") {
-                        if model.syncing {
-                            ProgressView()
-                        } else if let lastSync = model.stats.lastSync {
-                            Text(lastSync, format: .relative(presentation: .named))
-                        } else {
-                            Text("Never")
-                        }
-                    }
-                    Button("Sync now") { Task { await model.sync() } }
-                        .disabled(model.syncing)
-                }
-                if let error = model.error {
-                    Section { Text(error).foregroundStyle(.red) }
-                }
-                Section("Recently added") {
-                    ForEach(model.recent) { album in
-                        HStack(spacing: 12) {
-                            ArtView(album: album, size: 44)
-                            VStack(alignment: .leading) {
-                                Text(album.name)
-                                Text(album.artistName)
-                                    .font(.subheadline)
-                                    .foregroundStyle(.secondary)
-                            }
-                            .lineLimit(1)
-                        }
-                    }
-                }
-                Section {
-                    Button("Sign out", role: .destructive) { Task { await model.signOut() } }
-                }
-            }
-            .navigationTitle("journey.fm")
-            .task { await model.watchStats() }
-            .task { await model.watchRecent() }
-            .task { await model.sync() }
-        }
-    }
+enum LibraryKind: String {
+    case albums, artists
 }
 
-struct ArtView: View {
+struct LibraryView: View {
     @Environment(AppModel.self) private var model
-    @Environment(\.displayScale) private var displayScale
-    let album: Album
-    let size: CGFloat
-    @State private var image: UIImage?
+    @AppStorage("library.kind") private var kind = LibraryKind.albums
+    @AppStorage("library.sort") private var sort = AlbumSort.artist
+    @AppStorage("library.grid") private var grid = true
+    @State private var path: [Route] = []
+    @State private var filter = ""
+    @State private var albums: [Album] = []
+    @State private var artists: [ArtistSummary] = []
 
     var body: some View {
-        Group {
-            if let image {
-                Image(uiImage: image).resizable().scaledToFill()
-            } else {
-                Rectangle().fill(.quaternary)
+        TabStack(path: $path) {
+            content
+                .navigationTitle("Library")
+                .navigationSubtitle(model.syncStatus)
+                .searchable(
+                    text: $filter, placement: .navigationBarDrawer(displayMode: .always),
+                    prompt: kind == .albums ? "Filter albums" : "Filter artists"
+                )
+                .toolbar {
+                    if kind == .albums {
+                        ToolbarItemGroup(placement: .topBarTrailing) {
+                            Menu {
+                                Picker("Sort By", selection: $sort) {
+                                    Text("Title").tag(AlbumSort.title)
+                                    Text("Artist").tag(AlbumSort.artist)
+                                    Text("Year").tag(AlbumSort.year)
+                                    Text("Recently Added").tag(AlbumSort.added)
+                                }
+                            } label: {
+                                Label("Sort", systemImage: "arrow.up.arrow.down")
+                            }
+                            .accessibilityIdentifier("sort")
+                            Button(
+                                grid ? "Show as List" : "Show as Grid",
+                                systemImage: grid ? "list.bullet" : "square.grid.2x2"
+                            ) { grid.toggle() }
+                            .accessibilityIdentifier("layout")
+                        }
+                    }
+                }
+                .refreshable { await model.sync() }
+                .task(id: sort) {
+                    await watch(model.library.observeAlbums(sort: sort)) { albums = $0 }
+                }
+                .task { await watch(model.library.observeArtists()) { artists = $0 } }
+        }
+    }
+
+    @ViewBuilder private var content: some View {
+        switch kind {
+        case .albums where grid:
+            AlbumGrid(albums: shownAlbums) { chips }
+        case .albums:
+            albumList
+        case .artists:
+            artistList
+        }
+    }
+
+    private var chips: some View {
+        HStack {
+            chip("Albums", .albums)
+            chip("Artists", .artists)
+        }
+    }
+
+    @ViewBuilder private func chip(_ title: String, _ value: LibraryKind) -> some View {
+        if kind == value {
+            Button(title) { kind = value }
+                .buttonStyle(.borderedProminent)
+                .accessibilityAddTraits(.isSelected)
+                .accessibilityIdentifier("chip-\(value.rawValue)")
+        } else {
+            Button(title) { kind = value }
+                .buttonStyle(.bordered)
+                .accessibilityIdentifier("chip-\(value.rawValue)")
+        }
+    }
+
+    private var shownAlbums: [Album] {
+        guard !filter.isEmpty else { return albums }
+        return albums.filter {
+            $0.name.localizedStandardContains(filter)
+                || $0.artistName.localizedStandardContains(filter)
+        }
+    }
+
+    private var albumList: some View {
+        let shown = shownAlbums
+        let repeats = repeated(shown)
+        return List {
+            chips.buttonBorderShape(.capsule).listRowSeparator(.hidden)
+            ForEach(indexed(shown, key: sectionKey)) { section in
+                Section {
+                    ForEach(section.items) { album in
+                        AlbumRow(
+                            album: album,
+                            subtitle: album.subtitle(
+                                [album.artistName, album.year.map(String.init)], repeats: repeats))
+                    }
+                }
+                .sectionIndexLabel(section.label)
             }
         }
-        .frame(width: size, height: size)
-        .clipShape(.rect(cornerRadius: 4))
-        .task(id: album.imageTag) {
-            guard let tag = album.imageTag, let art = model.art else { return }
-            let width = Int(size * displayScale)
-            do {
-                image = UIImage(
-                    data: try await art.image(itemId: album.id, tag: tag, maxWidth: width))
-            } catch {
-                Log.art.error(
-                    "Art for \(album.id, privacy: .public) failed: \(String(describing: error), privacy: .public)"
-                )
+        .listStyle(.plain)
+        .listSectionIndexVisibility(sort == .added ? .hidden : .visible)
+    }
+
+    private var artistList: some View {
+        let shown =
+            filter.isEmpty ? artists : artists.filter { $0.name.localizedStandardContains(filter) }
+        return List {
+            chips.buttonBorderShape(.capsule).listRowSeparator(.hidden)
+            ForEach(indexed(shown) { indexLetter($0.sortName) }) { section in
+                Section {
+                    ForEach(section.items) { ArtistRow(artist: $0) }
+                }
+                .sectionIndexLabel(section.label)
             }
+        }
+        .listStyle(.plain)
+        .listSectionIndexVisibility(.visible)
+    }
+
+    private func sectionKey(_ album: Album) -> String {
+        switch sort {
+        case .title: indexLetter(album.sortName)
+        case .artist: indexLetter(album.artistSortName)
+        case .year: album.year.map { String(format: "%02ds", $0 / 10 % 10 * 10) } ?? "#"
+        case .added: ""
         }
     }
 }

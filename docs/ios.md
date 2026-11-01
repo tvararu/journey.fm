@@ -68,8 +68,8 @@ package: the Jellyfin client, the library database and sync, the art
 cache and the Keychain session. The app target holds only
 `AppModel.swift` and `Views/`. The package also builds `journey`, a
 command for testing against the real server without the simulator:
-`mise run ios cli sync [--full] | stats | art <album id>`, with its
-database in `apps/ios/build/cli`.
+`mise run ios cli sync [--full] | stats | art | search <words>`, with its
+database and covers in `apps/ios/build/cli`.
 
 ### Commands
 
@@ -159,12 +159,12 @@ Step 3:
   the subtitle adds the track count.
 - Album page: no title in the bar; cover, title (never truncated),
   artist (pushes the artist), "1982 · Punk" then "13 tracks · 44 min"
-  from the synced tracks, Play and Shuffle, tracks. Disc headings only
-  on multi-disc albums; a track's artist only when it differs from the
-  album's; More by the artist only when there is more.
-- Artist page: image, name, "16 albums · 1972–2013", Play and Shuffle,
-  then every album as a row, oldest first, the same for one album or
-  sixteen.
+  from the synced tracks, Play and Shuffle (from step 4), tracks. Disc
+  headings only on multi-disc albums; a track's artist only when it
+  differs from the album's; More by the artist only when there is more.
+- Artist page: image, name, "16 albums · 1972–2013", Play and Shuffle
+  (from step 4), then every album as a row, oldest first, the same for
+  one album or sixteen.
 - Search tab: `.searchable` on the Search tab's own stack, local FTS5
   with word-prefix matching, results grouped Artists, Albums, Tracks
   with a few of each and See All. A track result opens its album (and
@@ -176,8 +176,15 @@ Step 3:
   Remove Download in step 5.
 - Artists with no albums are hidden: Jellyfin returns five empty
   duplicates (Septicflesh, Various Artists and others), leaving 295.
-- Covers are fetched into Application Support during sync, so browsing
-  offline shows art; Caches can be purged by iOS.
+- Covers are fetched into Application Support after each sync, four at
+  a time, so browsing offline shows art; Caches can be purged by iOS.
+  All 932 album and artist covers at 600 px take 83 MB and about two
+  minutes on first sync.
+- Jellyfin data the phone works around: an album artist listed twice on
+  one album (Bong-Ra's two hyphens resolve to one ID) is stored once,
+  and nine albums arrive with no album artist IDs at all (Down, Septic
+  Flesh, Trouble, Run the Jewels, The Desert Sessions), so they have no
+  artist page until their tags are fixed.
 
 Step 4:
 
@@ -225,9 +232,9 @@ rather than patched on the phone.
    Keychain, full and delta sync into the local database, album art
    cached by `ImageTags`. A stand-in screen shows the counts and the
    albums added most recently.
-3. **Browse and search offline.** The three tabs, album and artist
-   pages, search against the local database only, covers kept on the
-   phone; as in Screens above.
+3. **Browse and search offline.** Done 1 Nov: the three tabs, album
+   and artist pages, search against the local database only, covers
+   kept on the phone; as in Screens above.
 4. **Play.** `AVAudioEngine` with gapless playback, lock screen and
    remote controls, interruptions and route changes, the mini player
    and now playing sheet, resume where playback stopped.

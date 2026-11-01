@@ -6,6 +6,7 @@ public struct Session: Codable, Sendable, Equatable {
     public var token: String
     public var deviceId: String
     public var deviceName: String
+    public var username: String?
 }
 
 public enum JellyfinError: LocalizedError, Equatable {
@@ -48,7 +49,7 @@ public struct JellyfinClient: LibrarySource {
         let result = try JSONDecoder().decode(AuthenticationResult.self, from: data)
         return Session(
             server: server, userId: result.user.id, token: result.accessToken,
-            deviceId: deviceId, deviceName: deviceName)
+            deviceId: deviceId, deviceName: deviceName, username: username)
     }
 
     public func artists() async throws -> [Artist] {

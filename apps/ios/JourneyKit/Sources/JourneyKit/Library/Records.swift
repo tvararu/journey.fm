@@ -23,6 +23,8 @@ public struct Album: Codable, Sendable, Equatable, Identifiable, FetchableRecord
     public var trackCount: Int
     public var imageTag: String?
     public var dateCreated: String
+    public var artistSortName = ""
+    public var artistId: String?
 }
 
 public struct AlbumArtist: Codable, Sendable, Equatable, FetchableRecord, PersistableRecord {

@@ -59,10 +59,27 @@ public final class Library: Sendable {
     static func stats(_ db: Database) throws -> LibraryStats {
         LibraryStats(
             albums: try Album.fetchCount(db),
-            artists: try Artist.fetchCount(db),
+            artists: try Artist.filter(sql: "id IN (SELECT artistId FROM albumArtist)")
+                .fetchCount(db),
             tracks: try Track.fetchCount(db),
             lastSync: try SyncState.fetchOne(db)?.lastSync
         )
+    }
+
+    static func refreshDerived(_ db: Database) throws {
+        try db.execute(
+            sql: """
+                UPDATE album SET
+                    trackCount = (SELECT count(*) FROM track WHERE albumId = album.id),
+                    duration = (SELECT total(duration) FROM track WHERE albumId = album.id)
+                WHERE EXISTS (SELECT 1 FROM track WHERE albumId = album.id);
+                UPDATE album SET artistId =
+                    (SELECT artist.id FROM albumArtist
+                     JOIN artist ON artist.id = albumArtist.artistId
+                     WHERE albumArtist.albumId = album.id ORDER BY position LIMIT 1);
+                UPDATE album SET artistSortName = coalesce(
+                    (SELECT sortName FROM artist WHERE id = album.artistId), lower(artistName));
+                """)
     }
 
     static var migrator: DatabaseMigrator {
@@ -108,6 +125,30 @@ public final class Library: Sendable {
                 t.column("lastSync", .datetime)
                 t.column("lastFullSync", .datetime)
             }
+        }
+        migrator.registerMigration("browse") { db in
+            try db.alter(table: "album") { t in
+                t.add(column: "artistSortName", .text).notNull().defaults(to: "")
+                t.add(column: "artistId", .text).indexed()
+            }
+            try refreshDerived(db)
+            for (table, columns) in [
+                ("artist", ["name"]), ("album", ["name", "artistName"]),
+                ("track", ["name", "artistName"]),
+            ] {
+                try db.create(virtualTable: "\(table)Search", using: FTS5()) { t in
+                    t.synchronize(withTable: table)
+                    t.tokenizer = .unicode61()
+                    for column in columns { t.column(column) }
+                }
+            }
+        }
+        migrator.registerMigration("uniqueAlbumArtists") { db in
+            try db.execute(
+                sql: """
+                    DELETE FROM albumArtist WHERE rowid NOT IN
+                        (SELECT min(rowid) FROM albumArtist GROUP BY albumId, artistId)
+                    """)
         }
         return migrator
     }
