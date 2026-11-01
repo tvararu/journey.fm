@@ -30,6 +30,33 @@ The app icon is a placeholder: SF Symbols' `music.note`, which Apple's
 licence does not allow in app icons. Replace it before anything goes
 beyond internal TestFlight.
 
+## What the screens can show (1 Nov)
+
+The phone's database (`JourneyKit/Sources/JourneyKit/Library`) holds
+what sync takes from Jellyfin, and nothing else:
+
+| Item | Fields |
+|---|---|
+| Album | title, album artists, year, genres, cover art, date added |
+| Artist | name, image (album artists only) |
+| Track | title, disc and track number, duration, artists, album |
+
+Jellyfin's track count per album can be wrong, so counts and total
+durations come from the synced tracks.
+
+Not available yet, so any screen that needs it waits for a later step:
+
+- Play history, so no recently played or jump back in: step 4
+- Downloaded state and storage used: step 5
+- Lyrics: step 8
+- RYM, MusicBrainz, Discogs and RED data (ratings, descriptors, labels,
+  credits, release types): only in the catalogue (`apps/web`) until tags
+  are written back to the FLACs, step 8
+- Playlists and favourites: in Jellyfin, but not synced
+
+The library is about 680 albums by 300 album artists, mostly one album
+per artist, so artist pages are often a single album.
+
 ## Structure and dependencies (1 Nov)
 
 Everything but the screens lives in `apps/ios/JourneyKit`, a local Swift
