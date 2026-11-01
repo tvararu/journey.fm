@@ -86,10 +86,12 @@ triage, which treats a `deity` value as settled.
 2. At once, start one `triage` subagent per album, giving each its slug
    and path. Each waits for its own album, then approves it (the final
    accept) or returns `needs_work` with reasons.
-3. When every triage result is in, hand all the `needs_work` albums,
-   each with its reasons, to a single `fixer` subagent in one task. Don't
-   start a fixer per album. It approves or flags each; flagged albums go
-   to Blocked, deity's only queue.
+3. When every triage result is in, hand the `needs_work` albums, each
+   with its reasons, to one `fixer` subagent at a time, at most 20
+   albums per fixer, so it isn't overwhelmed. Don't start a fixer per
+   album. Check in with deity after each fixer batch before starting the
+   next. It approves or flags each; flagged albums go to Blocked,
+   deity's only queue.
 4. Review the batch yourself before reporting. Read the triage and fixer
    results and the `prepare` log, and look for problems that repeat:
    pipeline bugs, missing tools, races, brief wording that sent albums on

@@ -268,8 +268,8 @@ function autoUpscale(slug: string, c: Candidate, cands: Candidate[], wait = fals
   const args = ["bun", `${import.meta.dir}/upscale.ts`, slug, c.id, "ultrasharpv2", "--master"];
   if (wait) {
     console.log(`upscaling ${c.width}x${c.height} with 4x-UltraSharpV2 and waiting for it`);
-    const p = Bun.spawnSync(args, { stderr: "inherit", stdout: "inherit" });
-    if (p.exitCode !== 0) throw new Error("upscale failed");
+    const p = Bun.spawnSync(args, { stderr: "pipe", stdout: "inherit" });
+    if (p.exitCode !== 0) throw new Error(`upscale failed: ${p.stderr.toString().trim().split("\n").filter((l) => /error|Error/.test(l)).slice(-2).join("; ").slice(0, 300)}`);
     return;
   }
   const log = Bun.file(`${RAW}/${slug}/covers/upscale.log`);
