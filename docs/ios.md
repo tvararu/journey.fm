@@ -26,6 +26,21 @@ decorative images are hidden from VoiceOver.
 
 No CarPlay: the car is a Tesla.
 
+## Dependencies (1 Nov)
+
+Vanilla Swift and Apple frameworks. A package only when it does
+something specific that would be annoying to do ourselves. So far
+nothing qualifies:
+
+- Jellyfin: `URLSession` and `Codable`, no SDK
+- Database and search: SQLite through the system `SQLite3` module
+  (FTS5 for search, if the system build has it), or SwiftData
+- Audio: Core Audio decodes FLAC natively (`AVAudioFile` opened a FLAC
+  made with `afconvert` on 1 Nov), so `AVAudioEngine` with an
+  `AVAudioPlayerNode` scheduling tracks back to back replaces Dorsal's
+  SFBAudioEngine. It stays the fallback if play-while-downloading
+  (step 6) proves annoying with the system APIs
+
 ## Roadmap
 
 1. **Ship to the phone.** Paid membership, App Store Connect app, API
@@ -36,14 +51,14 @@ No CarPlay: the car is a Tesla.
    deletions), art cached and refreshed by `ImageTags`.
 3. **Browse and search offline.** The three tabs, album and artist
    pages, search against the local database only.
-4. **Play.** SFBAudioEngine with gapless playback, lock screen and
+4. **Play.** `AVAudioEngine` with gapless playback, lock screen and
    remote controls, interruptions and route changes, the mini player
    and now playing sheet, resume where playback stopped.
 5. **Save offline.** Save tracks or albums through a background
    `URLSession` into Application Support, checking the HTTP status;
    played tracks stay cached; re-download when an item's audio changes.
-6. **Play while downloading.** An SFBAudioEngine input source that reads
-   a file still being written.
+6. **Play while downloading.** Decode a file that is still being
+   written, with the system APIs, or SFBAudioEngine if they fight it.
 7. **Download everything.** Hand every task to the system up front so
    it carries on with the phone locked and the app killed.
 8. **Lyrics and metadata.** Synced lyrics from `/Audio/{id}/Lyrics`,
