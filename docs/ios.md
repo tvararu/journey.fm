@@ -295,6 +295,41 @@ Left for the catalogue: Celldweller's five albums want distinct titles,
 and the hyphen variants want one spelling, both written back to the tags
 rather than patched on the phone.
 
+## Snagging (1 Nov)
+
+A pass through every screen on the simulator after step 7, by
+screenshot and accessibility tree. Every control on Home, Library,
+album, now playing, queue, Search and Settings has an accessibility
+label.
+
+Fixed:
+
+- Play on album and artist pages had no icon: `.glassProminent` dropped
+  it until the label style was set to title and icon.
+- A downloading row spun forever: iOS draws a circular `ProgressView` as
+  a spinner whatever its value, so the ring is two circles, one trimmed.
+- Settings said "0 tracks · Zero kB" with nothing downloaded; now "None".
+  Track counts in the thousands now have separators ("7,706 tracks").
+- The scrubber only sought at the end of a drag, so VoiceOver's adjust
+  never moved playback; a change outside a drag now seeks.
+- Now playing left a band of empty space under its controls and had a
+  tiny More button; the shuffle, repeat, AirPlay and queue row now sits
+  at the bottom and More is full size.
+- See All lists drew a stray separator above the first row.
+- The badge on downloaded covers was a small dark arrow, invisible on
+  dark art; it is now the tint with a white arrow, scaled to the cover.
+- Two downloads calls overlapping (a sync and the network returning)
+  spun the main actor forever; found by a test hanging.
+
+Open:
+
+- The Search title is inline over recent searches and large over
+  results, apparently the navigation bar's own handling of an
+  always-shown search field; left as it is.
+- Not checked on hardware: the lock screen and Control Center, call and
+  Siri interruptions, unplugging headphones, AirPlay, and the background
+  launch that queues the next downloads while the app is closed.
+
 ## Roadmap
 
 1. **Ship to the phone.** Done 1 Nov: builds go to TestFlight with

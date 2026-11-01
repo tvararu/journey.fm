@@ -92,6 +92,7 @@ struct NowPlayingView: View {
                 .labelStyle(.iconOnly)
                 .buttonStyle(.glass)
                 .buttonBorderShape(.circle)
+                .controlSize(.large)
                 .accessibilityIdentifier("now-playing-more")
             }
             ArtView(item: entry.album.art)
@@ -143,6 +144,7 @@ struct NowPlayingView: View {
             .font(.largeTitle)
             .labelStyle(.iconOnly)
             .buttonStyle(.plain)
+            Spacer(minLength: 0)
             HStack {
                 Toggle(
                     isOn: Binding {
@@ -175,10 +177,10 @@ struct NowPlayingView: View {
             .labelStyle(.iconOnly)
             .buttonStyle(.plain)
             .font(.title3)
-            Spacer(minLength: 0)
         }
         .padding(.horizontal, 28)
         .padding(.top, 16)
+        .padding(.bottom, 8)
     }
 
     private var repeatLabel: String {

@@ -116,12 +116,15 @@ struct SearchAllView: View {
 
     var body: some View {
         List {
-            switch kind {
-            case .artists: ForEach(results.artists) { ArtistRow(artist: $0) }
-            case .albums:
-                ForEach(results.albums) { AlbumRow(album: $0, subtitle: searchSubtitle($0)) }
-            case .tracks: ForEach(results.tracks) { TrackHitRow(hit: $0) }
+            Section {
+                switch kind {
+                case .artists: ForEach(results.artists) { ArtistRow(artist: $0) }
+                case .albums:
+                    ForEach(results.albums) { AlbumRow(album: $0, subtitle: searchSubtitle($0)) }
+                case .tracks: ForEach(results.tracks) { TrackHitRow(hit: $0) }
+                }
             }
+            .listSectionSeparator(.hidden, edges: .top)
         }
         .listStyle(.plain)
         .navigationTitle(title)
