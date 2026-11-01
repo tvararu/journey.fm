@@ -93,7 +93,9 @@ pass from mise; release builds never read them. On the simulator, Orca
 drives input and reads the screen (`orca emulator tap`, `type`,
 `gesture`, `ax`); installing, launching, the keychain, logs and
 screenshots go through `xcrun simctl`, which Orca doesn't wrap for iOS.
-Run `orca emulator kill` when done.
+Never run `orca emulator kill` or `shutdown`: the helper is shared with
+deity's simulator pane, which goes dark when it stops. The simulator
+runs in dark mode (`xcrun simctl ui booted appearance dark`).
 
 The Jellyfin device ID lives in the Keychain apart from the session, so
 signing out and back in, or reinstalling, doesn't add a new device to
