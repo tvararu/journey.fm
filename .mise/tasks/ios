@@ -1,30 +1,20 @@
 #!/usr/bin/env bash
-#MISE description="Build the iOS app: ios sim | testflight | test | cli <args> (JourneyKit's journey command)"
+#MISE description="Build the iOS app: ios sim | device | log | test | format | cli <args> | testflight"
 set -euo pipefail
 cd "$MISE_PROJECT_ROOT/apps/ios"
-command -v xcodegen >/dev/null || { echo "xcodegen is missing: brew install xcodegen" >&2; exit 1; }
-xcodegen generate --quiet
 
-case "${1:-}" in
-sim)
-  udid=$(xcrun simctl list devices booted --json | jq -r '[.devices[][]][0].udid // empty')
-  [ -n "$udid" ] || { echo "No simulator is booted" >&2; exit 1; }
-  xcodebuild -project Journey.xcodeproj -scheme Journey -destination "id=$udid" \
-    -derivedDataPath build/sim -quiet build CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY=- \
-    DEVELOPMENT_TEAM= PROVISIONING_PROFILE_SPECIFIER=
-  xcrun simctl install "$udid" build/sim/Build/Products/Debug-iphonesimulator/Journey.app
-  xcrun simctl launch "$udid" fm.journey.app
-  ;;
-test)
-  swift test --package-path JourneyKit
-  ;;
-cli)
-  shift
-  mkdir -p build/cli
-  swift build --package-path JourneyKit --product journey -q
-  JOURNEY_HOME=build/cli JourneyKit/.build/debug/journey "$@"
-  ;;
-testflight)
+noise='IDERunDestination|IDESchemeActionsInvocationRecord|store configuration failed|xcdistributionlogs|^$'
+filter() {
+  sed -E -e "/$noise/d" ${ASC_KEY_ID:+-e "s/$ASC_KEY_ID/<key>/g"} \
+    ${ASC_ISSUER_ID:+-e "s/$ASC_ISSUER_ID/<issuer>/g"}
+}
+
+generate() {
+  command -v xcodegen >/dev/null || { echo "xcodegen is missing: brew install xcodegen" >&2; exit 1; }
+  xcodegen generate --quiet
+}
+
+signing() {
   for name in ASC_KEY_ID ASC_ISSUER_ID ASC_KEY_P8; do
     [ -n "${!name:-}" ] || { echo "$name is not set" >&2; exit 1; }
   done
@@ -34,22 +24,75 @@ testflight)
   printf %s "$ASC_KEY_P8" | base64 -d >"$key"
   auth=(-allowProvisioningUpdates -authenticationKeyPath "$key"
     -authenticationKeyID "$ASC_KEY_ID" -authenticationKeyIssuerID "$ASC_ISSUER_ID")
-  redact() { sed -e "s/$ASC_KEY_ID/<key>/g" -e "s/$ASC_ISSUER_ID/<issuer>/g"; }
+}
+
+case "${1:-}" in
+sim)
+  generate
+  udid=$(xcrun simctl list devices booted --json | jq -r '[.devices[][]][0].udid // empty')
+  [ -n "$udid" ] || { echo "No simulator is booted" >&2; exit 1; }
+  xcodebuild -project Journey.xcodeproj -scheme Journey -destination "id=$udid" \
+    -derivedDataPath build/sim -quiet build CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY=- \
+    DEVELOPMENT_TEAM= PROVISIONING_PROFILE_SPECIFIER= 2>&1 | filter
+  xcrun simctl install "$udid" build/sim/Build/Products/Debug-iphonesimulator/Journey.app
+  SIMCTL_CHILD_JELLYFIN_URL="$JELLYFIN_URL" SIMCTL_CHILD_JELLYFIN_USERNAME="$JELLYFIN_USERNAME" \
+    SIMCTL_CHILD_JELLYFIN_PASSWORD="$JELLYFIN_PASSWORD" \
+    xcrun simctl launch --terminate-running-process "$udid" fm.journey.app
+  ;;
+device)
+  generate
+  signing
+  devices=$(mktemp)
+  xcrun devicectl list devices --json-output "$devices" >/dev/null
+  udid=$(jq -r '[.result.devices[] | select(.hardwareProperties.reality == "physical"
+    and .connectionProperties.pairingState == "paired")][0].hardwareProperties.udid // empty' "$devices")
+  rm -f "$devices"
+  [ -n "$udid" ] || { echo "No paired iPhone" >&2; exit 1; }
+  xcodebuild -project Journey.xcodeproj -scheme Journey -destination "id=$udid" \
+    -derivedDataPath build/device "${auth[@]}" -quiet build 2>&1 | filter
+  xcrun devicectl device install app --device "$udid" \
+    build/device/Build/Products/Debug-iphoneos/Journey.app -q
+  DEVICECTL_CHILD_JELLYFIN_URL="$JELLYFIN_URL" DEVICECTL_CHILD_JELLYFIN_USERNAME="$JELLYFIN_USERNAME" \
+    DEVICECTL_CHILD_JELLYFIN_PASSWORD="$JELLYFIN_PASSWORD" \
+    xcrun devicectl device process launch --terminate-existing --device "$udid" fm.journey.app -q
+  echo "Launched on $udid"
+  ;;
+log)
+  xcrun simctl spawn booted log stream --style compact --level info \
+    --predicate 'subsystem == "fm.journey.app"'
+  ;;
+test)
+  swift test --package-path JourneyKit
+  ;;
+format)
+  swift format format -i -r Sources JourneyKit/Sources JourneyKit/Tests JourneyKit/Package.swift
+  swift format lint -r Sources JourneyKit/Sources JourneyKit/Tests
+  ;;
+cli)
+  shift
+  mkdir -p build/cli
+  swift build --package-path JourneyKit --product journey -q
+  JOURNEY_HOME=build/cli JourneyKit/.build/debug/journey "$@"
+  ;;
+testflight)
+  generate
+  signing
   build=$(date -u +%y%m%d%H%M)
   rm -rf build/Journey.xcarchive build/export
   xcodebuild -project Journey.xcodeproj -scheme Journey -configuration Release \
     -destination generic/platform=iOS -archivePath build/Journey.xcarchive \
-    CURRENT_PROJECT_VERSION="$build" "${auth[@]}" -quiet archive 2>&1 | redact
+    CURRENT_PROJECT_VERSION="$build" "${auth[@]}" -quiet archive 2>&1 | filter
   xcodebuild -exportArchive -archivePath build/Journey.xcarchive \
     -exportOptionsPlist ExportOptions.plist -exportPath build/export \
-    "${auth[@]}" -quiet 2>&1 | redact
+    "${auth[@]}" -quiet 2>&1 | filter
   API_PRIVATE_KEYS_DIR="$keys" xcrun altool --upload-app -t ios \
     -f build/export/Journey.ipa --apiKey "$ASC_KEY_ID" \
-    --apiIssuer "$ASC_ISSUER_ID" 2>&1 | redact
-  echo "Uploaded build $build to TestFlight"
+    --apiIssuer "$ASC_ISSUER_ID" 2>&1 | filter
+  echo "Uploaded build $build; waiting for App Store Connect to process it"
+  bun testflight.ts "$build"
   ;;
 *)
-  echo "usage: mise run ios sim | testflight | test | cli <args>" >&2
+  echo "usage: mise run ios sim | device | log | test | format | cli <args> | testflight" >&2
   exit 1
   ;;
 esac

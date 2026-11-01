@@ -12,15 +12,18 @@ struct SignInView: View {
             Form {
                 Section {
                     TextField("Server", text: $server)
+                        .accessibilityLabel("Server")
                         .keyboardType(.URL)
                         .textContentType(.URL)
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
                     TextField("Username", text: $username)
+                        .accessibilityLabel("Username")
                         .textContentType(.username)
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
                     SecureField("Password", text: $password)
+                        .accessibilityLabel("Password")
                         .textContentType(.password)
                 } footer: {
                     if let error = model.error {
@@ -40,6 +43,9 @@ struct SignInView: View {
                 }
             }
             .navigationTitle("journey.fm")
+            #if DEBUG
+                .task { await model.signInFromLaunchEnvironment() }
+            #endif
         }
     }
 }

@@ -72,8 +72,13 @@ struct ArtView: View {
         .task(id: album.imageTag) {
             guard let tag = album.imageTag, let art = model.art else { return }
             let width = Int(size * displayScale)
-            if let data = try? await art.image(itemId: album.id, tag: tag, maxWidth: width) {
-                image = UIImage(data: data)
+            do {
+                image = UIImage(
+                    data: try await art.image(itemId: album.id, tag: tag, maxWidth: width))
+            } catch {
+                Log.art.error(
+                    "Art for \(album.id, privacy: .public) failed: \(String(describing: error), privacy: .public)"
+                )
             }
         }
     }

@@ -39,7 +39,7 @@ public struct Sync: Sendable {
         let albums = try await source.albums(since: since)
         let tracks = try await source.tracks(since: since)
 
-        return try await library.db.write { db in
+        let report = try await library.db.write { db in
             var report = SyncReport(
                 full: full, artists: artists.count, albums: albums.count, tracks: tracks.count)
 
@@ -74,5 +74,9 @@ public struct Sync: Sendable {
             try SyncState(lastSync: now, lastFullSync: full ? now : state.lastFullSync).upsert(db)
             return report
         }
+        Log.sync.info(
+            "\(full ? "full" : "delta", privacy: .public) sync: \(report.artists) artists, \(report.albums) albums, \(report.tracks) tracks, \(report.deleted) deleted, \(report.deferred) deferred"
+        )
+        return report
     }
 }

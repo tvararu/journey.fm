@@ -38,8 +38,32 @@ cache and the Keychain session. The app target holds only
 `AppModel.swift` and `Views/`. The package also builds `journey`, a
 command for testing against the real server without the simulator:
 `mise run ios cli sync [--full] | stats | art <album id>`, with its
-database in `apps/ios/build/cli`. `mise run ios test` runs the package
-tests.
+database in `apps/ios/build/cli`.
+
+### Commands
+
+| `mise run ios …` | Does |
+|---|---|
+| `sim` | Build, install and launch on the booted simulator |
+| `device` | Build, install and launch on the paired iPhone (Developer Mode on) |
+| `log` | Stream the app's `fm.journey.app` logs from the simulator |
+| `test` | JourneyKit's tests |
+| `format` | `swift format` with `apps/ios/.swift-format`, then lint |
+| `cli …` | The `journey` command |
+| `testflight` | Archive, upload, and wait until App Store Connect has processed the build |
+
+Debug builds sign in on their own when launched with `JELLYFIN_URL`,
+`JELLYFIN_USERNAME` and `JELLYFIN_PASSWORD`, which `sim` and `device`
+pass from mise; release builds never read them. On the simulator, Orca
+drives input and reads the screen (`orca emulator tap`, `type`,
+`gesture`, `ax`); installing, launching, the keychain, logs and
+screenshots go through `xcrun simctl`, which Orca doesn't wrap for iOS.
+Run `orca emulator kill` when done.
+
+The Jellyfin device ID lives in the Keychain apart from the session, so
+signing out and back in, or reinstalling, doesn't add a new device to
+Jellyfin's dashboard. The build number is the UTC time of the upload;
+`MARKETING_VERSION` in `project.yml` changes only at milestones.
 
 Vanilla Swift and Apple frameworks, plus a package only when it does
 something specific that would be annoying to do ourselves:

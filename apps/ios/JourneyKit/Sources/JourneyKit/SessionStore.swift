@@ -2,36 +2,51 @@ import Foundation
 import Security
 
 public enum SessionStore {
-    static var query: [String: Any] {
-        [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: "fm.journey.session",
-            kSecAttrAccount as String: "jellyfin",
-        ]
-    }
-
     public static func load() -> Session? {
-        var item: CFTypeRef?
-        var lookup = query
-        lookup[kSecReturnData as String] = true
-        guard SecItemCopyMatching(lookup as CFDictionary, &item) == errSecSuccess,
-            let data = item as? Data
-        else { return nil }
-        return try? JSONDecoder().decode(Session.self, from: data)
+        read("jellyfin").flatMap { try? JSONDecoder().decode(Session.self, from: $0) }
     }
 
     public static func save(_ session: Session) throws {
-        clear()
-        var item = query
-        item[kSecValueData as String] = try JSONEncoder().encode(session)
+        try write("jellyfin", JSONEncoder().encode(session))
+    }
+
+    public static func clear() {
+        SecItemDelete(query("jellyfin") as CFDictionary)
+    }
+
+    public static func deviceId() -> String {
+        if let data = read("device"), let id = String(data: data, encoding: .utf8) { return id }
+        let id = UUID().uuidString
+        try? write("device", Data(id.utf8))
+        return id
+    }
+
+    static func query(_ account: String) -> [String: Any] {
+        [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: "fm.journey.session",
+            kSecAttrAccount as String: account,
+        ]
+    }
+
+    static func read(_ account: String) -> Data? {
+        var item: CFTypeRef?
+        var lookup = query(account)
+        lookup[kSecReturnData as String] = true
+        guard SecItemCopyMatching(lookup as CFDictionary, &item) == errSecSuccess else {
+            return nil
+        }
+        return item as? Data
+    }
+
+    static func write(_ account: String, _ data: Data) throws {
+        SecItemDelete(query(account) as CFDictionary)
+        var item = query(account)
+        item[kSecValueData as String] = data
         item[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
         let status = SecItemAdd(item as CFDictionary, nil)
         guard status == errSecSuccess else {
             throw NSError(domain: NSOSStatusErrorDomain, code: Int(status))
         }
-    }
-
-    public static func clear() {
-        SecItemDelete(query as CFDictionary)
     }
 }
