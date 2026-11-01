@@ -122,8 +122,8 @@ async function candidates(slug: string, choice: Choice): Promise<Candidate[]> {
     try {
       return await get(url, dest);
     } catch (e) {
-      if (!/HTTP 5\d\d/.test((e as Error).message)) throw e;
-      console.error(`skipped a Cover Art Archive image that keeps failing: ${(e as Error).message}`);
+      if (!/HTTP (5\d\d|404)/.test((e as Error).message)) throw e;
+      console.error(`skipped a Cover Art Archive image it lists but will not serve: ${(e as Error).message}`);
       return null;
     }
   };
