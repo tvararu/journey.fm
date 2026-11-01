@@ -123,6 +123,15 @@ something specific that would be annoying to do ourselves:
   current one's, which makes playback gapless; a test renders two tracks
   offline and checks the second starts on the sample after the first
   ends. A next track in another format is resampled to the current one.
+  A seek far into a track still streaming would make Core Audio scan
+  every FLAC frame from the start, at download speed, so the decoder
+  reads the SEEKTABLE (`flac` writes a point every 10 s; both files
+  checked on 1 Nov had one, and a file without falls back to the scan)
+  and opens the file as the header followed by the bytes from the
+  nearest point. That first read lands past the download, which
+  restarts it with a `Range` request there (Jellyfin answers 206); once
+  the end arrives, the gap is fetched before the file is cached. A seek
+  to 14 minutes into a 17-minute track plays within a second.
 - Downloads: a background `URLSession` (`fm.journey.app.downloads`, four
   connections) into `Application Support/audio`, excluded from backup.
   The `download` table holds what is wanted; a row is saved once the
@@ -251,10 +260,18 @@ Step 5:
 - Downloads pause while less than 2 GB is free, and resume when space
   returns.
 
-Steps 6 to 8:
+Step 6:
 
-- Seeking past what has downloaded waits for the stream to get there;
-  step 6 makes it jump with an HTTP range request.
+- Seeking past what has downloaded jumps there with an HTTP range
+  request; playing starts as soon as the rest of the current track is
+  scheduled, without waiting for the next track to open. The scrubber
+  also seeks on VoiceOver adjustments, not only at the end of a drag.
+- A track being saved by step 5 plays from the stream, not the
+  background download, whose bytes stay private until it finishes; when
+  the stream completes, its file is saved and the download cancelled.
+
+Steps 7 and 8:
+
 - Download All shows one progress row in Settings, with each pause
   named (Low Power Mode, waiting for Wi-Fi, storage full). When it
   finishes, Download New Albums turns on.
@@ -288,9 +305,9 @@ rather than patched on the phone.
    Support, checking the HTTP status; download states on album pages,
    rows and covers; offline dimming and skipping; storage and Remove All
    Downloads in Settings; re-download when a track's audio changes.
-6. **Seek while streaming.** Streaming playback arrived in step 4; what
-   is left is a range request for a seek past the downloaded part, and
-   playing a track that step 5 is still saving from its partial file.
+6. **Seek while streaming.** Done 1 Nov: range requests for a seek past
+   the downloaded part, starting the decoder at the nearest FLAC seek
+   point; a track that step 5 is still saving plays from the stream.
 7. **Download everything.** Hand every task to the system up front so
    it carries on with the phone locked and the app killed.
 8. **Lyrics and metadata.** Synced lyrics from `/Audio/{id}/Lyrics`,

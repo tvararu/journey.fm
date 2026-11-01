@@ -217,7 +217,7 @@ public final class Output: @unchecked Sendable {
         }
         let buffered = Double(scheduled - now) / format.sampleRate
         if wantsPlay && !node.isPlaying && engine.isRunning
-            && (buffered >= prebuffer || (!segments.isEmpty && segments.allSatisfy(\.done)))
+            && (buffered >= prebuffer || segments.first?.done == true)
             && scheduled > now
         {
             node.play()
@@ -233,9 +233,9 @@ public final class Output: @unchecked Sendable {
 
         do {
             if segment.decoder == nil {
-                let decoder = try TrackDecoder(source: segment.item.source)
+                let decoder = try TrackDecoder(
+                    source: segment.item.source, from: segment.startTime)
                 let startFrame = AVAudioFramePosition(segment.startTime * decoder.format.sampleRate)
-                if startFrame > 0 { try decoder.seek(to: startFrame) }
                 state.withLock {
                     guard generation == self.generation else { return decoder.cancel() }
                     if fresh && !decoder.format.isEqual(format) {

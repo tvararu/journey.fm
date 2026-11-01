@@ -99,7 +99,7 @@ func untilScheduled(_ output: Output) async throws {
         for offset in stride(from: 0, to: bytes.count, by: 4096) {
             let piece = bytes[offset..<min(offset + 4096, bytes.count)]
             try writer.write(contentsOf: piece)
-            source.wrote(piece.count)
+            source.wrote(piece.count, at: Int64(offset))
             try await Task.sleep(for: .milliseconds(1))
         }
         source.finish(nil)

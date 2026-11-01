@@ -57,6 +57,7 @@ struct NowPlayingView: View {
     @Environment(\.dismiss) private var dismiss
     let open: (Route) -> Void
     @State private var scrub: Double?
+    @State private var scrubbing = false
     @State private var showQueue = false
 
     var body: some View {
@@ -111,11 +112,12 @@ struct NowPlayingView: View {
                     value: Binding {
                         elapsed
                     } set: {
-                        scrub = $0
+                        if scrubbing { scrub = $0 } else { player.seek(to: $0) }
                     }, in: 0...duration
                 ) {
                     Text("Position")
                 } onEditingChanged: { editing in
+                    scrubbing = editing
                     if !editing, let scrub {
                         player.seek(to: scrub)
                         self.scrub = nil
