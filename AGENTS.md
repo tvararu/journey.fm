@@ -52,10 +52,11 @@ saved once it is open. Albums are not marked In collection.
 20 s apart, and rings a bell when it needs deity: a security check, a
 lost login, or an album it can't match. When claude runs it, claude
 keeps `mise run rym alert` running beside it; that returns at the next
-call for help, and claude tells deity in the chat. Claude's bell and
-desktop notification go to t1, not to deity. `s` marks an album not on
-RYM (`records/rym-skip.tsv`). Batches take only albums listed by
-`mise run rym ready`, and `prepare` refuses any others.
+call for help, and claude asks deity with the ask tool, which shows a
+blocking question in Orca. Claude's bell and desktop notification go to
+t1, not to deity. `s` marks an album not on RYM
+(`records/rym-skip.tsv`). Batches take only albums listed by `mise run
+rym ready`, and `prepare` refuses any others.
 
 RED is optional. While it is up, `mise run red` caches every album's
 RED match in the background (about 2.3 s per request). `prepare` reads
