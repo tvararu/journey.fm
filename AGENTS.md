@@ -29,6 +29,12 @@ and later written back as tags. `docs/library.md` holds the agreed rules.
 - The Mac builds the iOS app (Xcode, XcodeGen from Homebrew). TestFlight
   uploads sign through an App Store Connect API key: `ASC_KEY_ID`,
   `ASC_ISSUER_ID` and `ASC_KEY_P8` (the `.p8` file, base64-encoded).
+  To do once the paid membership (order W1658633449) is active: put the
+  paid team's ID (Membership details; probably not the free personal
+  team's ABCDE12345) in `project.yml` as `DEVELOPMENT_TEAM`, create the
+  App Store Connect app for `fm.journey.app`, create an Admin API key
+  and set the three secrets, add deity to an internal TestFlight group,
+  then run `mise run ios testflight`.
 
 ## Rules
 
