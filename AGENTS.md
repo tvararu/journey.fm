@@ -7,6 +7,9 @@ and later written back as tags. `docs/library.md` holds the agreed rules.
 ## Layout
 
 - `apps/web`: the catalogue viewer (Astro on Bun, port 8786)
+- `apps/ios`: the iOS player (SwiftUI, XcodeGen `project.yml`, bundle
+  `fm.journey.app`); `mise run ios sim` runs it on the booted simulator,
+  `mise run ios testflight` uploads a build to TestFlight
 - `packages/catalogue`: the pipeline and reviewer tools
 - `tools/tagging`: scripts that run on sol, plus the RYM grabbers
 - `records/`: reviews, verdicts, notes and RYM IDs (committed)
@@ -23,10 +26,13 @@ and later written back as tags. `docs/library.md` holds the agreed rules.
   `journey-web` on 127.0.0.1:8786 (rebuild and restart to update), and
   is published as the Tailscale Service `svc:journey`
   (`journey.example`).
+- The Mac builds the iOS app (Xcode, XcodeGen from Homebrew). TestFlight
+  uploads sign through an App Store Connect API key: `ASC_KEY_ID`,
+  `ASC_ISSUER_ID` and `ASC_KEY_P8` (the `.p8` file, base64-encoded).
 
 ## Rules
 
-- Bun + TypeScript + mise only. No Python.
+- Bun + TypeScript + mise only, and Swift for the iOS app. No Python.
 - Run everything through `mise run <task>`; tasks load the secrets.
 - Never print a secret. Secrets are set by deity in their own terminal
   with `mise set --age-encrypt --prompt NAME`; list names only.

@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+#MISE description="Build the iOS app: ios sim (run on the booted simulator) | ios testflight (upload a build)"
+set -euo pipefail
+cd "$MISE_PROJECT_ROOT/apps/ios"
+command -v xcodegen >/dev/null || { echo "xcodegen is missing: brew install xcodegen" >&2; exit 1; }
+xcodegen generate --quiet
+
+case "${1:-}" in
+sim)
+  udid=$(xcrun simctl list devices booted --json | jq -r '[.devices[][]][0].udid // empty')
+  [ -n "$udid" ] || { echo "No simulator is booted" >&2; exit 1; }
+  xcodebuild -project Journey.xcodeproj -scheme Journey -destination "id=$udid" \
+    -derivedDataPath build/sim -quiet build CODE_SIGNING_ALLOWED=NO
+  xcrun simctl install "$udid" build/sim/Build/Products/Debug-iphonesimulator/Journey.app
+  xcrun simctl launch "$udid" fm.journey.app
+  ;;
+testflight)
+  for name in ASC_KEY_ID ASC_ISSUER_ID ASC_KEY_P8; do
+    [ -n "${!name:-}" ] || { echo "$name is not set" >&2; exit 1; }
+  done
+  keys=$(mktemp -d)
+  trap 'rm -rf "$keys"' EXIT
+  key="$keys/AuthKey_$ASC_KEY_ID.p8"
+  printf %s "$ASC_KEY_P8" | base64 -d >"$key"
+  auth=(-allowProvisioningUpdates -authenticationKeyPath "$key"
+    -authenticationKeyID "$ASC_KEY_ID" -authenticationKeyIssuerID "$ASC_ISSUER_ID")
+  build=$(date -u +%y%m%d%H%M)
+  rm -rf build/Journey.xcarchive build/export
+  xcodebuild -project Journey.xcodeproj -scheme Journey -configuration Release \
+    -destination generic/platform=iOS -archivePath build/Journey.xcarchive \
+    CURRENT_PROJECT_VERSION="$build" "${auth[@]}" -quiet archive
+  xcodebuild -exportArchive -archivePath build/Journey.xcarchive \
+    -exportOptionsPlist ExportOptions.plist -exportPath build/export "${auth[@]}" -quiet
+  echo "Uploaded build $build to TestFlight"
+  ;;
+*)
+  echo "usage: mise run ios sim | testflight" >&2
+  exit 1
+  ;;
+esac
