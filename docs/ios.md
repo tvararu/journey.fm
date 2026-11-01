@@ -26,6 +26,10 @@ decorative images are hidden from VoiceOver.
 
 No CarPlay: the car is a Tesla.
 
+The app icon is a placeholder: SF Symbols' `music.note`, which Apple's
+licence does not allow in app icons. Replace it before anything goes
+beyond internal TestFlight.
+
 ## Dependencies (1 Nov)
 
 Vanilla Swift and Apple frameworks. A package only when it does
@@ -45,9 +49,11 @@ nothing qualifies:
 
 1. **Ship to the phone.** Done 1 Nov: builds go to TestFlight with
    `mise run ios testflight`.
-2. **Sign in and sync.** Jellyfin sign-in, a local database of the whole
-   library, a full sync then deltas (`MinDateLastSaved` on albums and
-   tracks, parents of changed tracks, a periodic full ID list for
+2. **Sign in and sync.** Jellyfin sign-in (sol's Jellyfin 12.4 at
+   `JELLYFIN_URL`, https://jellyfin.example; the account is in
+   `JELLYFIN_USERNAME` and `JELLYFIN_PASSWORD`), a local database of the
+   whole library, a full sync then deltas (`MinDateLastSaved` on albums
+   and tracks, parents of changed tracks, a periodic full ID list for
    deletions), art cached and refreshed by `ImageTags`.
 3. **Browse and search offline.** The three tabs, album and artist
    pages, search against the local database only.
