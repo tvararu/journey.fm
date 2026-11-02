@@ -242,21 +242,29 @@ Step 4:
 - Now playing follows Apple Music's: a full-screen cover, over the
   status bar, on a dark backdrop of the cover blurred, with a
   grabber-sized handle at the top that shows it swipes down and closes
-  it when tapped (VoiceOver: Close). The cover shrinks a little while
-  paused. Below it the title and artist with a "…" menu (Download, Go
-  to Album and Go to Artist, each naming its target); a thin scrubber
-  with no thumb, elapsed and remaining either side of a Lossless badge
-  for FLAC, ALAC, WAV and AIFF; previous (restarts after 3 s),
-  play/pause and next; the system volume slider (`MPVolumeView`, which
+  it when tapped (VoiceOver: Close). Measured against Music's: the
+  cover fills the width less 24 pt while playing and shrinks to 73% of
+  that while paused, growing with a bouncy spring (0.5 s, bounce 0.3)
+  and shrinking without one. Below it the title and artist with a "…"
+  menu (Download, Go to Album and Go to Artist, each naming its
+  target); a thin scrubber with no thumb, elapsed and remaining either
+  side of a Lossless badge for FLAC, ALAC, WAV and AIFF; previous
+  (restarts after 3 s), play/pause and next, which shrink inside a grey
+  circle while pressed; the system volume slider (`MPVolumeView`, which
   the simulator doesn't draw); then AirPlay (`AVRoutePickerView`) and
   the queue button, leaving the lyrics slot empty until step 8. Music's
   favourite, share, pin, station, credits, suggest less and playlist
   actions are left out.
-- The queue button swaps the cover for a small header (cover, title,
-  "…") and turns white while open. Below it, shuffle and repeat (off,
-  all, one) as capsules, then Up Next with reorder handles always
-  showing: tap a track to play it, long-press to remove it, Clear
-  empties Up Next. Scrubber and controls stay put.
+- The queue button crossfades the cover for one list and turns white
+  while open. The list holds History (the tracks before the current one
+  in this queue, with Clear), a header row (cover, title, "…"), then
+  shuffle and repeat (off, all, one) as capsules and Up Next, pinned as
+  a section header. It opens at the header, so History sits above it
+  until pulled down, unless the whole queue fits. Reorder handles always
+  show: tap a track to play it, long-press to remove it, Clear empties
+  Up Next. Scrubber and controls stay put. Music shrinks the cover into
+  the header instead of crossfading, but SwiftUI's matched geometry
+  doesn't animate into a `List` row.
 - "Played" on a track row means it became the current track earlier in
   this queue, shown as secondary text; starting an album at track 3 does
   not mark tracks 1 and 2. Home gains Recently Played, the first shelf,

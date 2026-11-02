@@ -60,7 +60,6 @@ struct NowPlayingView: View {
     @State private var scrub: Double?
     @State private var scrubbing = false
     @State private var showingQueue = false
-    @Namespace private var artwork
 
     var body: some View {
         Group {
@@ -78,22 +77,29 @@ struct NowPlayingView: View {
             Button("Close") { dismiss() }
                 .buttonStyle(Grabber())
                 .accessibilityIdentifier("now-playing-close")
-            if showingQueue {
-                header(entry)
-                    .padding(.horizontal, 28)
-                    .padding(.vertical, 12)
-                UpNextPanel()
-            } else {
-                Spacer(minLength: 12)
-                ArtView(item: entry.album.art)
-                    .matchedGeometryEffect(id: "art", in: artwork)
-                    .shadow(color: .black.opacity(0.35), radius: 20, y: 10)
-                    .scaleEffect(player.isPlaying ? 1 : 0.85)
-                    .animation(.spring(duration: 0.45, bounce: 0.25), value: player.isPlaying)
-                    .padding(.horizontal, 28)
-                Spacer(minLength: 12)
-                titleRow(entry).padding(.horizontal, 28)
+            ZStack {
+                if showingQueue {
+                    QueuePanel { header(entry) }
+                        .transition(.opacity)
+                } else {
+                    VStack(spacing: 0) {
+                        Spacer(minLength: 12)
+                        ArtView(item: entry.album.art)
+                            .shadow(color: .black.opacity(0.35), radius: 20, y: 10)
+                            .scaleEffect(player.isPlaying ? 1 : 0.73)
+                            .animation(
+                                player.isPlaying
+                                    ? .spring(duration: 0.5, bounce: 0.3) : .spring(duration: 0.5),
+                                value: player.isPlaying
+                            )
+                            .padding(.horizontal, 24)
+                        Spacer(minLength: 12)
+                        titleRow(entry).padding(.horizontal, 28)
+                    }
+                    .transition(.opacity)
+                }
             }
+            .frame(maxHeight: .infinity)
             controls(entry)
                 .padding(.horizontal, 28)
                 .padding(.top, 20)
@@ -122,7 +128,6 @@ struct NowPlayingView: View {
     private func header(_ entry: QueueEntry) -> some View {
         HStack(spacing: 12) {
             ArtView(item: entry.album.art, size: 64)
-                .matchedGeometryEffect(id: "art", in: artwork)
             VStack(alignment: .leading, spacing: 2) {
                 Text(entry.track.name).font(.headline).lineLimit(1)
                 Text(entry.track.artistName).foregroundStyle(.secondary).lineLimit(1)
@@ -218,7 +223,7 @@ struct NowPlayingView: View {
             }
             .font(.system(size: 36))
             .labelStyle(.iconOnly)
-            .buttonStyle(.plain)
+            .buttonStyle(TransportButton())
             HStack(spacing: 10) {
                 Image(systemName: "speaker.fill")
                 VolumeSlider().frame(height: 30)
@@ -311,64 +316,93 @@ struct RoutePicker: UIViewRepresentable {
     func updateUIView(_ view: AVRoutePickerView, context: Context) {}
 }
 
-struct UpNextPanel: View {
+struct QueuePanel<Header: View>: View {
     @Environment(Player.self) private var player
+    @ViewBuilder var header: Header
 
     var body: some View {
+        let history = Array(player.queue.history)
         let upNext = Array(player.queue.upNext)
-        VStack(spacing: 12) {
-            HStack(spacing: 10) {
-                modeButton(
-                    "Shuffle", systemImage: "shuffle", on: player.queue.shuffle
-                ) { player.setShuffle(!player.queue.shuffle) }
-                modeButton(
-                    repeatLabel,
-                    systemImage: player.queue.repeatMode == .one ? "repeat.1" : "repeat",
-                    on: player.queue.repeatMode != .off
-                ) { player.cycleRepeat() }
-            }
-            .padding(.horizontal, 28)
+        ScrollViewReader { proxy in
             List {
+                if !history.isEmpty {
+                    Section {
+                        ForEach(history) { entry in
+                            row(entry)
+                        }
+                    } header: {
+                        heading("History") { player.clearHistory() }
+                    }
+                }
+                Section {
+                    header
+                        .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
+                        .listRowSeparator(.hidden)
+                        .listRowBackground(Color.clear)
+                        .id("current")
+                }
                 Section {
                     ForEach(upNext) { entry in
-                        Button {
-                            player.jump(to: entry.id)
-                        } label: {
-                            QueueRow(entry: entry, playing: false)
-                        }
-                        .buttonStyle(.plain)
-                        .contextMenu {
-                            Button("Remove", systemImage: "minus.circle", role: .destructive) {
-                                remove(entry, from: upNext)
+                        row(entry)
+                            .contextMenu {
+                                Button("Remove", systemImage: "minus.circle", role: .destructive) {
+                                    remove(entry, from: upNext)
+                                }
                             }
-                        }
                     }
                     .onMove { player.moveUpNext(fromOffsets: $0, toOffset: $1) }
-                    .deleteDisabled(true)
-                    .listRowBackground(Color.clear)
-                } header: {
-                    HStack {
-                        Text("Up Next").font(.headline).foregroundStyle(.primary)
-                        Spacer()
-                        if !upNext.isEmpty {
-                            Button("Clear") { player.clearUpNext() }
-                                .font(.subheadline.weight(.semibold))
-                                .foregroundStyle(.secondary)
-                        }
+                    if upNext.isEmpty {
+                        Text("Nothing up next").foregroundStyle(.secondary)
+                            .listRowBackground(Color.clear)
                     }
-                    .textCase(nil)
+                } header: {
+                    VStack(spacing: 14) {
+                        HStack(spacing: 10) {
+                            modeButton(
+                                "Shuffle", systemImage: "shuffle", on: player.queue.shuffle
+                            ) { player.setShuffle(!player.queue.shuffle) }
+                            modeButton(
+                                repeatLabel,
+                                systemImage: player.queue.repeatMode == .one
+                                    ? "repeat.1" : "repeat",
+                                on: player.queue.repeatMode != .off
+                            ) { player.cycleRepeat() }
+                        }
+                        heading("Up Next", clear: upNext.isEmpty ? nil : { player.clearUpNext() })
+                    }
+                    .padding(.top, 4)
                 }
             }
             .listStyle(.plain)
             .scrollContentBackground(.hidden)
             .contentMargins(.horizontal, 12, for: .scrollContent)
             .environment(\.editMode, .constant(.active))
-            .overlay {
-                if upNext.isEmpty {
-                    Text("Nothing up next").foregroundStyle(.secondary)
-                }
+            .onAppear { proxy.scrollTo("current", anchor: .top) }
+        }
+    }
+
+    private func row(_ entry: QueueEntry) -> some View {
+        Button {
+            player.jump(to: entry.id)
+        } label: {
+            QueueRow(entry: entry, playing: false)
+        }
+        .buttonStyle(.plain)
+        .listRowBackground(Color.clear)
+    }
+
+    private func heading(_ title: String, clear: (() -> Void)?) -> some View {
+        HStack {
+            Text(title).font(.headline).foregroundStyle(.primary)
+            Spacer()
+            if let clear {
+                Button("Clear", action: clear)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                    .accessibilityLabel("Clear \(title)")
             }
         }
+        .textCase(nil)
     }
 
     private func modeButton(
@@ -399,6 +433,17 @@ struct UpNextPanel: View {
     private func remove(_ entry: QueueEntry, from upNext: [QueueEntry]) {
         guard let offset = upNext.firstIndex(where: { $0.id == entry.id }) else { return }
         player.removeUpNext(atOffsets: [offset])
+    }
+}
+
+struct TransportButton: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? 0.85 : 1)
+            .padding(14)
+            .background(.white.opacity(configuration.isPressed ? 0.18 : 0), in: .circle)
+            .contentShape(.circle)
+            .animation(.spring(duration: 0.25), value: configuration.isPressed)
     }
 }
 

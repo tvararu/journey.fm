@@ -42,6 +42,7 @@ public struct PlayQueue: Codable, Sendable, Equatable {
     public var upNext: ArraySlice<QueueEntry> {
         entries.isEmpty ? [] : entries[(index + 1)...]
     }
+    public var history: ArraySlice<QueueEntry> { entries.prefix(index) }
     public var played: Set<String> {
         Set(entries.prefix(index).filter { $0.started && !$0.missing }.map(\.track.id))
     }
@@ -196,6 +197,13 @@ public struct PlayQueue: Codable, Sendable, Equatable {
         let ids = Set(upNext.map(\.id))
         entries.removeSubrange((index + 1)...)
         original?.removeAll { ids.contains($0) }
+    }
+
+    public mutating func clearHistory() {
+        let ids = Set(history.map(\.id))
+        entries.removeFirst(index)
+        original?.removeAll { ids.contains($0) }
+        index = 0
     }
 
     public mutating func setShuffle(_ on: Bool, using generator: inout some RandomNumberGenerator) {

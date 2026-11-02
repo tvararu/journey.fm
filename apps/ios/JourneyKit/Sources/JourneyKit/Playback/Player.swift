@@ -139,6 +139,11 @@ public final class Player {
         edited()
     }
 
+    public func clearHistory() {
+        queue.clearHistory()
+        edited()
+    }
+
     public func setShuffle(_ on: Bool) {
         queue.setShuffle(on)
         edited()
