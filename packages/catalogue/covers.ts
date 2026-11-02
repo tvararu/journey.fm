@@ -176,7 +176,8 @@ async function candidates(slug: string, choice: Choice): Promise<Candidate[]> {
   if (!album) throw new Error(`no album at ${choice.path}`);
   const pictures = db
     .query<{ sha256: string }, [number]>(
-      "select distinct p.sha256 from pictures p join files f on f.id = p.file_id where f.album_id = ? and p.type = 3",
+      `select distinct p.sha256 from pictures p join files f on f.id = p.file_id where f.album_id = ?
+      and (p.type = 3 or not exists (select 1 from pictures q join files g on g.id = q.file_id where g.album_id = f.album_id and q.type = 3))`,
     )
     .all(album.id);
   for (const { sha256: h } of pictures) add("files (embedded)", blob(h));
