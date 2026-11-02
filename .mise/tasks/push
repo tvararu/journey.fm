@@ -3,7 +3,7 @@
 set -euo pipefail
 
 data="$MISE_PROJECT_ROOT/data"
-for dir in raw catalogue design; do
+for dir in raw catalogue catalogue-removed design; do
   [ -d "$data/$dir" ] || continue
   rsync -au "$data/$dir" sol:/mnt/pool/music-meta/
   echo "pushed $dir/ to sol"
