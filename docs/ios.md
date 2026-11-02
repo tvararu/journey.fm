@@ -79,7 +79,7 @@ end of the track and prints the hand-over to the next one.
 | `mise run ios …` | Does |
 |---|---|
 | `sim` | Build, install and launch on the booted simulator |
-| `device` | Build, install and launch on the paired iPhone (Developer Mode on) |
+| `device` | Build and install on the paired iPhone (Developer Mode on), without opening it |
 | `log` | Stream the app's `fm.journey.app` logs from the simulator |
 | `test` | JourneyKit's tests |
 | `format` | `swift format` with `apps/ios/.swift-format`, then lint |
@@ -91,8 +91,8 @@ the phone is registered with the team). TestFlight isn't part of the
 loop.
 
 Debug builds sign in on their own when launched with `JELLYFIN_URL`,
-`JELLYFIN_USERNAME` and `JELLYFIN_PASSWORD`, which `sim` and `device`
-pass from mise; release builds never read them. On the simulator, Orca
+`JELLYFIN_USERNAME` and `JELLYFIN_PASSWORD`, which `sim` passes from
+mise; release builds never read them. On the simulator, Orca
 drives input and reads the screen (`orca emulator tap`, `type`,
 `gesture`, `ax`); installing, launching, the keychain, logs and
 screenshots go through `xcrun simctl`, which Orca doesn't wrap for iOS.

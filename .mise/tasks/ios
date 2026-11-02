@@ -53,10 +53,7 @@ device)
     -quiet build 2>&1 | filter
   xcrun devicectl device install app --device "$udid" \
     build/device/Build/Products/Debug-iphoneos/Journey.app -q
-  DEVICECTL_CHILD_JELLYFIN_URL="$JELLYFIN_URL" DEVICECTL_CHILD_JELLYFIN_USERNAME="$JELLYFIN_USERNAME" \
-    DEVICECTL_CHILD_JELLYFIN_PASSWORD="$JELLYFIN_PASSWORD" \
-    xcrun devicectl device process launch --terminate-existing --device "$udid" fm.journey.app -q
-  echo "Launched on $udid"
+  echo "Installed on $udid"
   ;;
 log)
   xcrun simctl spawn booted log stream --style compact --level info \
