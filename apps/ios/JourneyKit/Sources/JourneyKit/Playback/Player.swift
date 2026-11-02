@@ -69,6 +69,11 @@ public final class Player {
         wasEmpty ? begin(at: 0, play: true) : edited()
     }
 
+    public func playNow(_ hit: TrackHit) {
+        queue.playNow(hit)
+        begin(at: 0, play: true)
+    }
+
     public func toggle() {
         isPlaying ? pause() : resume()
     }

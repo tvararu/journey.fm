@@ -189,3 +189,22 @@ struct Seeded: RandomNumberGenerator {
     #expect(saved.queue == queue)
     #expect(saved.position == 83.5)
 }
+
+@Test func playNowPlaysTheTrackAndKeepsUpNext() {
+    var queue = PlayQueue()
+    queue.play(hits("a", "b", "c"))
+    queue.playNow(hits("x")[0])
+    #expect(queue.current?.track.id == "x")
+    #expect(queue.upNextNames == ["b", "c"])
+
+    var generator = Seeded(state: 5)
+    queue.play(hits("a", "b", "c", "d"))
+    queue.setShuffle(true, using: &generator)
+    let upNext = queue.upNextNames
+    queue.playNow(hits("x")[0])
+    #expect(queue.current?.track.id == "x")
+    #expect(queue.upNextNames == upNext)
+    queue.setShuffle(false, using: &generator)
+    #expect(queue.names == ["a", "x", "b", "c", "d"])
+    #expect(queue.current?.track.id == "x")
+}

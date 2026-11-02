@@ -134,6 +134,18 @@ public struct PlayQueue: Codable, Sendable, Equatable {
         original?.append(contentsOf: added.map(\.id))
     }
 
+    public mutating func playNow(_ hit: TrackHit) {
+        guard !entries.isEmpty else { return play([hit]) }
+        let added = QueueEntry(hit)
+        entries.insert(added, at: index + 1)
+        if var original, let anchor = original.firstIndex(of: entries[index].id) {
+            original.insert(added.id, at: anchor + 1)
+            self.original = original
+        }
+        index += 1
+        settle()
+    }
+
     @discardableResult
     public mutating func advance() -> Bool {
         if repeatMode == .one { return !entries.isEmpty }
