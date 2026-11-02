@@ -1,4 +1,4 @@
-import { readdirSync } from "node:fs";
+import { appendFileSync, readdirSync } from "node:fs";
 
 import { CATALOGUE, DATA, INVENTORY, NOTES } from "./paths";
 
@@ -104,7 +104,5 @@ export async function notes(): Promise<Map<string, Note[]>> {
 }
 
 export async function addNote(note: Note): Promise<void> {
-  const file = Bun.file(NOTES);
-  const before = (await file.exists()) ? await file.text() : "";
-  await Bun.write(NOTES, `${before}${JSON.stringify(note)}\n`);
+  appendFileSync(NOTES, `${JSON.stringify(note)}\n`);
 }

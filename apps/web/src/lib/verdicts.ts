@@ -1,3 +1,5 @@
+import { appendFileSync } from "node:fs";
+
 import { VERDICTS } from "./paths";
 import type { AlbumRecord } from "./records";
 import { fingerprint, statusOf, type Review } from "./reviews";
@@ -39,7 +41,5 @@ export async function verdicts(): Promise<Map<string, Verdict[]>> {
 
 
 export async function addVerdict(v: Verdict): Promise<void> {
-  const file = Bun.file(VERDICTS);
-  const before = (await file.exists()) ? await file.text() : "";
-  await Bun.write(VERDICTS, `${before}${JSON.stringify(v)}\n`);
+  appendFileSync(VERDICTS, `${JSON.stringify(v)}\n`);
 }

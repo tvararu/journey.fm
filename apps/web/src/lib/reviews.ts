@@ -1,3 +1,5 @@
+import { appendFileSync } from "node:fs";
+
 import { REVIEWS } from "./paths";
 import type { AlbumRecord } from "./records";
 import type { State } from "./state";
@@ -59,7 +61,5 @@ export function statusOf(rec: AlbumRecord, list: Review[] | undefined, flags: Fl
 }
 
 export async function addReview(r: Review): Promise<void> {
-  const file = Bun.file(REVIEWS);
-  const before = (await file.exists()) ? await file.text() : "";
-  await Bun.write(REVIEWS, `${before}${JSON.stringify(r)}\n`);
+  appendFileSync(REVIEWS, `${JSON.stringify(r)}\n`);
 }
