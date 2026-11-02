@@ -60,7 +60,7 @@ async function get(url: string, dest: string): Promise<string> {
         break;
       }
       const why = r instanceof Response ? `HTTP ${r.status} ${r.statusText}` : r.message;
-      if (attempt >= 3 || (r instanceof Response && r.status < 500 && r.status !== 429)) throw new Error(`${why} for ${url}`);
+      if (attempt >= 6 || (r instanceof Response && r.status < 500 && r.status !== 429)) throw new Error(`${why} for ${url}`);
     }
   }
   return dest;
