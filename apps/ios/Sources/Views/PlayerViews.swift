@@ -68,7 +68,6 @@ struct NowPlayingView: View {
                 Color.clear.onAppear { dismiss() }
             }
         }
-        .presentationDragIndicator(.visible)
         .sheet(isPresented: $showQueue) {
             QueueView().presentationDetents([.medium, .large])
         }
@@ -94,6 +93,11 @@ struct NowPlayingView: View {
                 .buttonBorderShape(.circle)
                 .controlSize(.large)
                 .accessibilityIdentifier("now-playing-more")
+            }
+            .overlay(alignment: .top) {
+                Button("Close") { dismiss() }
+                    .buttonStyle(Grabber())
+                    .accessibilityIdentifier("now-playing-close")
             }
             ArtView(item: entry.album.art)
                 .shadow(color: .black.opacity(0.2), radius: 16, y: 6)
@@ -189,6 +193,19 @@ struct NowPlayingView: View {
         case .all: "Repeat All"
         case .one: "Repeat One"
         }
+    }
+}
+
+struct Grabber: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        Capsule()
+            .fill(.tertiary)
+            .frame(width: 36, height: 5)
+            .padding(.vertical, 6)
+            .padding(.horizontal, 24)
+            .contentShape(.rect)
+            .opacity(configuration.isPressed ? 0.5 : 1)
+            .accessibilityLabel(Text("Close"))
     }
 }
 

@@ -28,7 +28,7 @@ struct RootView: View {
             MiniPlayer { showPlayer = true }
                 .matchedTransitionSource(id: "player", in: playerZoom)
         }
-        .sheet(isPresented: $showPlayer) {
+        .fullScreenCover(isPresented: $showPlayer) {
             NowPlayingView { route in
                 showPlayer = false
                 paths[tab, default: []].append(route)

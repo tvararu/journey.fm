@@ -17,9 +17,10 @@ better than Apple Music's, and build it entirely from stock iOS parts:
 - `NavigationStack` with the system navigation bar, large titles and
   back swipe
 - `List` and `LazyVGrid` for shelves and track lists; `.searchable` for
-  search; `.sheet` for now playing, zooming out of the mini player
-  (`.navigationTransition(.zoom)`); `.contextMenu` and `.swipeActions`
-  for album and track actions
+  search; `.fullScreenCover` for now playing, zooming out of the mini
+  player (`.navigationTransition(.zoom)`, which also gives the swipe
+  down to close); `.contextMenu` and `.swipeActions` for album and
+  track actions
 - System fonts, colours, symbols, light and dark mode; no custom
   gestures, drawers, tab bars or animations
 
@@ -238,11 +239,13 @@ Step 4:
   Inline (`tabViewBottomAccessoryPlacement`): art, title, play/pause.
   Tapping it opens now playing, which grows out of the bar and shrinks
   back into it, as in Apple Music.
-- Now playing: a full-height sheet with art, title, "artist · album",
-  scrubber with elapsed and remaining, previous (restarts after 3 s),
-  play/pause, next, shuffle, repeat (off, all, one), AirPlay
-  (`AVRoutePickerView`, the one UIKit wrapper) and the queue. A More
-  menu goes to the album or artist. No volume slider.
+- Now playing: a full-screen cover, over the status bar as in Apple
+  Music, with a grabber-sized handle at the top that shows it swipes
+  down and closes it when tapped (VoiceOver: Close); art, title,
+  "artist · album", scrubber with elapsed and remaining, previous
+  (restarts after 3 s), play/pause, next, shuffle, repeat (off, all,
+  one), AirPlay (`AVRoutePickerView`, the one UIKit wrapper) and the
+  queue. A More menu goes to the album or artist. No volume slider.
 - Queue: a second sheet with medium and large detents; now playing
   fixed at the top, Up Next below with Play Next items marked; swipe to
   remove, Edit to reorder, Clear empties Up Next.
