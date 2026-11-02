@@ -1,5 +1,6 @@
 import AVKit
 import JourneyKit
+import MediaPlayer
 import SwiftUI
 
 struct MiniPlayer: View {
@@ -58,7 +59,8 @@ struct NowPlayingView: View {
     let open: (Route) -> Void
     @State private var scrub: Double?
     @State private var scrubbing = false
-    @State private var showQueue = false
+    @State private var showingQueue = false
+    @Namespace private var artwork
 
     var body: some View {
         Group {
@@ -68,43 +70,44 @@ struct NowPlayingView: View {
                 Color.clear.onAppear { dismiss() }
             }
         }
-        .sheet(isPresented: $showQueue) {
-            QueueView().presentationDetents([.medium, .large])
-        }
+        .environment(\.colorScheme, .dark)
     }
 
     private func content(_ entry: QueueEntry) -> some View {
-        let duration = max(player.duration, 1)
-        let elapsed = min(scrub ?? player.position, duration)
-        return VStack(spacing: 24) {
-            HStack {
-                Spacer()
-                Menu("More", systemImage: "ellipsis") {
-                    Button("Go to Album", systemImage: "square.stack") {
-                        open(.album(entry.album.id))
-                    }
-                    if let artistId = entry.album.artistId {
-                        Button("Go to Artist", systemImage: "music.mic") { open(.artist(artistId)) }
-                    }
-                    TrackDownloadActions(track: entry.track)
-                }
-                .labelStyle(.iconOnly)
-                .buttonStyle(.glass)
-                .buttonBorderShape(.circle)
-                .controlSize(.large)
-                .accessibilityIdentifier("now-playing-more")
+        VStack(spacing: 0) {
+            Button("Close") { dismiss() }
+                .buttonStyle(Grabber())
+                .accessibilityIdentifier("now-playing-close")
+            if showingQueue {
+                header(entry)
+                    .padding(.horizontal, 28)
+                    .padding(.vertical, 12)
+                UpNextPanel()
+            } else {
+                Spacer(minLength: 12)
+                ArtView(item: entry.album.art)
+                    .matchedGeometryEffect(id: "art", in: artwork)
+                    .shadow(color: .black.opacity(0.35), radius: 20, y: 10)
+                    .scaleEffect(player.isPlaying ? 1 : 0.85)
+                    .animation(.spring(duration: 0.45, bounce: 0.25), value: player.isPlaying)
+                    .padding(.horizontal, 28)
+                Spacer(minLength: 12)
+                titleRow(entry).padding(.horizontal, 28)
             }
-            .overlay(alignment: .top) {
-                Button("Close") { dismiss() }
-                    .buttonStyle(Grabber())
-                    .accessibilityIdentifier("now-playing-close")
-            }
-            ArtView(item: entry.album.art)
-                .shadow(color: .black.opacity(0.2), radius: 16, y: 6)
-            VStack(alignment: .leading, spacing: 4) {
-                Text(entry.track.name).font(.title2.bold()).lineLimit(2)
-                Text("\(entry.track.artistName) · \(entry.album.name)")
-                    .foregroundStyle(.secondary).lineLimit(1)
+            controls(entry)
+                .padding(.horizontal, 28)
+                .padding(.top, 20)
+        }
+        .padding(.bottom, 8)
+        .background { Backdrop(art: entry.album.art) }
+    }
+
+    private func titleRow(_ entry: QueueEntry) -> some View {
+        HStack(alignment: .center, spacing: 12) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(entry.track.name).font(.title3.weight(.semibold)).lineLimit(1)
+                Text(entry.track.artistName).font(.title3).foregroundStyle(.secondary)
+                    .lineLimit(1)
                 if let failure = player.failure {
                     Text(failure).font(.subheadline).foregroundStyle(.red)
                 }
@@ -112,7 +115,61 @@ struct NowPlayingView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .accessibilityElement(children: .combine)
             .accessibilityIdentifier("now-playing-title")
-            VStack(spacing: 4) {
+            more(entry)
+        }
+    }
+
+    private func header(_ entry: QueueEntry) -> some View {
+        HStack(spacing: 12) {
+            ArtView(item: entry.album.art, size: 64)
+                .matchedGeometryEffect(id: "art", in: artwork)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(entry.track.name).font(.headline).lineLimit(1)
+                Text(entry.track.artistName).foregroundStyle(.secondary).lineLimit(1)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .accessibilityElement(children: .combine)
+            .accessibilityIdentifier("now-playing-title")
+            more(entry)
+        }
+    }
+
+    private func more(_ entry: QueueEntry) -> some View {
+        Menu {
+            TrackDownloadActions(track: entry.track)
+            Section {
+                Button {
+                    open(.album(entry.album.id))
+                } label: {
+                    Label("Go to Album", systemImage: "square.stack")
+                    Text(entry.album.name)
+                }
+                if let artistId = entry.album.artistId {
+                    Button {
+                        open(.artist(artistId))
+                    } label: {
+                        Label("Go to Artist", systemImage: "music.mic")
+                        Text(entry.album.artistName)
+                    }
+                }
+            }
+        } label: {
+            Image(systemName: "ellipsis")
+                .font(.title3.weight(.semibold))
+                .frame(width: 36, height: 36)
+                .contentShape(.rect)
+                .accessibilityLabel("More")
+        }
+        .buttonStyle(.plain)
+        .menuOrder(.fixed)
+        .accessibilityIdentifier("now-playing-more")
+    }
+
+    private func controls(_ entry: QueueEntry) -> some View {
+        let duration = max(player.duration, 1)
+        let elapsed = min(scrub ?? player.position, duration)
+        return VStack(spacing: 22) {
+            VStack(spacing: 6) {
                 Slider(
                     value: Binding {
                         elapsed
@@ -128,71 +185,106 @@ struct NowPlayingView: View {
                         self.scrub = nil
                     }
                 }
+                .sliderThumbVisibility(.hidden)
+                .tint(.white.opacity(0.8))
                 .accessibilityValue(timeText(elapsed))
                 HStack {
                     Text(timeText(elapsed)).accessibilityIdentifier("elapsed")
-                    Spacer()
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    if entry.track.isLossless {
+                        Label("Lossless", systemImage: "waveform")
+                            .font(.caption2.weight(.semibold))
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(.white.opacity(0.12), in: .rect(cornerRadius: 4))
+                    }
                     Text("-" + timeText(duration - elapsed))
+                        .frame(maxWidth: .infinity, alignment: .trailing)
                 }
                 .font(.caption).monospacedDigit().foregroundStyle(.secondary)
             }
             HStack {
-                Spacer()
                 Button("Previous", systemImage: "backward.fill") { player.previous() }
-                Spacer()
-                PlayPauseButton().font(.system(size: 44))
-                Spacer()
-                Button("Next", systemImage: "forward.fill") { player.next() }
-                Spacer()
-            }
-            .font(.largeTitle)
-            .labelStyle(.iconOnly)
-            .buttonStyle(.plain)
-            Spacer(minLength: 0)
-            HStack {
-                Toggle(
-                    isOn: Binding {
-                        player.queue.shuffle
-                    } set: {
-                        player.setShuffle($0)
-                    }
-                ) {
-                    Label("Shuffle", systemImage: "shuffle")
-                }
-                .toggleStyle(.button)
-                .foregroundStyle(
-                    player.queue.shuffle ? AnyShapeStyle(.tint) : AnyShapeStyle(.secondary))
-                Spacer()
+                    .frame(maxWidth: .infinity)
                 Button(
-                    repeatLabel,
-                    systemImage: player.queue.repeatMode == .one ? "repeat.1" : "repeat"
-                ) {
-                    player.cycleRepeat()
-                }
-                .foregroundStyle(
-                    player.queue.repeatMode == .off
-                        ? AnyShapeStyle(.secondary) : AnyShapeStyle(.tint))
-                Spacer()
-                RoutePicker().frame(width: 44, height: 44).accessibilityLabel("AirPlay")
-                Spacer()
-                Button("Queue", systemImage: "list.bullet") { showQueue = true }
-                    .foregroundStyle(.secondary)
+                    player.isPlaying ? "Pause" : "Play",
+                    systemImage: player.isPlaying ? "pause.fill" : "play.fill"
+                ) { player.toggle() }
+                .contentTransition(.symbolEffect(.replace))
+                .font(.system(size: 52))
+                .frame(maxWidth: .infinity)
+                Button("Next", systemImage: "forward.fill") { player.next() }
+                    .frame(maxWidth: .infinity)
             }
+            .font(.system(size: 36))
             .labelStyle(.iconOnly)
             .buttonStyle(.plain)
-            .font(.title3)
+            HStack(spacing: 10) {
+                Image(systemName: "speaker.fill")
+                VolumeSlider().frame(height: 30)
+                Image(systemName: "speaker.wave.3.fill")
+            }
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            .accessibilityElement(children: .contain)
+            HStack {
+                Color.clear.frame(width: 44, height: 44).frame(maxWidth: .infinity)
+                RoutePicker().frame(width: 44, height: 44).accessibilityLabel("AirPlay")
+                    .frame(maxWidth: .infinity)
+                Button("Queue", systemImage: "list.bullet") {
+                    withAnimation(.spring(duration: 0.4)) { showingQueue.toggle() }
+                }
+                .labelStyle(.iconOnly)
+                .font(.title3)
+                .foregroundStyle(showingQueue ? AnyShapeStyle(.black) : AnyShapeStyle(.secondary))
+                .frame(width: 40, height: 40)
+                .background(showingQueue ? Color.white.opacity(0.85) : .clear, in: .circle)
+                .accessibilityAddTraits(showingQueue ? .isSelected : [])
+                .accessibilityIdentifier("now-playing-queue")
+                .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.plain)
         }
-        .padding(.horizontal, 28)
-        .padding(.top, 16)
-        .padding(.bottom, 8)
+    }
+}
+
+struct Backdrop: View {
+    let art: ArtItem?
+
+    var body: some View {
+        Color.black
+            .overlay {
+                ArtView(item: art)
+                    .scaleEffect(3)
+                    .blur(radius: 60)
+                    .saturation(1.4)
+                    .opacity(0.7)
+            }
+            .overlay(Color.black.opacity(0.25))
+            .clipped()
+            .ignoresSafeArea()
+            .accessibilityHidden(true)
+    }
+}
+
+struct VolumeSlider: UIViewRepresentable {
+    func makeUIView(context: Context) -> MPVolumeView {
+        let view = MPVolumeView()
+        let thumb = UIGraphicsImageRenderer(size: CGSize(width: 12, height: 12)).image { _ in
+            UIColor.white.setFill()
+            UIBezierPath(ovalIn: CGRect(x: 0, y: 0, width: 12, height: 12)).fill()
+        }
+        view.setVolumeThumbImage(thumb, for: .normal)
+        view.tintColor = .white.withAlphaComponent(0.8)
+        return view
     }
 
-    private var repeatLabel: String {
-        switch player.queue.repeatMode {
-        case .off: "Repeat Off"
-        case .all: "Repeat All"
-        case .one: "Repeat One"
-        }
+    func updateUIView(_ view: MPVolumeView, context: Context) {}
+}
+
+extension Track {
+    var isLossless: Bool {
+        ["flac", "alac", "wav", "aiff"].contains(container?.lowercased() ?? "")
     }
 }
 
@@ -219,51 +311,88 @@ struct RoutePicker: UIViewRepresentable {
     func updateUIView(_ view: AVRoutePickerView, context: Context) {}
 }
 
-struct QueueView: View {
+struct UpNextPanel: View {
     @Environment(Player.self) private var player
-    @State private var editMode = EditMode.inactive
 
     var body: some View {
         let upNext = Array(player.queue.upNext)
-        NavigationStack {
+        VStack(spacing: 12) {
+            HStack(spacing: 10) {
+                modeButton(
+                    "Shuffle", systemImage: "shuffle", on: player.queue.shuffle
+                ) { player.setShuffle(!player.queue.shuffle) }
+                modeButton(
+                    repeatLabel,
+                    systemImage: player.queue.repeatMode == .one ? "repeat.1" : "repeat",
+                    on: player.queue.repeatMode != .off
+                ) { player.cycleRepeat() }
+            }
+            .padding(.horizontal, 28)
             List {
-                if let current = player.current {
-                    Section("Now Playing") {
-                        QueueRow(entry: current, playing: true)
-                            .moveDisabled(true)
-                            .deleteDisabled(true)
-                    }
-                }
-                if !upNext.isEmpty {
-                    Section("Up Next · \(tracksText(upNext.count))") {
-                        ForEach(upNext) { entry in
-                            Button {
-                                player.jump(to: entry.id)
-                            } label: {
-                                QueueRow(entry: entry, playing: false)
-                            }
-                            .buttonStyle(.plain)
-                            .swipeActions(edge: .trailing) {
-                                Button("Remove", systemImage: "trash", role: .destructive) {
-                                    remove(entry, from: upNext)
-                                }
+                Section {
+                    ForEach(upNext) { entry in
+                        Button {
+                            player.jump(to: entry.id)
+                        } label: {
+                            QueueRow(entry: entry, playing: false)
+                        }
+                        .buttonStyle(.plain)
+                        .contextMenu {
+                            Button("Remove", systemImage: "minus.circle", role: .destructive) {
+                                remove(entry, from: upNext)
                             }
                         }
-                        .onDelete { player.removeUpNext(atOffsets: $0) }
-                        .onMove { player.moveUpNext(fromOffsets: $0, toOffset: $1) }
                     }
+                    .onMove { player.moveUpNext(fromOffsets: $0, toOffset: $1) }
+                    .deleteDisabled(true)
+                    .listRowBackground(Color.clear)
+                } header: {
+                    HStack {
+                        Text("Up Next").font(.headline).foregroundStyle(.primary)
+                        Spacer()
+                        if !upNext.isEmpty {
+                            Button("Clear") { player.clearUpNext() }
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .textCase(nil)
                 }
             }
-            .navigationTitle("Up Next")
-            .toolbarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Button("Clear", role: .destructive) { player.clearUpNext() }
-                        .disabled(upNext.isEmpty)
+            .listStyle(.plain)
+            .scrollContentBackground(.hidden)
+            .contentMargins(.horizontal, 12, for: .scrollContent)
+            .environment(\.editMode, .constant(.active))
+            .overlay {
+                if upNext.isEmpty {
+                    Text("Nothing up next").foregroundStyle(.secondary)
                 }
-                ToolbarItem(placement: .topBarTrailing) { EditButton() }
             }
-            .environment(\.editMode, $editMode)
+        }
+    }
+
+    private func modeButton(
+        _ title: String, systemImage: String, on: Bool, action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            Label(title, systemImage: systemImage)
+                .labelStyle(.iconOnly)
+                .font(.body.weight(.semibold))
+                .frame(maxWidth: .infinity, minHeight: 34)
+                .foregroundStyle(on ? AnyShapeStyle(.black) : AnyShapeStyle(.primary))
+                .background(
+                    on ? Color.white.opacity(0.85) : Color.white.opacity(0.15), in: .capsule)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(title)
+        .accessibilityAddTraits(on ? .isSelected : [])
+    }
+
+    private var repeatLabel: String {
+        switch player.queue.repeatMode {
+        case .off: "Repeat Off"
+        case .all: "Repeat All"
+        case .one: "Repeat One"
         }
     }
 

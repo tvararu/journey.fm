@@ -239,16 +239,24 @@ Step 4:
   Inline (`tabViewBottomAccessoryPlacement`): art, title, play/pause.
   Tapping it opens now playing, which grows out of the bar and shrinks
   back into it, as in Apple Music.
-- Now playing: a full-screen cover, over the status bar as in Apple
-  Music, with a grabber-sized handle at the top that shows it swipes
-  down and closes it when tapped (VoiceOver: Close); art, title,
-  "artist · album", scrubber with elapsed and remaining, previous
-  (restarts after 3 s), play/pause, next, shuffle, repeat (off, all,
-  one), AirPlay (`AVRoutePickerView`, the one UIKit wrapper) and the
-  queue. A More menu goes to the album or artist. No volume slider.
-- Queue: a second sheet with medium and large detents; now playing
-  fixed at the top, Up Next below with Play Next items marked; swipe to
-  remove, Edit to reorder, Clear empties Up Next.
+- Now playing follows Apple Music's: a full-screen cover, over the
+  status bar, on a dark backdrop of the cover blurred, with a
+  grabber-sized handle at the top that shows it swipes down and closes
+  it when tapped (VoiceOver: Close). The cover shrinks a little while
+  paused. Below it the title and artist with a "…" menu (Download, Go
+  to Album and Go to Artist, each naming its target); a thin scrubber
+  with no thumb, elapsed and remaining either side of a Lossless badge
+  for FLAC, ALAC, WAV and AIFF; previous (restarts after 3 s),
+  play/pause and next; the system volume slider (`MPVolumeView`, which
+  the simulator doesn't draw); then AirPlay (`AVRoutePickerView`) and
+  the queue button, leaving the lyrics slot empty until step 8. Music's
+  favourite, share, pin, station, credits, suggest less and playlist
+  actions are left out.
+- The queue button swaps the cover for a small header (cover, title,
+  "…") and turns white while open. Below it, shuffle and repeat (off,
+  all, one) as capsules, then Up Next with reorder handles always
+  showing: tap a track to play it, long-press to remove it, Clear
+  empties Up Next. Scrubber and controls stay put.
 - "Played" on a track row means it became the current track earlier in
   this queue, shown as secondary text; starting an album at track 3 does
   not mark tracks 1 and 2. Home gains Recently Played, the first shelf,
