@@ -68,10 +68,10 @@ struct DownloadTests {
         await downloads.save(trackIds: ["x1"])
         #expect(await eventually { downloads.summary.saved == ["x1"] })
 
+        stub.lock.withLock { stub.body = pattern(1500) }
         var changed = track("x1", album: "x")
         changed.duration = 61
         try await library.db.write { [changed] in try changed.upsert($0) }
-        stub.lock.withLock { stub.body = pattern(1500) }
         await downloads.resume()
         #expect(
             await eventually {

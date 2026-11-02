@@ -26,20 +26,36 @@ public final class SavedFiles: @unchecked Sendable {
     }
 
     func store(_ file: URL, as name: String, trackId: String) -> Bool {
-        let manager = FileManager.default
-        let destination = directory.appending(path: name)
-        do {
-            try prepare()
-            try? manager.removeItem(at: destination)
-            try manager.moveItem(at: file, to: destination)
-            let size = try destination.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0
-            if try library.markSaved(trackId: trackId, bytes: Int64(size)) { return true }
-            try? manager.removeItem(at: destination)
-        } catch {
-            Log.audio.error(
-                "Saving \(trackId, privacy: .public) failed: \(error, privacy: .public)")
+        lock.withLock {
+            let manager = FileManager.default
+            let destination = directory.appending(path: name)
+            do {
+                try prepare()
+                try? manager.removeItem(at: destination)
+                try manager.moveItem(at: file, to: destination)
+                let size = try destination.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0
+                if try library.markSaved(trackId: trackId, bytes: Int64(size)) { return true }
+                try? manager.removeItem(at: destination)
+            } catch {
+                Log.audio.error(
+                    "Saving \(trackId, privacy: .public) failed: \(error, privacy: .public)")
+            }
+            return false
         }
-        return false
+    }
+
+    func sweep() throws -> Set<String> {
+        try lock.withLock {
+            let manager = FileManager.default
+            let saved = try library.savedFiles()
+            let present = Set(
+                (try? manager.contentsOfDirectory(atPath: directory.path(percentEncoded: false)))
+                    ?? [])
+            for name in present.subtracting(saved) {
+                try? manager.removeItem(at: directory.appending(path: name))
+            }
+            return saved.subtracting(present)
+        }
     }
 
     func prepare() throws {
@@ -55,7 +71,7 @@ public final class SavedFiles: @unchecked Sendable {
 
 enum DownloadEvent: Sendable {
     case progress(String, Double)
-    case done(String, saved: Bool)
+    case done(String, task: Int, failed: Bool)
     case finishedEvents
 }
 
@@ -105,11 +121,12 @@ final class DownloadDelegate: NSObject, URLSessionDownloadDelegate, @unchecked S
     ) {
         guard let (id, _) = Downloads.parse(task) else { return }
         let saved = lock.withLock { stored.remove(task.taskIdentifier) != nil }
-        if let error, (error as? URLError)?.code != .cancelled {
+        let cancelled = (error as? URLError)?.code == .cancelled
+        if let error, !cancelled {
             Log.audio.error(
                 "Download of \(id, privacy: .public) failed: \(error, privacy: .public)")
         }
-        send(.done(id, saved: saved))
+        send(.done(id, task: task.taskIdentifier, failed: !saved && !cancelled))
     }
 
     func urlSessionDidFinishEvents(forBackgroundURLSession session: URLSession) {
@@ -251,25 +268,19 @@ public final class Downloads {
     func reconcile() async {
         do {
             try files.prepare()
-            let saved = try await library.savedFiles()
-            let present = Set(
-                (try? FileManager.default.contentsOfDirectory(
-                    atPath: files.directory.path(percentEncoded: false)))
-                    ?? [])
-            delete(Array(present.subtracting(saved)))
-            let lost = saved.subtracting(present).map(Self.trackId)
+            let lost = try files.sweep().map(Self.trackId)
             if !lost.isEmpty { try await library.markUnsaved(trackIds: lost) }
 
+            var live: [String: URLSessionDownloadTask] = [:]
+            for case let task as URLSessionDownloadTask in await session.allTasks {
+                guard let (id, _) = Self.parse(task), task.state != .completed else { continue }
+                if live[id] == nil { live[id] = task } else { task.cancel() }
+            }
             let pending = try await library.pendingDownloads()
             let wanted = Set(pending.map(\.trackId))
             tasks = [:]
-            for case let task as URLSessionDownloadTask in await session.allTasks {
-                guard let (id, _) = Self.parse(task), task.state != .completed else { continue }
-                if wanted.contains(id) && tasks[id] == nil {
-                    tasks[id] = task
-                } else {
-                    task.cancel()
-                }
+            for (id, task) in live {
+                if wanted.contains(id) { tasks[id] = task } else { task.cancel() }
             }
             guard !paused else { return }
             let wifiOnly = Set(pending.filter(\.wifiOnly).map(\.trackId))
@@ -302,10 +313,12 @@ public final class Downloads {
             guard tasks[id] != nil, abs((progress[id] ?? 0) - fraction) >= 0.01 || fraction == 1
             else { return }
             progress[id] = fraction
-        case .done(let id, let saved):
-            tasks[id] = nil
-            progress[id] = nil
-            if !saved { failedAt[id] = .now }
+        case .done(let id, let task, let failed):
+            if tasks[id].map({ $0.taskIdentifier == task }) ?? true {
+                tasks[id] = nil
+                progress[id] = nil
+            }
+            if failed { failedAt[id] = .now }
             Task { await resume(retry: false) }
         case .finishedEvents:
             Task {

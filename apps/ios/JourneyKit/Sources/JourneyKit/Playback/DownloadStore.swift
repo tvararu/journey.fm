@@ -98,8 +98,8 @@ extension Library {
         }
     }
 
-    public func savedFiles() async throws -> Set<String> {
-        try await db.read { db in
+    func savedFiles() throws -> Set<String> {
+        try db.read { db in
             Set(
                 try String.fetchAll(
                     db,

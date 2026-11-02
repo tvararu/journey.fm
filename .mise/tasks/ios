@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#MISE description="Build the iOS app: ios sim | device | log | test | format | cli <args> | testflight"
+#MISE description="Build the iOS app: ios sim | device | log | test [args] | format | cli <args> | testflight"
 set -euo pipefail
 cd "$MISE_PROJECT_ROOT/apps/ios"
 
@@ -63,7 +63,7 @@ log)
     --predicate 'subsystem == "fm.journey.app"'
   ;;
 test)
-  swift test --package-path JourneyKit
+  swift test --package-path JourneyKit "${@:2}"
   ;;
 format)
   swift format format -i -r Sources JourneyKit/Sources JourneyKit/Tests JourneyKit/Package.swift
