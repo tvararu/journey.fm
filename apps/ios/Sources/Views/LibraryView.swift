@@ -11,7 +11,6 @@ struct LibraryView: View {
     @AppStorage("library.sort") private var sort = AlbumSort.artist
     @AppStorage("library.grid") private var grid = true
     @Binding var path: [Route]
-    @State private var filter = ""
     @State private var albums: [Album] = []
     @State private var artists: [ArtistSummary] = []
 
@@ -19,11 +18,6 @@ struct LibraryView: View {
         TabStack(path: $path) {
             content
                 .navigationTitle("Library")
-                .navigationSubtitle(model.syncStatus)
-                .searchable(
-                    text: $filter, placement: .navigationBarDrawer(displayMode: .always),
-                    prompt: kind == .albums ? "Filter albums" : "Filter artists"
-                )
                 .toolbar {
                     if kind == .albums {
                         ToolbarItemGroup(placement: .topBarTrailing) {
@@ -57,7 +51,7 @@ struct LibraryView: View {
     @ViewBuilder private var content: some View {
         switch kind {
         case .albums where grid:
-            AlbumGrid(albums: shownAlbums) { chips }
+            AlbumGrid(albums: albums) { chips }
         case .albums:
             albumList
         case .artists:
@@ -85,20 +79,11 @@ struct LibraryView: View {
         }
     }
 
-    private var shownAlbums: [Album] {
-        guard !filter.isEmpty else { return albums }
-        return albums.filter {
-            $0.name.localizedStandardContains(filter)
-                || $0.artistName.localizedStandardContains(filter)
-        }
-    }
-
     private var albumList: some View {
-        let shown = shownAlbums
-        let repeats = repeated(shown)
+        let repeats = repeated(albums)
         return List {
             chips.buttonBorderShape(.capsule).listRowSeparator(.hidden)
-            ForEach(indexed(shown, key: sectionKey)) { section in
+            ForEach(indexed(albums, key: sectionKey)) { section in
                 Section {
                     ForEach(section.items) { album in
                         AlbumRow(
@@ -117,11 +102,9 @@ struct LibraryView: View {
     }
 
     private var artistList: some View {
-        let shown =
-            filter.isEmpty ? artists : artists.filter { $0.name.localizedStandardContains(filter) }
-        return List {
+        List {
             chips.buttonBorderShape(.capsule).listRowSeparator(.hidden)
-            ForEach(indexed(shown) { indexLetter($0.sortName) }) { section in
+            ForEach(indexed(artists) { indexLetter($0.sortName) }) { section in
                 Section {
                     ForEach(section.items) { ArtistRow(artist: $0) }
                 } header: {

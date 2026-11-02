@@ -174,11 +174,10 @@ Navigation:
 - Home's toolbar has only a gear, which opens Settings as a sheet:
   account, library counts, last sync, Sync Now, Sign Out, storage and
   downloads later. Library's toolbar holds sort and layout.
-- Sync status is the `navigationSubtitle` on Home and Library: "Synced
-  5 min ago", "Syncing…", "Couldn't sync · Synced yesterday",
-  "Offline · Synced 3 h ago". Failures never block browsing; the detail
-  is in Settings. A 401 signs out with a message on the sign-in screen.
-  Pull to refresh runs a delta sync.
+- No sync status in the title bars: Settings shows the last sync and
+  any failure, and offline shows as dimmed tracks that aren't on the
+  phone. Failures never block browsing. A 401 signs out with a message
+  on the sign-in screen. Pull to refresh runs a delta sync.
 
 Step 3:
 
@@ -187,12 +186,13 @@ Step 3:
   on Home, `.onScrollDown` on Library.
 - Library: Albums and Artists as capsule buttons (Downloaded joins them
   as a toggle in step 5), a sort Menu (Title, Artist, Year, Recently
-  Added; default Artist, then year within an artist), a list/grid
-  toggle and a `.searchable` filter for this screen only, all kept in
-  `@AppStorage`. The grid has two columns of covers with title and
-  artist below. Lists get an A–Z index from Jellyfin's sort names (`#`
-  for digits, decades when sorted by year, none for Recently Added),
-  and each letter or decade heads its section, as in Apple Music.
+  Added; default Artist, then year within an artist) and a list/grid
+  toggle, all kept in `@AppStorage`; no filter field, since Search and
+  the index cover finding things. The grid has two columns of covers
+  with title and artist below. Lists get an A–Z index from Jellyfin's
+  sort names (`#` for digits, decades when sorted by year, none for
+  Recently Added), and each letter or decade heads its section, as in
+  Apple Music.
 - Where title and artist repeat (Celldweller's five End of an Empire),
   the subtitle adds the track count.
 - Album page: no title in the bar; cover, title (never truncated),

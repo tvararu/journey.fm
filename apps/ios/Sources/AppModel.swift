@@ -20,7 +20,6 @@ final class AppModel {
     var covers: CoverProgress?
     var syncError: String?
     var error: String?
-    var clock = Date.now
     var syncOffline = false { didSet { player.offline = offline } }
     var network = NWPath.Status.satisfied { didSet { player.offline = offline } }
     var expensiveNetwork = false
@@ -170,24 +169,6 @@ final class AppModel {
 
     var needsFirstSync: Bool { statsLoaded && stats.lastSync == nil }
 
-    var syncStatus: String {
-        if syncing { return "Syncing…" }
-        let synced =
-            stats.lastSync.map {
-                "Synced \(Self.relative.localizedString(for: $0, relativeTo: max(clock, $0)))"
-            } ?? "Never synced"
-        if offline { return "Offline · \(synced)" }
-        if syncError != nil { return "Couldn't sync · \(synced)" }
-        return synced
-    }
-
-    func tick() async {
-        while !Task.isCancelled {
-            try? await Task.sleep(for: .seconds(30))
-            clock = .now
-        }
-    }
-
     func signIn(server: String, username: String, password: String) async {
         guard let url = URL(string: server.trimmingCharacters(in: .whitespaces)), url.host() != nil
         else {
@@ -313,12 +294,6 @@ final class AppModel {
         .notConnectedToInternet, .networkConnectionLost, .cannotConnectToHost, .cannotFindHost,
         .dnsLookupFailed, .timedOut,
     ]
-
-    private static let relative = {
-        let formatter = RelativeDateTimeFormatter()
-        formatter.dateTimeStyle = .named
-        return formatter
-    }()
 
     private static func artCache(_ session: Session) -> ArtCache {
         ArtCache(

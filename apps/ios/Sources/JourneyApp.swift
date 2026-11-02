@@ -34,7 +34,6 @@ struct JourneyApp: App {
             .environment(model)
             .environment(model.player)
             .task { await model.watchStats() }
-            .task { await model.tick() }
             .onChange(of: scenePhase, initial: true) { _, phase in
                 if phase == .active { Task { await model.sync() } }
             }

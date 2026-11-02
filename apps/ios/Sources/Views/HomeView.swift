@@ -22,7 +22,6 @@ struct HomeView: View {
                 .padding(.vertical)
             }
             .navigationTitle("Home")
-            .navigationSubtitle(model.syncStatus)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Settings", systemImage: "gearshape") { showSettings = true }
