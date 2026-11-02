@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+#MISE description="Write accepted albums' catalogue tags, art and ReplayGain to their FLACs on sol: write <slug>... [--plan] [--backup]"
+set -euo pipefail
+cd "$MISE_PROJECT_ROOT/packages/catalogue"
+exec bun write.ts "$@"
