@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#MISE description="Jellyfin: refresh (replace all metadata from the tags, then the album artists) | clear (online leftovers on albums) | options (prefer ARTISTS) | test (the plugin's tests) | plugin (build and install the plugin on sol)"
+#MISE description="Jellyfin: refresh (replace all metadata from the tags, then the album artists) | clear (online leftovers on albums) | options (prefer ARTISTS, hide tags in the web UI) | test (the plugin's tests) | plugin (build and install the plugin on sol)"
 set -euo pipefail
 root="$MISE_PROJECT_ROOT"
 case "${1:-}" in

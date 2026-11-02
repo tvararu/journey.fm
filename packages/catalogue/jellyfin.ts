@@ -53,17 +53,30 @@ async function clear(): Promise<void> {
   console.log(`cleared ${n} of ${Items.length} albums`);
 }
 
+const HIDE_TAGS = ".itemTags { display: none !important; }";
+
 async function options(): Promise<void> {
   const lib = await music();
   if (lib.LibraryOptions["PreferNonstandardArtistsTag"] === true) {
     console.log("PreferNonstandardArtistsTag already on");
+  } else {
+    await call("/Library/VirtualFolders/LibraryOptions", {
+      method: "POST",
+      body: JSON.stringify({ Id: lib.ItemId, LibraryOptions: { ...lib.LibraryOptions, PreferNonstandardArtistsTag: true } }),
+    });
+    console.log("PreferNonstandardArtistsTag on");
+  }
+  const branding = await call("/System/Configuration/branding");
+  const css: string = branding.CustomCss ?? "";
+  if (css.includes(HIDE_TAGS)) {
+    console.log("tags already hidden in the web UI");
     return;
   }
-  await call("/Library/VirtualFolders/LibraryOptions", {
+  await call("/System/Configuration/branding", {
     method: "POST",
-    body: JSON.stringify({ Id: lib.ItemId, LibraryOptions: { ...lib.LibraryOptions, PreferNonstandardArtistsTag: true } }),
+    body: JSON.stringify({ ...branding, CustomCss: css ? `${css}\n${HIDE_TAGS}` : HIDE_TAGS }),
   });
-  console.log("PreferNonstandardArtistsTag on");
+  console.log("tags hidden in the web UI");
 }
 
 const cmd = Bun.argv[2];
