@@ -1,4 +1,5 @@
 import AVFoundation
+import Accelerate
 
 public final class Output: @unchecked Sendable {
     public enum Event: Sendable, Equatable {
@@ -11,10 +12,12 @@ public final class Output: @unchecked Sendable {
     public struct Item: Sendable {
         public var entry: UUID
         public var source: ByteSource
+        public var gain: Float
 
-        public init(entry: UUID, source: ByteSource) {
+        public init(entry: UUID, source: ByteSource, gain: Float = 1) {
             self.entry = entry
             self.source = source
+            self.gain = gain
         }
     }
 
@@ -262,6 +265,7 @@ public final class Output: @unchecked Sendable {
             else { return true }
             let more = try decoder.read(into: buffer)
             let output = more ? try convert(buffer, segment.converter) : nil
+            if let output { Self.scale(output, by: segment.item.gain) }
             state.withLock {
                 guard generation == self.generation else { return }
                 if segment.base == nil { segment.base = scheduled - segment.startFrame }
@@ -310,5 +314,14 @@ public final class Output: @unchecked Sendable {
         }
         if let error { throw error }
         return output
+    }
+
+    static func scale(_ buffer: AVAudioPCMBuffer, by gain: Float) {
+        guard gain != 1, let channels = buffer.floatChannelData else { return }
+        var gain = gain
+        let count = vDSP_Length(Int(buffer.frameLength) * buffer.stride)
+        for channel in 0..<Int(buffer.format.isInterleaved ? 1 : buffer.format.channelCount) {
+            vDSP_vsmul(channels[channel], 1, &gain, channels[channel], 1, count)
+        }
     }
 }

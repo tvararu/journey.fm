@@ -88,6 +88,40 @@ func untilScheduled(_ output: Output) async throws {
     #expect((early + rest).filter { $0 != 0 }.count == 22_050)
 }
 
+@Test func eachTrackPlaysAtItsOwnGain() async throws {
+    let a = UUID()
+    let b = UUID()
+    let output = try offlineOutput()
+    try output.start(
+        .init(
+            entry: a, source: try ByteSource(complete: flac(value: 0.5, frames: 10_000)), gain: 0.5),
+        at: 0,
+        following: .init(
+            entry: b, source: try ByteSource(complete: flac(value: 0.5, frames: 10_000)), gain: 1),
+        play: true)
+    try await untilScheduled(output)
+    let samples = try render(output, frames: 28_192).filter { $0 != 0 }
+    #expect(samples.count == 20_000)
+    #expect(samples[..<10_000].allSatisfy { abs($0 - 0.25) < 1e-4 })
+    #expect(samples[10_000...].allSatisfy { abs($0 - 0.5) < 1e-4 })
+}
+
+@Test func albumGainWinsAndThePeakCapsIt() {
+    var album = paranoid.album
+    var track = song("t", "T", album: "p")
+    #expect(playbackGain(album: album, track: track) == 1)
+    track.gain = -6
+    track.peak = 0.5
+    #expect(abs(playbackGain(album: album, track: track) - 0.501187) < 1e-5)
+    album.gain = 12
+    album.peak = 0.8
+    #expect(playbackGain(album: album, track: track) == 1.25)
+    album.peak = nil
+    #expect(playbackGain(album: album, track: track) == 1)
+    album.gain = -3
+    #expect(abs(playbackGain(album: album, track: track) - 0.707946) < 1e-5)
+}
+
 @Test func aSourceStillDownloadingDecodesEveryFrame() async throws {
     let url = try flac(value: 0.25, frames: 100_000)
     let bytes = try Data(contentsOf: url)

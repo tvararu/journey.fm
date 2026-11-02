@@ -179,7 +179,9 @@ public final class Player {
         failure = nil
         do {
             try output.start(
-                Output.Item(entry: entry.id, source: cache.source(for: entry.track)), at: time,
+                Output.Item(
+                    entry: entry.id, source: cache.source(for: entry.track),
+                    gain: playbackGain(album: entry.album, track: entry.track)), at: time,
                 following: following(), play: play)
             prepared = true
             isPlaying = play
@@ -213,7 +215,9 @@ public final class Player {
         guard let entry = queue.following(where: available()), let cache,
             let source = try? cache.source(for: entry.track)
         else { return nil }
-        return Output.Item(entry: entry.id, source: source)
+        return Output.Item(
+            entry: entry.id, source: source,
+            gain: playbackGain(album: entry.album, track: entry.track))
     }
 
     func available() -> (Track) -> Bool {
