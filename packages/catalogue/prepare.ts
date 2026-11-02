@@ -140,6 +140,13 @@ function difference(a: Uint8Array, b: Uint8Array): number {
 }
 
 async function cover(a: Album): Promise<void> {
+  const kept = existsSync(`${CATALOGUE}/covers.json`)
+    ? (JSON.parse(readFileSync(`${CATALOGUE}/covers.json`, "utf8")) as Record<string, { chosen: { source: string; width: number; height: number } }>)[a.slug]
+    : undefined;
+  if (kept) {
+    say(a, `cover: kept the master already chosen, ${kept.chosen.source} ${kept.chosen.width}x${kept.chosen.height}`);
+    return;
+  }
   const cands = JSON.parse(readFileSync(`${RAW}/${a.slug}/covers/candidates.json`, "utf8")) as Cover[];
   const ratio = (c: Cover) => Math.max(c.width, c.height) / Math.min(c.width, c.height);
   const usable = cands.filter((c) => COVER_TIERS.includes(c.source) && (c.types.includes("Front") || !c.types.length) && ratio(c) <= 1.2);
