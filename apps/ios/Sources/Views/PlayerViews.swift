@@ -317,21 +317,31 @@ struct RoutePicker: UIViewRepresentable {
 }
 
 struct QueuePanel<Header: View>: View {
+    @Environment(AppModel.self) private var model
     @Environment(Player.self) private var player
     @ViewBuilder var header: Header
+    @State private var history: [TrackHit] = []
 
     var body: some View {
-        let history = Array(player.queue.history)
         let upNext = Array(player.queue.upNext)
         ScrollViewReader { proxy in
             List {
                 if !history.isEmpty {
                     Section {
-                        ForEach(history) { entry in
-                            row(entry)
+                        ForEach(history) { hit in
+                            Button {
+                                player.playNow(hit)
+                            } label: {
+                                QueueRow(entry: QueueEntry(hit), playing: false)
+                            }
+                            .buttonStyle(.plain)
+                            .listRowBackground(Color.clear)
                         }
                     } header: {
-                        heading("History") { player.clearHistory() }
+                        heading("History") {
+                            let library = model.library
+                            Task { try? await library.clearHistory() }
+                        }
                     }
                 }
                 Section {
@@ -377,6 +387,11 @@ struct QueuePanel<Header: View>: View {
             .scrollContentBackground(.hidden)
             .contentMargins(.horizontal, 12, for: .scrollContent)
             .environment(\.editMode, .constant(.active))
+            .task(id: player.current?.id) {
+                await watch(model.library.observeHistory(excluding: player.current?.id)) {
+                    history = $0
+                }
+            }
             .onAppear { proxy.scrollTo("current", anchor: .top) }
         }
     }

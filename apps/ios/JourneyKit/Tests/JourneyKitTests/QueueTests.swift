@@ -161,22 +161,6 @@ struct Seeded: RandomNumberGenerator {
     #expect(queue.current?.track.id == "b")
 }
 
-@Test func clearingHistoryKeepsTheCurrentTrackAndWhatFollows() {
-    var queue = PlayQueue()
-    queue.play(hits("a", "b", "c", "d"), from: 2)
-    queue.setShuffle(true)
-    queue.skip()
-    let current = queue.current?.track.id
-    let upNext = queue.upNextNames
-    queue.clearHistory()
-    #expect(queue.history.isEmpty)
-    #expect(queue.current?.track.id == current)
-    #expect(queue.upNextNames == upNext)
-    queue.setShuffle(false)
-    #expect(queue.current?.track.id == current)
-    #expect(queue.names.count == 1 + upNext.count)
-}
-
 @Test func playbackResumesFromTheSavedQueueAndPosition() async throws {
     let path = FileManager.default.temporaryDirectory.appending(path: "\(UUID()).sqlite")
         .path(percentEncoded: false)
