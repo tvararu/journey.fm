@@ -189,14 +189,3 @@ struct Seeded: RandomNumberGenerator {
     #expect(saved.queue == queue)
     #expect(saved.position == 83.5)
 }
-
-@Test func recentlyPlayedListsAlbumsNewestFirstOnce() async throws {
-    let other = synced("v", name: "Vol. 4", artist: sabbath)
-    let library = try await librarySynced(
-        artists: [sabbath], albums: [paranoid, other], tracks: [])
-    try await library.recordPlay(albumId: "p", at: start)
-    try await library.recordPlay(albumId: "v", at: start.addingTimeInterval(60))
-    try await library.recordPlay(albumId: "p", at: start.addingTimeInterval(120))
-    var recent = library.observeRecentlyPlayed(limit: 10).makeAsyncIterator()
-    #expect(try await recent.next()?.map(\.id) == ["p", "v"])
-}

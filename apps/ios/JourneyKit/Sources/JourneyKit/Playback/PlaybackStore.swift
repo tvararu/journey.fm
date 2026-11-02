@@ -25,11 +25,19 @@ extension Library {
         }
     }
 
-    public func recordPlay(albumId: String, at date: Date = .now) async throws {
+    public func recordPlay(_ play: CountedPlay) async throws {
         try await db.write { db in
             try db.execute(
-                sql: "INSERT OR REPLACE INTO played (albumId, playedAt) VALUES (?, ?)",
-                arguments: [albumId, date])
+                sql: "INSERT INTO play (entryId, trackId, albumId, playedAt) VALUES (?, ?, ?, ?)",
+                arguments: [play.entryId.uuidString, play.trackId, play.albumId, play.startedAt])
+        }
+    }
+
+    public func clearHistory(at date: Date = .now) async throws {
+        try await db.write { db in
+            try db.execute(
+                sql: "INSERT OR REPLACE INTO history (id, clearedAt) VALUES (1, ?)",
+                arguments: [date])
         }
     }
 
@@ -38,9 +46,35 @@ extension Library {
             try Album.fetchAll(
                 db,
                 sql: """
-                    SELECT album.* FROM album JOIN played ON played.albumId = album.id
-                    ORDER BY played.playedAt DESC LIMIT ?
+                    SELECT album.* FROM album
+                    JOIN (SELECT albumId, max(playedAt) AS last FROM play GROUP BY albumId) p
+                        ON p.albumId = album.id
+                    ORDER BY p.last DESC LIMIT ?
                     """, arguments: [limit])
+        }.values(in: db)
+    }
+
+    public func observeHistory(excluding entryId: UUID?, limit: Int = 100)
+        -> AsyncValueObservation<[TrackHit]>
+    {
+        ValueObservation.tracking { db in
+            let tracks = try Track.fetchAll(
+                db,
+                sql: """
+                    SELECT track.* FROM track
+                    JOIN (
+                        SELECT trackId, max(playedAt) AS last FROM play
+                        WHERE playedAt > coalesce((SELECT clearedAt FROM history), '')
+                            AND entryId IS NOT ?
+                        GROUP BY trackId ORDER BY last DESC LIMIT ?
+                    ) p ON p.trackId = track.id
+                    ORDER BY p.last
+                    """, arguments: [entryId?.uuidString, limit])
+            let albums = try Album.fetchAll(db, keys: Set(tracks.map(\.albumId)))
+            let byId = Dictionary(uniqueKeysWithValues: albums.map { ($0.id, $0) })
+            return tracks.compactMap { track in
+                byId[track.albumId].map { TrackHit(track: track, album: $0) }
+            }
         }.values(in: db)
     }
 

@@ -18,6 +18,7 @@ public final class Player {
     @ObservationIgnored var prepared = false
     @ObservationIgnored var loop: Task<Void, Never>?
     @ObservationIgnored var savedAt = Date.distantPast
+    @ObservationIgnored var counter = PlayCounter()
 
     public init(library: Library, output: Output = Output()) {
         self.library = library
@@ -116,7 +117,7 @@ public final class Player {
 
     public func seek(to time: Double) {
         guard queue.current != nil else { return }
-        begin(at: max(0, min(time, duration)), play: isPlaying)
+        begin(at: max(0, min(time, duration)), play: isPlaying, session: false)
     }
 
     public func jump(to id: UUID) {
@@ -155,7 +156,7 @@ public final class Player {
         edited()
     }
 
-    func begin(at time: Double, play: Bool) {
+    func begin(at time: Double, play: Bool, session: Bool = true) {
         guard let cache, !queue.isEmpty else { return }
         guard queue.skipUnavailable(available()) else {
             output.stop()
@@ -177,7 +178,11 @@ public final class Player {
             prepared = true
             isPlaying = play
             cache.cancel(except: wanted(entry))
-            if play { record(entry) }
+            if !session {
+                counter.rebase(to: time)
+            } else if play {
+                counter.start(entry, at: time)
+            }
             startLoop()
         } catch {
             fail(error)
@@ -188,7 +193,7 @@ public final class Player {
 
     func edited() {
         if prepared, !output.setFollowing(following()) {
-            begin(at: position, play: isPlaying)
+            begin(at: position, play: isPlaying, session: false)
             return
         }
         if let cache, let entry = queue.current {
@@ -255,7 +260,7 @@ public final class Player {
                     queue.markMissing(before: id)
                     queue.jump(to: id)
                 }
-                if let entry = queue.current { record(entry) }
+                if let entry = queue.current { counter.start(entry, at: position) }
                 edited()
             case .ended:
                 finish()
@@ -266,8 +271,14 @@ public final class Player {
                 save(force: true)
                 changed()
             case .reset:
-                begin(at: position, play: isPlaying)
+                begin(at: position, play: isPlaying, session: false)
             }
+        }
+        if let entry = queue.current,
+            let play = counter.advance(entry, to: position, playing: isPlaying)
+        {
+            let library = library
+            Task { try? await library.recordPlay(play) }
         }
         save()
         if !isPlaying && events.isEmpty {
@@ -275,11 +286,6 @@ public final class Player {
             return false
         }
         return true
-    }
-
-    func record(_ entry: QueueEntry) {
-        let library = library
-        Task { try? await library.recordPlay(albumId: entry.album.id) }
     }
 
     func save(force: Bool = false) {

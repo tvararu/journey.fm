@@ -86,3 +86,61 @@ extension PlayCounter {
     #expect(
         counted == [CountedPlay(entryId: second.id, trackId: "b", albumId: "p", startedAt: later)])
 }
+
+func logged(_ track: String, album: String = "p", at seconds: Double, entry: UUID = UUID())
+    -> CountedPlay
+{
+    CountedPlay(
+        entryId: entry, trackId: track, albumId: album,
+        startedAt: start.addingTimeInterval(seconds))
+}
+
+func paranoidWith(_ ids: [String]) async throws -> Library {
+    let other = synced("v", name: "Vol. 4", artist: sabbath)
+    return try await librarySynced(
+        artists: [sabbath], albums: [paranoid, other],
+        tracks: ids.map { song($0, $0, album: "p") } + [song("v1", "v1", album: "v")])
+}
+
+@Test func recentlyPlayedOrdersAlbumsByTheirLatestPlay() async throws {
+    let library = try await paranoidWith(["a"])
+    try await library.recordPlay(logged("a", at: 0))
+    try await library.recordPlay(logged("v1", album: "v", at: 60))
+    try await library.recordPlay(logged("a", at: 120))
+    var recent = library.observeRecentlyPlayed(limit: 10).makeAsyncIterator()
+    #expect(try await recent.next()?.map(\.id) == ["p", "v"])
+}
+
+@Test func historyListsEachTrackOnceOldestFirst() async throws {
+    let library = try await paranoidWith(["a", "b"])
+    try await library.recordPlay(logged("a", at: 0))
+    try await library.recordPlay(logged("b", at: 60))
+    try await library.recordPlay(logged("a", at: 120))
+    try await library.recordPlay(logged("gone", at: 180))
+    var history = library.observeHistory(excluding: nil).makeAsyncIterator()
+    #expect(try await history.next()?.map(\.track.id) == ["b", "a"])
+}
+
+@Test func historyHidesClearedPlaysAndTheCurrentEntry() async throws {
+    let library = try await paranoidWith(["a", "b", "c"])
+    let current = UUID()
+    try await library.recordPlay(logged("a", at: 0))
+    try await library.clearHistory(at: start.addingTimeInterval(30))
+    try await library.recordPlay(logged("b", at: 60))
+    try await library.recordPlay(logged("c", at: 120, entry: current))
+    var history = library.observeHistory(excluding: current).makeAsyncIterator()
+    #expect(try await history.next()?.map(\.track.id) == ["b"])
+    var recent = library.observeRecentlyPlayed(limit: 10).makeAsyncIterator()
+    #expect(try await recent.next()?.map(\.id) == ["p"])
+}
+
+@Test func historyKeepsTheLatestHundredTracks() async throws {
+    let ids = (0..<101).map { "t\($0)" }
+    let library = try await paranoidWith(ids)
+    for (offset, id) in ids.enumerated() {
+        try await library.recordPlay(logged(id, at: Double(offset)))
+    }
+    var history = library.observeHistory(excluding: nil).makeAsyncIterator()
+    let tracks = try #require(try await history.next()).map(\.track.id)
+    #expect(tracks == Array(ids.dropFirst()))
+}

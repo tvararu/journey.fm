@@ -53,7 +53,10 @@ public final class Library: Sendable {
             try Album.deleteAll(db)
             try Artist.deleteAll(db)
             try SyncState.deleteAll(db)
-            try db.execute(sql: "DELETE FROM playback; DELETE FROM played; DELETE FROM download")
+            try db.execute(
+                sql:
+                    "DELETE FROM playback; DELETE FROM play; DELETE FROM history; DELETE FROM download"
+            )
         }
     }
 
@@ -170,6 +173,20 @@ public final class Library: Sendable {
                 t.column("wifiOnly", .boolean).notNull()
                 t.column("bytes", .integer)
                 t.column("savedAt", .datetime)
+            }
+        }
+        migrator.registerMigration("playLog") { db in
+            try db.drop(table: "played")
+            try db.create(table: "play") { t in
+                t.autoIncrementedPrimaryKey("id")
+                t.column("entryId", .text).notNull()
+                t.column("trackId", .text).notNull().indexed()
+                t.column("albumId", .text).notNull().indexed()
+                t.column("playedAt", .datetime).notNull().indexed()
+            }
+            try db.create(table: "history") { t in
+                t.primaryKey("id", .integer)
+                t.column("clearedAt", .datetime)
             }
         }
         return migrator
