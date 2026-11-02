@@ -12,6 +12,8 @@ and later written back as tags. `docs/library.md` holds the agreed rules.
   sim | device | log | test | format | cli | testflight`, described with
   the vision, UX and roadmap in `docs/ios.md`
 - `packages/catalogue`: the pipeline and reviewer tools
+- `apps/jellyfin`: the Jellyfin plugin that maps the tags into Jellyfin's
+  fields (C#); `mise run jellyfin test | plugin | options | refresh`
 - `tools/tagging`: scripts that run on sol, plus the RYM grabbers
 - `records/`: reviews, verdicts, notes and RYM IDs (committed)
 - `data/`: raw responses, covers, catalogue, design boards in
@@ -37,7 +39,8 @@ and later written back as tags. `docs/library.md` holds the agreed rules.
 
 ## Rules
 
-- Bun + TypeScript + mise only, and Swift for the iOS app. No Python.
+- Bun + TypeScript + mise only, Swift for the iOS app and C# for the
+  Jellyfin plugin. No Python.
 - Run everything through `mise run <task>`; tasks load the secrets.
 - Never print a secret. Secrets are set by deity in their own terminal
   with `mise set --age-encrypt --prompt NAME`; list names only.

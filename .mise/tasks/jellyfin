@@ -1,5 +1,14 @@
 #!/usr/bin/env bash
-#MISE description="Refresh Jellyfin's Music library from the tags (replace all metadata), or clear the online leftovers from its albums: jellyfin refresh | clear"
+#MISE description="Jellyfin: refresh (replace all metadata from the tags, then the album artists) | clear (online leftovers on albums) | test (the plugin's tests)"
 set -euo pipefail
-cd "$MISE_PROJECT_ROOT/packages/catalogue"
-exec bun jellyfin.ts "$@"
+root="$MISE_PROJECT_ROOT"
+case "${1:-}" in
+test)
+  shift
+  exec dotnet test "$root/apps/jellyfin/Jellyfin.Plugin.Journey.Tests" "$@"
+  ;;
+*)
+  cd "$root/packages/catalogue"
+  exec bun jellyfin.ts "$@"
+  ;;
+esac

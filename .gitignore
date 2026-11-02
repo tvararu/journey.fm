@@ -7,3 +7,6 @@ apps/ios/Info.plist
 apps/ios/build/
 apps/ios/JourneyKit/.build/
 apps/ios/JourneyKit/.swiftpm/
+apps/jellyfin/**/bin/
+apps/jellyfin/**/obj/
+apps/jellyfin/build/

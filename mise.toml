@@ -1,6 +1,7 @@
 [tools]
 age = "latest"
 bun = "latest"
+dotnet = "10"
 
 [settings]
 age.key_file = "~/.config/journey.fm/age.key"
