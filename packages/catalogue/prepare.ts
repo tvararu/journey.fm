@@ -223,6 +223,7 @@ async function album(a: Album): Promise<boolean> {
   try {
     if (!(await step("edition", () => edition(a)))) {
       await marker({ failed: "no edition picked" });
+      console.log(`PREPARED ${a.slug} (failed)`);
       return false;
     }
     await step("covers", () => coverGate.run(async () => {
