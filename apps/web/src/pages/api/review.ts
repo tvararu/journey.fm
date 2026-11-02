@@ -36,7 +36,7 @@ export const POST: APIRoute = async ({ request, redirect, cookies }) => {
   const current = (await coverChoices())[rec.slug]?.chosen.id;
   if (cover && cover !== current) {
     run([`${SCRIPTS}/covers.ts`, "choose", rec.slug, cover, "Picked as master by deity in review", "--keep"]);
-    run([`${SCRIPTS}/resolve.ts`]);
+    run([`${SCRIPTS}/resolve.ts`, rec.slug]);
     rec = (await processed()).get(album) ?? rec;
   }
   const at = new Date().toLocaleString("sv-SE", { timeZone: "Europe/London" }).slice(0, 16);
