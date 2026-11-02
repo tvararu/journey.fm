@@ -234,15 +234,23 @@ struct NowPlayingView: View {
             .accessibilityElement(children: .contain)
             HStack {
                 Color.clear.frame(width: 44, height: 44).frame(maxWidth: .infinity)
-                RoutePicker().frame(width: 44, height: 44).accessibilityLabel("AirPlay")
-                    .frame(maxWidth: .infinity)
+                ZStack {
+                    Image(systemName: "airplay.audio")
+                        .font(.system(size: 24))
+                        .foregroundStyle(.secondary)
+                    RoutePicker()
+                }
+                .frame(width: 44, height: 44)
+                .accessibilityElement(children: .contain)
+                .accessibilityLabel("AirPlay")
+                .frame(maxWidth: .infinity)
                 Button("Queue", systemImage: "list.bullet") {
                     withAnimation(.spring(duration: 0.4)) { showingQueue.toggle() }
                 }
                 .labelStyle(.iconOnly)
-                .font(.title3)
+                .font(.system(size: 24))
                 .foregroundStyle(showingQueue ? AnyShapeStyle(.black) : AnyShapeStyle(.secondary))
-                .frame(width: 40, height: 40)
+                .frame(width: 44, height: 44)
                 .background(showingQueue ? Color.white.opacity(0.85) : .clear, in: .circle)
                 .accessibilityAddTraits(showingQueue ? .isSelected : [])
                 .accessibilityIdentifier("now-playing-queue")
@@ -317,7 +325,8 @@ struct Grabber: ButtonStyle {
 struct RoutePicker: UIViewRepresentable {
     func makeUIView(context: Context) -> AVRoutePickerView {
         let view = AVRoutePickerView()
-        view.tintColor = .secondaryLabel
+        view.tintColor = .clear
+        view.activeTintColor = .clear
         return view
     }
 
