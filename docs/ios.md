@@ -54,7 +54,7 @@ Not available yet, so any screen that needs it waits for a later step:
 
 - Play history, so no recently played or jump back in: step 4
 - Downloaded state and storage used: step 5
-- Lyrics: step 8
+- Lyrics: step 9
 - RYM, MusicBrainz, Discogs and RED data (ratings, descriptors, labels,
   credits, release types): only in the catalogue (`apps/web`) until tags
   are written back to the FLACs, step 8
@@ -252,23 +252,29 @@ Step 4:
   (restarts after 3 s), play/pause and next, which shrink inside a grey
   circle while pressed; the system volume slider (`MPVolumeView`, which
   the simulator doesn't draw); then AirPlay (`AVRoutePickerView`) and
-  the queue button, leaving the lyrics slot empty until step 8. Music's
+  the queue button, leaving the lyrics slot empty until step 9. Music's
   favourite, share, pin, station, credits, suggest less and playlist
   actions are left out.
 - The queue button crossfades the cover for one list and turns white
-  while open. The list holds History (the tracks before the current one
-  in this queue, with Clear), a header row (cover, title, "…"), then
-  shuffle and repeat (off, all, one) as capsules and Up Next, pinned as
-  a section header. It opens at the header, so History sits above it
-  until pulled down, unless the whole queue fits. Reorder handles always
-  show: tap a track to play it, long-press to remove it, Clear empties
-  Up Next. Scrubber and controls stay put. Music shrinks the cover into
-  the header instead of crossfading, but SwiftUI's matched geometry
-  doesn't animate into a `List` row.
+  while open. The list holds History (the latest 100 tracks played, each
+  once, from the play log; Clear hides them without forgetting them;
+  tapping one plays it and keeps Up Next), a header row (cover, title,
+  "…"), then shuffle and repeat (off, all, one) as capsules and Up Next,
+  pinned as a section header. It opens at the header, so History sits
+  above it until pulled down, unless the whole queue fits. Reorder
+  handles always show: tap an Up Next track to play it, long-press to
+  remove it, Clear empties Up Next. Scrubber and controls stay put.
+  Music shrinks the cover into the header instead of crossfading, but
+  SwiftUI's matched geometry doesn't animate into a `List` row.
 - "Played" on a track row means it became the current track earlier in
   this queue, shown as secondary text; starting an album at track 3 does
-  not mark tracks 1 and 2. Home gains Recently Played, the first shelf,
-  newest play first.
+  not mark tracks 1 and 2. Home gains Recently Played, the first shelf:
+  albums with a counted play, newest first.
+- A play counts once half the track or 4 minutes has been heard,
+  whichever is less, and never for a track under 30 s; seeking adds
+  nothing and pausing keeps what was heard. Each one goes in the play
+  log on the phone, which Recently Played and History read. Plays from
+  before the log were dropped.
 - The queue and position are saved on every change, on pause and every
   ten seconds while playing; after a relaunch the mini player shows the
   last track, paused where it stopped. Previous restarts the track after
@@ -390,6 +396,6 @@ Open:
 9. **Lyrics.** Plain lyrics, and synced lyrics that follow playback,
    from `/Audio/{id}/Lyrics`, filling the empty slot left of AirPlay in
    now playing.
-10. **Play log.** Every play recorded on the phone and kept across
-    queues, so the queue's History becomes all recent listening, as in
-    Apple Music, rather than only this queue's earlier tracks.
+10. **Play log.** Done 2 Nov: a play counts after half the track or 4
+    minutes heard (never under 30 s), is kept on the phone and feeds the
+    queue's History and Recently Played.
