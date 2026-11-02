@@ -189,6 +189,65 @@ public final class Library: Sendable {
                 t.column("clearedAt", .datetime)
             }
         }
+        migrator.registerMigration("metadata") { db in
+            try db.alter(table: "artist") { t in t.add(column: "overview", .text) }
+            try db.alter(table: "album") { t in
+                t.add(column: "released", .text)
+                t.add(column: "rating", .double)
+                t.add(column: "label", .text)
+                t.add(column: "gain", .double)
+                t.add(column: "peak", .double)
+            }
+            try db.alter(table: "track") { t in
+                t.add(column: "gain", .double)
+                t.add(column: "peak", .double)
+                t.add(column: "hasLyrics", .boolean)
+                t.add(column: "etag", .text)
+            }
+            try db.create(table: "albumTag") { t in
+                t.column("albumId", .text).notNull().indexed().references(
+                    "album", onDelete: .cascade)
+                t.column("key", .text).notNull()
+                t.column("value", .text).notNull()
+                t.column("position", .integer).notNull()
+            }
+            try db.create(table: "trackTag") { t in
+                t.column("trackId", .text).notNull().indexed().references(
+                    "track", onDelete: .cascade)
+                t.column("key", .text).notNull()
+                t.column("value", .text).notNull()
+                t.column("position", .integer).notNull()
+            }
+            try db.create(table: "albumGenre") { t in
+                t.column("albumId", .text).notNull().indexed().references(
+                    "album", onDelete: .cascade)
+                t.column("name", .text).notNull().indexed()
+                t.column("position", .integer).notNull()
+            }
+            try db.create(table: "credit") { t in
+                t.column("trackId", .text).notNull().indexed().references(
+                    "track", onDelete: .cascade)
+                t.column("name", .text).notNull()
+                t.column("role", .text).notNull()
+                t.column("kind", .text).notNull()
+                t.column("position", .integer).notNull()
+            }
+            try db.create(table: "lyrics") { t in
+                t.primaryKey("trackId", .text).references("track", onDelete: .cascade)
+                t.column("etag", .text)
+                t.column("synced", .boolean).notNull()
+                t.column("lines", .text).notNull()
+                t.column("text", .text).notNull()
+            }
+            for (table, column) in [("credit", "name"), ("lyrics", "text")] {
+                try db.create(virtualTable: "\(table)Search", using: FTS5()) { t in
+                    t.synchronize(withTable: table)
+                    t.tokenizer = .unicode61()
+                    t.column(column)
+                }
+            }
+            try db.execute(sql: "UPDATE syncState SET lastFullSync = NULL")
+        }
         return migrator
     }
 }

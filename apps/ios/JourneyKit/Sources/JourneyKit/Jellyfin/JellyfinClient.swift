@@ -57,7 +57,7 @@ public struct JellyfinClient: LibrarySource {
             "Artists/AlbumArtists",
             [
                 .init(name: "userId", value: session.userId),
-                .init(name: "Fields", value: "SortName"),
+                .init(name: "Fields", value: "SortName,Overview"),
                 .init(name: "EnableUserData", value: "false"),
                 .init(name: "EnableTotalRecordCount", value: "false"),
                 .init(name: "EnableImageTypes", value: "Primary"),
@@ -68,13 +68,23 @@ public struct JellyfinClient: LibrarySource {
 
     public func albums(since: Date?) async throws -> [SyncedAlbum] {
         try await items(
-            type: "MusicAlbum", fields: "SortName,Genres,ChildCount,DateCreated", images: true,
-            since: since
+            type: "MusicAlbum", fields: "SortName,Genres,ChildCount,DateCreated,Tags,Studios",
+            images: true, since: since
         ).map(\.album)
     }
 
-    public func tracks(since: Date?) async throws -> [Track] {
-        try await items(type: "Audio", fields: "", images: false, since: since).compactMap(\.track)
+    public func tracks(since: Date?) async throws -> [SyncedTrack] {
+        try await items(type: "Audio", fields: "Tags,People,Etag", images: false, since: since)
+            .compactMap(\.track)
+    }
+
+    public func lyrics(trackId: String) async throws -> [LyricLine] {
+        do {
+            let response: LyricsResponse = try await get("Audio/\(trackId)/Lyrics", [])
+            return response.lines
+        } catch JellyfinError.status(404) {
+            return []
+        }
     }
 
     public func imageURL(itemId: String, tag: String, maxWidth: Int) -> URL {

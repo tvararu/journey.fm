@@ -4,7 +4,7 @@ import GRDB
 public protocol LibrarySource: Sendable {
     func artists() async throws -> [Artist]
     func albums(since: Date?) async throws -> [SyncedAlbum]
-    func tracks(since: Date?) async throws -> [Track]
+    func tracks(since: Date?) async throws -> [SyncedTrack]
 }
 
 public struct SyncReport: Sendable, Equatable {
@@ -64,27 +64,42 @@ public struct Sync: Sendable {
 
             for artist in artists { try artist.upsert(db) }
             for synced in albums {
+                let id = synced.album.id
                 try synced.album.upsert(db)
-                try AlbumArtist.filter(Column("albumId") == synced.album.id).deleteAll(db)
+                try AlbumArtist.filter(Column("albumId") == id).deleteAll(db)
                 var seen = Set<String>()
                 let artistIds = synced.artistIds.filter { seen.insert($0).inserted }
                 for (position, artistId) in artistIds.enumerated() {
-                    try AlbumArtist(
-                        albumId: synced.album.id, artistId: artistId, position: position
-                    )
-                    .insert(db)
+                    try AlbumArtist(albumId: id, artistId: artistId, position: position).insert(db)
+                }
+                try AlbumTag.filter(Column("albumId") == id).deleteAll(db)
+                for (position, tag) in synced.tags.enumerated() {
+                    try AlbumTag(albumId: id, key: tag.key, value: tag.value, position: position)
+                        .insert(db)
+                }
+                try AlbumGenre.filter(Column("albumId") == id).deleteAll(db)
+                for (position, name) in synced.genres.enumerated() {
+                    try AlbumGenre(albumId: id, name: name, position: position).insert(db)
                 }
             }
             let albumIds = Set(try String.fetchAll(db, Album.select(Column("id"))))
-            for track in tracks {
-                if albumIds.contains(track.albumId) {
-                    try track.upsert(db)
-                } else {
+            for synced in tracks {
+                let id = synced.track.id
+                guard albumIds.contains(synced.track.albumId) else {
                     report.deferred += 1
+                    continue
                 }
+                try synced.track.upsert(db)
+                try TrackTag.filter(Column("trackId") == id).deleteAll(db)
+                for (position, tag) in synced.tags.enumerated() {
+                    try TrackTag(trackId: id, key: tag.key, value: tag.value, position: position)
+                        .insert(db)
+                }
+                try Credit.filter(Column("trackId") == id).deleteAll(db)
+                for credit in synced.credits { try credit.insert(db) }
             }
             if full {
-                report.deleted += try Track.filter(!tracks.map(\.id).contains(Column("id")))
+                report.deleted += try Track.filter(!tracks.map(\.track.id).contains(Column("id")))
                     .deleteAll(db)
                 report.deleted += try Album.filter(!albums.map(\.album.id).contains(Column("id")))
                     .deleteAll(db)
