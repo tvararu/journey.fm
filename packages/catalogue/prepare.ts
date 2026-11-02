@@ -88,14 +88,14 @@ async function edition(a: Album): Promise<boolean> {
     const release = load(a.slug, `mb_release_${c.id}`) as { status?: string; media?: { format?: string }[] } | null;
     const vinyl = (release?.media ?? []).some((m) => /vinyl/i.test(m.format ?? ""));
     const heard = c.evidence.includes("track lengths") || (of > 0 && hit === of);
-    return { ...c, ev, hit, of, official: release?.status === "Official", cd: heard && !vinyl };
+    return { ...c, ev, hit, of, official: release?.status === "Official", cd: heard && !vinyl, lengths: c.evidence.includes("track lengths") };
   });
   const t0 = files(a.path)[0]!.tags;
   const tagged = t0["MUSICBRAINZ_ALBUMID"];
   const fileYear = yearOf(t0);
   const day = (c: Candidate) => Number((c.date ?? "").replace(/-/g, "").padEnd(8, "9")) || 99999999;
   const rank = (c: (typeof scored)[number]) => [
-    Number(c.official), Number(c.cd), c.ev.length, c.hit,
+    Number(c.official), Number(c.cd), Number(c.lengths), c.ev.length, c.hit,
     Number(c.id === tagged), Number(c.how === "discid"), Number(c.ev.includes("RED year")),
     Number(!!fileYear && Number((c.date ?? "").slice(0, 4)) === fileYear), -day(c),
   ];
@@ -103,8 +103,8 @@ async function edition(a: Album): Promise<boolean> {
   const cmp = (x: number[], y: number[]) => x.reduce((d, v, i) => d || y[i]! - v, 0);
   scored.sort((x, y) => cmp(rank(x), rank(y)));
   const best = scored[0]!;
-  const tied = scored.filter((c) => c !== best && c.official === best.official && c.cd === best.cd && c.ev.length === best.ev.length && c.hit === best.hit);
-  const decided = tied.length ? rank(best).slice(4).findIndex((v, i) => v !== rank(scored[1]!).slice(4)[i]) : -1;
+  const tied = scored.filter((c) => c !== best && c.official === best.official && c.cd === best.cd && c.lengths === best.lengths && c.ev.length === best.ev.length && c.hit === best.hit);
+  const decided = tied.length ? rank(best).slice(5).findIndex((v, i) => v !== rank(scored[1]!).slice(5)[i]) : -1;
   const breaker = tied.length
     ? `; tied on evidence with ${tied.map((c) => `${c.id.slice(0, 8)} (${c.date ?? "?"})`).join(", ")}, broken by ${BREAKERS[decided] ?? "MusicBrainz order"}`
     : "";
