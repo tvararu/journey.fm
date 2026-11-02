@@ -54,13 +54,16 @@ function rymDate(s: string | null | undefined): string | null {
 
 const LRC_HEAD = /^\[(?:ar|al|ti|au|by|re|ve|length|offset|#):[^\]]*\]\s*$\n?/gim;
 const PLACEHOLDER = /^(?:this (?:track|song) is (?:an )?)?instrumental[.!]?$/i;
+const STUB = /^(?:(?:artist|album|title|from record|record|source)\s*:.*|-\s.*\s-)$/i;
+const bareText = (s: string) => s.replace(LRC_HEAD, "").replace(/\[[\d:.]+\]\s*/g, "").trim();
 function lyric(s: string | null | undefined): string | null {
   if (!s) return s ?? null;
   const bare = s.replace(LRC_HEAD, "");
   const t = bare === s ? s : bare.replace(/^\s+/, "");
-  return t.trim() && !PLACEHOLDER.test(t.replace(/\[[\d:.]+\]\s*/g, "").trim()) ? t : null;
+  const text = bareText(s);
+  return text && !PLACEHOLDER.test(text) && !text.split(/\r?\n/).every((l) => !l.trim() || STUB.test(l.trim())) ? t : null;
 }
-const placeholder = (s: string | null | undefined) => !!s && !lyric(s) && !!s.replace(LRC_HEAD, "").trim();
+const placeholder = (s: string | null | undefined) => !!s && PLACEHOLDER.test(bareText(s));
 
 const rymName = (slug: string) =>
   (existsSync(`${META}/raw/${slug}`) ? readdirSync(`${META}/raw/${slug}`) : []).filter((n) => /^rym-\d{4}-\d{2}-\d{2}\.json$/.test(n)).sort().at(-1)?.slice(0, -5) ?? "rym-none";
