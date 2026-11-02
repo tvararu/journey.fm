@@ -274,7 +274,7 @@ struct Backdrop: View {
 
 struct VolumeSlider: UIViewRepresentable {
     func makeUIView(context: Context) -> MPVolumeView {
-        let view = MPVolumeView()
+        let view = CentredVolumeView()
         let thumb = UIGraphicsImageRenderer(size: CGSize(width: 12, height: 12)).image { _ in
             UIColor.white.setFill()
             UIBezierPath(ovalIn: CGRect(x: 0, y: 0, width: 12, height: 12)).fill()
@@ -285,6 +285,14 @@ struct VolumeSlider: UIViewRepresentable {
     }
 
     func updateUIView(_ view: MPVolumeView, context: Context) {}
+}
+
+final class CentredVolumeView: MPVolumeView {
+    override func volumeSliderRect(forBounds bounds: CGRect) -> CGRect {
+        var rect = super.volumeSliderRect(forBounds: bounds)
+        rect.origin.y = bounds.midY - rect.height / 2
+        return rect
+    }
 }
 
 extension Track {
