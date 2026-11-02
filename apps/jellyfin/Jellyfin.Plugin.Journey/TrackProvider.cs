@@ -44,6 +44,7 @@ public class TrackProvider(AlbumTags albumTags, ILibraryManager libraryManager)
     {
         var existing = libraryManager.GetPeople(item);
         var next = existing.Where(p => !CreditKinds.Contains(p.Type))
+            .Select(p => new PersonInfo { Name = p.Name, Type = p.Type, Role = p.Role, SortOrder = p.SortOrder })
             .Concat(credits.Select(c => new PersonInfo { Name = c.Name, Type = Enum.Parse<PersonKind>(c.Kind) }))
             .ToList();
         if (existing.Select(Key).SequenceEqual(next.Select(Key)))

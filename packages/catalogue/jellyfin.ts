@@ -14,7 +14,7 @@ async function call(path: string, init: RequestInit = {}): Promise<any> {
   return r.status === 204 ? null : r.json();
 }
 
-type Folder = { Name: string; ItemId: string; RefreshStatus?: string; RefreshProgress?: number };
+type Folder = { Name: string; ItemId: string; RefreshStatus?: string; RefreshProgress?: number; LibraryOptions: Record<string, unknown> };
 const music = async () => ((await call("/Library/VirtualFolders")) as Folder[]).find((f) => f.Name === "Music")!;
 
 async function refresh(): Promise<void> {
@@ -28,6 +28,11 @@ async function refresh(): Promise<void> {
     await Bun.sleep(30000);
   }
   console.log("refreshed");
+  const { Items } = await call(`/Artists/AlbumArtists?userId=${login.User.Id}&ParentId=${lib.ItemId}`);
+  for (const a of Items) {
+    await call(`/Items/${a.Id}/Refresh?MetadataRefreshMode=Default&ImageRefreshMode=None&ReplaceAllMetadata=false&ReplaceAllImages=false`, { method: "POST" });
+  }
+  console.log(`queued ${Items.length} album artists`);
 }
 
 async function clear(): Promise<void> {
@@ -48,11 +53,25 @@ async function clear(): Promise<void> {
   console.log(`cleared ${n} of ${Items.length} albums`);
 }
 
+async function options(): Promise<void> {
+  const lib = await music();
+  if (lib.LibraryOptions["PreferNonstandardArtistsTag"] === true) {
+    console.log("PreferNonstandardArtistsTag already on");
+    return;
+  }
+  await call("/Library/VirtualFolders/LibraryOptions", {
+    method: "POST",
+    body: JSON.stringify({ Id: lib.ItemId, LibraryOptions: { ...lib.LibraryOptions, PreferNonstandardArtistsTag: true } }),
+  });
+  console.log("PreferNonstandardArtistsTag on");
+}
+
 const cmd = Bun.argv[2];
 if (cmd === "refresh") await refresh();
 else if (cmd === "clear") await clear();
+else if (cmd === "options") await options();
 else {
-  console.error("usage: jellyfin refresh | clear");
+  console.error("usage: jellyfin refresh | clear | options | test | plugin");
   process.exit(1);
 }
 
