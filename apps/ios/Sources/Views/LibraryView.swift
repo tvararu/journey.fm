@@ -106,6 +106,8 @@ struct LibraryView: View {
                             subtitle: album.subtitle(
                                 [album.artistName, album.year.map(String.init)], repeats: repeats))
                     }
+                } header: {
+                    header(section.label)
                 }
                 .sectionIndexLabel(section.label)
             }
@@ -122,12 +124,24 @@ struct LibraryView: View {
             ForEach(indexed(shown) { indexLetter($0.sortName) }) { section in
                 Section {
                     ForEach(section.items) { ArtistRow(artist: $0) }
+                } header: {
+                    header(section.label)
                 }
                 .sectionIndexLabel(section.label)
             }
         }
         .listStyle(.plain)
         .listSectionIndexVisibility(.visible)
+    }
+
+    @ViewBuilder private func header(_ label: String) -> some View {
+        if !label.isEmpty {
+            Text(label)
+                .font(.title3.weight(.semibold))
+                .foregroundStyle(Color.primary)
+                .textCase(nil)
+                .accessibilityAddTraits(.isHeader)
+        }
     }
 
     private func sectionKey(_ album: Album) -> String {

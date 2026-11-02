@@ -191,7 +191,8 @@ Step 3:
   toggle and a `.searchable` filter for this screen only, all kept in
   `@AppStorage`. The grid has two columns of covers with title and
   artist below. Lists get an A–Z index from Jellyfin's sort names (`#`
-  for digits, decades when sorted by year, none for Recently Added).
+  for digits, decades when sorted by year, none for Recently Added),
+  and each letter or decade heads its section, as in Apple Music.
 - Where title and artist repeat (Celldweller's five End of an Empire),
   the subtitle adds the track count.
 - Album page: no title in the bar; cover, title (never truncated),
@@ -209,6 +210,8 @@ Step 3:
   local FTS5 with word-prefix matching, results grouped Artists, Albums,
   Tracks with a few of each and See All. A track result opens its album
   and plays from it. Recent searches fill the empty state.
+  Tapping the tab you're on goes back to its top page; on Search's top
+  page it focuses the field.
   Matching ignores hyphen variants (Bong-Ra is tagged with both U+2010
   and an ASCII hyphen).
 - Context menus on every album tile and track row: Play, Shuffle, Play

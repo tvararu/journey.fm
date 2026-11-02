@@ -10,14 +10,17 @@ struct RootView: View {
     @State private var tab = AppTab.home
     @State private var paths: [AppTab: [Route]] = [:]
     @State private var showPlayer = false
+    @State private var focusSearch = 0
 
     var body: some View {
-        TabView(selection: $tab) {
+        TabView(selection: Binding(get: { tab }, set: select)) {
             Tab("Home", systemImage: "house", value: AppTab.home) { HomeView(path: path(.home)) }
             Tab("Library", systemImage: "square.stack", value: AppTab.library) {
                 LibraryView(path: path(.library))
             }
-            Tab(value: AppTab.search, role: .search) { SearchView(path: path(.search)) }
+            Tab(value: AppTab.search, role: .search) {
+                SearchView(path: path(.search), focusRequest: focusSearch)
+            }
         }
         .tabBarMinimizeBehavior(tab == .library ? .onScrollDown : .never)
         .tabViewBottomAccessory(isEnabled: player.current != nil) {
@@ -29,6 +32,17 @@ struct RootView: View {
                 paths[tab, default: []].append(route)
             }
         }
+    }
+
+    private func select(_ chosen: AppTab) {
+        if chosen == tab {
+            if !(paths[chosen] ?? []).isEmpty {
+                paths[chosen] = []
+            } else if chosen == .search {
+                focusSearch += 1
+            }
+        }
+        tab = chosen
     }
 
     private func path(_ tab: AppTab) -> Binding<[Route]> {

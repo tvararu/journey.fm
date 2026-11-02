@@ -7,6 +7,8 @@ struct SearchView: View {
     @Binding var path: [Route]
     @State private var query = ""
     @State private var results = SearchResults()
+    @FocusState private var searching: Bool
+    var focusRequest = 0
 
     var body: some View {
         TabStack(path: $path) {
@@ -16,6 +18,8 @@ struct SearchView: View {
                     text: $query, placement: .navigationBarDrawer(displayMode: .always),
                     prompt: "Artists, Albums and Tracks"
                 )
+                .searchFocused($searching)
+                .onChange(of: focusRequest) { searching = true }
                 .task(id: query) {
                     try? await Task.sleep(for: .milliseconds(150))
                     guard !Task.isCancelled else { return }
