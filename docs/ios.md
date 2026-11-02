@@ -17,7 +17,8 @@ better than Apple Music's, and build it entirely from stock iOS parts:
 - `NavigationStack` with the system navigation bar, large titles and
   back swipe
 - `List` and `LazyVGrid` for shelves and track lists; `.searchable` for
-  search; `.sheet` for now playing; `.contextMenu` and `.swipeActions`
+  search; `.sheet` for now playing, zooming out of the mini player
+  (`.navigationTransition(.zoom)`); `.contextMenu` and `.swipeActions`
   for album and track actions
 - System fonts, colours, symbols, light and dark mode; no custom
   gestures, drawers, tab bars or animations
@@ -235,7 +236,8 @@ Step 4:
 - Mini player: `tabViewBottomAccessory(isEnabled:)`, hidden until
   something is queued. Expanded: art, title, artist, play/pause, next.
   Inline (`tabViewBottomAccessoryPlacement`): art, title, play/pause.
-  Tapping it opens now playing.
+  Tapping it opens now playing, which grows out of the bar and shrinks
+  back into it, as in Apple Music.
 - Now playing: a full-height sheet with art, title, "artist · album",
   scrubber with elapsed and remaining, previous (restarts after 3 s),
   play/pause, next, shuffle, repeat (off, all, one), AirPlay

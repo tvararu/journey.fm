@@ -11,6 +11,7 @@ struct RootView: View {
     @State private var paths: [AppTab: [Route]] = [:]
     @State private var showPlayer = false
     @State private var focusSearch = 0
+    @Namespace private var playerZoom
 
     var body: some View {
         TabView(selection: Binding(get: { tab }, set: select)) {
@@ -25,12 +26,14 @@ struct RootView: View {
         .tabBarMinimizeBehavior(tab == .library ? .onScrollDown : .never)
         .tabViewBottomAccessory(isEnabled: player.current != nil) {
             MiniPlayer { showPlayer = true }
+                .matchedTransitionSource(id: "player", in: playerZoom)
         }
         .sheet(isPresented: $showPlayer) {
             NowPlayingView { route in
                 showPlayer = false
                 paths[tab, default: []].append(route)
             }
+            .navigationTransition(.zoom(sourceID: "player", in: playerZoom))
         }
     }
 
