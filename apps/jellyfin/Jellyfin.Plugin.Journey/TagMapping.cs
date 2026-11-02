@@ -33,7 +33,6 @@ public static partial class TagMapping
         "TITLE", "ALBUM", "ARTIST", "ARTISTS", "ALBUMARTIST", "GENRE", "LABEL", "COMPOSER", "TRACKNUMBER",
         "DISCNUMBER", "MUSICBRAINZ_ALBUMID", "MUSICBRAINZ_RELEASEGROUPID", "MUSICBRAINZ_ALBUMARTISTID",
         "MUSICBRAINZ_TRACKID", "MUSICBRAINZ_RELEASETRACKID", "MUSICBRAINZ_ARTISTID", "LYRICS",
-        "REPLAYGAIN_TRACK_GAIN", "REPLAYGAIN_ALBUM_GAIN",
     };
 
     public static readonly IReadOnlyDictionary<string, string> Credits = new Dictionary<string, string>
@@ -50,7 +49,7 @@ public static partial class TagMapping
 
     public static readonly IReadOnlySet<string> Native = new HashSet<string>
     {
-        "ORIGINALDATE", "RYM_RATING_SCORE", "RYM_ID", "ACOUSTID_ID", "LRCLIB_ID",
+        "RYM_RATING_SCORE", "RYM_ID", "ACOUSTID_ID", "LRCLIB_ID",
     };
 
     public static readonly IReadOnlyList<string> TrackProviderIds = [AcoustId, LrcLib];
@@ -80,6 +79,11 @@ public static partial class TagMapping
                     continue;
                 }
 
+                if (key == "ORIGINALDATE")
+                {
+                    fields.PremiereDate = ParseDate(value);
+                }
+
                 if (Credits.TryGetValue(key, out var kind))
                 {
                     fields.People.Add(new Credit(value, kind));
@@ -87,10 +91,6 @@ public static partial class TagMapping
                 else if (TrackIdKeys.TryGetValue(key, out var id))
                 {
                     fields.ProviderIds[id] = value;
-                }
-                else if (key == "ORIGINALDATE")
-                {
-                    fields.PremiereDate = ParseDate(value);
                 }
                 else if (key == "RYM_ID")
                 {

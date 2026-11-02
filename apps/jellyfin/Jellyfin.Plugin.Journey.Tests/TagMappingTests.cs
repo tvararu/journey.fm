@@ -18,6 +18,7 @@ public class TagMappingTests
             "DATE:2004-03-23", "RELEASETYPE:album", "CATALOGNUMBER:STH2065", "ALBUMARTISTSORT:Madvillain",
             "RYM_SECONDARY_GENRE:Jazz Rap (18)", "RYM_DESCRIPTORS:playful", "RYM_RANK:#1 for 2004, #9 overall",
             "TOTALTRACKS:22", "REPLAYGAIN_ALBUM_PEAK:1.00000000", "CATALOGUED_AT:2026-11-02",
+            "ORIGINALDATE:2004-03-19", "REPLAYGAIN_ALBUM_GAIN:-7.01 dB",
         ];
         foreach (var tag in expected)
         {
@@ -37,6 +38,7 @@ public class TagMappingTests
         Assert.Contains("PERFORMER:MF DOOM (lead vocals)", track.Tags);
         Assert.Contains("ISRC:US2S70465001", track.Tags);
         Assert.Contains("REPLAYGAIN_TRACK_PEAK:0.95852661", track.Tags);
+        Assert.Contains("REPLAYGAIN_TRACK_GAIN:-6.25 dB", track.Tags);
         Assert.DoesNotContain("DATE:2004-03-23", track.Tags);
         Assert.Equal("1bd79e69-4915-46bb-933b-0787df19752c", track.ProviderIds[TagMapping.AcoustId]);
         Assert.Equal("27139463", track.ProviderIds[TagMapping.LrcLib]);
@@ -128,7 +130,7 @@ public class TagMappingTests
     public void ATrackOnItsOwnKeepsEveryTag()
     {
         var fields = TagMapping.MapAlone(Fixtures.Track("a", ("RELEASETYPE", "album"), ("ISRC", "X1"), ("ORIGINALDATE", "2001")));
-        Assert.Equal(new[] { "RELEASETYPE:album", "ISRC:X1" }, fields.Tags);
+        Assert.Equal(new[] { "RELEASETYPE:album", "ISRC:X1", "ORIGINALDATE:2001" }, fields.Tags);
         Assert.Equal(new DateTime(2001, 1, 1), fields.PremiereDate);
     }
 
