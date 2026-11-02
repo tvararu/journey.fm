@@ -383,5 +383,13 @@ Open:
 7. **Download everything.** Done 1 Nov: Download All and Download New
    Albums, carried on by the system's background session a few tracks at
    a time, with the app woken to queue the next ones.
-8. **Lyrics and metadata.** Synced lyrics from `/Audio/{id}/Lyrics`,
-   genres and the rest once tags are written back to the FLACs.
+8. **Metadata.** Once the catalogue writes it back to the FLACs or
+   serves it alongside them: genres, browsable and on album and artist
+   pages; genre descriptions; moods; artist origins, shown as the
+   country's flag; artist descriptions.
+9. **Lyrics.** Plain lyrics, and synced lyrics that follow playback,
+   from `/Audio/{id}/Lyrics`, filling the empty slot left of AirPlay in
+   now playing.
+10. **Play log.** Every play recorded on the phone and kept across
+    queues, so the queue's History becomes all recent listening, as in
+    Apple Music, rather than only this queue's earlier tracks.
