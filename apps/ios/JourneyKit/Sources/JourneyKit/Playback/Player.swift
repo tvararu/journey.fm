@@ -145,6 +145,12 @@ public final class Player {
         edited()
     }
 
+    public func clearHistory() {
+        let at = queue.current.flatMap { counter.sessionStart(of: $0.id) } ?? .now
+        let library = library
+        Task { try? await library.clearHistory(at: at) }
+    }
+
     public func setShuffle(_ on: Bool) {
         queue.setShuffle(on)
         edited()

@@ -64,7 +64,7 @@ extension Library {
                     SELECT track.* FROM track
                     JOIN (
                         SELECT trackId, max(playedAt) AS last FROM play
-                        WHERE playedAt > coalesce((SELECT clearedAt FROM history), '')
+                        WHERE playedAt >= coalesce((SELECT clearedAt FROM history), '')
                             AND entryId IS NOT ?
                         GROUP BY trackId ORDER BY last DESC LIMIT ?
                     ) p ON p.trackId = track.id

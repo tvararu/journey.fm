@@ -321,6 +321,7 @@ struct QueuePanel<Header: View>: View {
     @Environment(Player.self) private var player
     @ViewBuilder var header: Header
     @State private var history: [TrackHit] = []
+    @State private var loaded = false
 
     var body: some View {
         let upNext = Array(player.queue.upNext)
@@ -338,10 +339,7 @@ struct QueuePanel<Header: View>: View {
                             .listRowBackground(Color.clear)
                         }
                     } header: {
-                        heading("History") {
-                            let library = model.library
-                            Task { try? await library.clearHistory() }
-                        }
+                        heading("History") { player.clearHistory() }
                     }
                 }
                 Section {
@@ -390,9 +388,10 @@ struct QueuePanel<Header: View>: View {
             .task(id: player.current?.id) {
                 await watch(model.library.observeHistory(excluding: player.current?.id)) {
                     history = $0
+                    loaded = true
                 }
             }
-            .onAppear { proxy.scrollTo("current", anchor: .top) }
+            .onChange(of: loaded) { proxy.scrollTo("current", anchor: .top) }
         }
     }
 

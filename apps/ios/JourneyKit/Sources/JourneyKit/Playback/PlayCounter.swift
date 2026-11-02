@@ -30,6 +30,10 @@ struct PlayCounter {
         sampled = position
     }
 
+    func sessionStart(of id: UUID) -> Date? {
+        entry?.id == id ? startedAt : nil
+    }
+
     mutating func advance(
         _ entry: QueueEntry, to position: Double, playing: Bool, now: Date = .now
     ) -> CountedPlay? {

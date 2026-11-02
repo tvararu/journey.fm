@@ -134,6 +134,15 @@ func paranoidWith(_ ids: [String]) async throws -> Library {
     #expect(try await recent.next()?.map(\.id) == ["p"])
 }
 
+@Test func clearingAtThePlayingTrackStartKeepsItInHistory() async throws {
+    let library = try await paranoidWith(["a", "b"])
+    try await library.recordPlay(logged("a", at: 0))
+    try await library.clearHistory(at: start.addingTimeInterval(60))
+    try await library.recordPlay(logged("b", at: 60))
+    var history = library.observeHistory(excluding: nil).makeAsyncIterator()
+    #expect(try await history.next()?.map(\.track.id) == ["b"])
+}
+
 @Test func historyKeepsTheLatestHundredTracks() async throws {
     let ids = (0..<101).map { "t\($0)" }
     let library = try await paranoidWith(ids)
