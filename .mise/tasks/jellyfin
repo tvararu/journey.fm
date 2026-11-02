@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+#MISE description="Refresh Jellyfin's Music library from the tags (replace all metadata), or clear the online leftovers from its albums: jellyfin refresh | clear"
+set -euo pipefail
+cd "$MISE_PROJECT_ROOT/packages/catalogue"
+exec bun jellyfin.ts "$@"
