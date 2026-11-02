@@ -10,6 +10,7 @@ public struct ArtistSummary: Codable, Sendable, Hashable, Identifiable, Fetchabl
     public var name: String
     public var sortName: String
     public var imageTag: String?
+    public var overview: String?
     public var albumCount: Int
     public var firstYear: Int?
     public var lastYear: Int?
@@ -20,11 +21,25 @@ public struct AlbumDetail: Sendable, Equatable {
     public var artists: [Artist]
     public var tracks: [Track]
     public var more: [Album]
+    public var tags: [Tag] = []
+    public var genres: [String] = []
+    public var credits: [Credit] = []
 }
 
 public struct ArtistDetail: Sendable, Equatable {
     public var artist: ArtistSummary
     public var albums: [Album]
+}
+
+public struct GenreSummary: Codable, Sendable, Hashable, Identifiable, FetchableRecord {
+    public var name: String
+    public var albumCount: Int
+    public var id: String { name }
+}
+
+public struct TrackCredits: Sendable, Equatable {
+    public var credits: [Credit]
+    public var isrc: [String]
 }
 
 public struct TrackHit: Sendable, Equatable, Identifiable {
@@ -38,20 +53,31 @@ public struct TrackHit: Sendable, Equatable, Identifiable {
     }
 }
 
+public struct CreditHit: Sendable, Equatable, Identifiable {
+    public var album: Album
+    public var name: String
+    public var reads: String
+    public var id: String { "\(album.id)\u{0}\(name)" }
+}
+
+public struct LyricHit: Sendable, Equatable, Identifiable {
+    public var hit: TrackHit
+    public var line: String
+    public var id: String { hit.id }
+}
+
 public struct SearchResults: Sendable, Equatable {
     public var artists: [ArtistSummary] = []
     public var albums: [Album] = []
     public var tracks: [TrackHit] = []
+    public var credits: [CreditHit] = []
+    public var lyrics: [LyricHit] = []
 
     public init() {}
 
-    init(artists: [ArtistSummary], albums: [Album], tracks: [TrackHit]) {
-        self.artists = artists
-        self.albums = albums
-        self.tracks = tracks
+    public var isEmpty: Bool {
+        artists.isEmpty && albums.isEmpty && tracks.isEmpty && credits.isEmpty && lyrics.isEmpty
     }
-
-    public var isEmpty: Bool { artists.isEmpty && albums.isEmpty && tracks.isEmpty }
 }
 
 extension Library {
@@ -92,7 +118,20 @@ extension Library {
             let more = try artists.first.map { artist in
                 try Self.albums(db, artistId: artist.id).filter { $0.id != id }
             }
-            return AlbumDetail(album: album, artists: artists, tracks: tracks, more: more ?? [])
+            let tags = try AlbumTag.filter(Column("albumId") == id).order(Column("position"))
+                .fetchAll(db).map { Tag($0.key, $0.value) }
+            let genres = try String.fetchAll(
+                db, sql: "SELECT name FROM albumGenre WHERE albumId = ? ORDER BY position",
+                arguments: [id])
+            let credits = try Credit.fetchAll(
+                db,
+                sql: """
+                    SELECT credit.* FROM credit JOIN track ON track.id = credit.trackId
+                    WHERE track.albumId = ?
+                    """, arguments: [id])
+            return AlbumDetail(
+                album: album, artists: artists, tracks: tracks, more: more ?? [], tags: tags,
+                genres: genres, credits: credits)
         }.values(in: db)
     }
 
@@ -107,6 +146,46 @@ extension Library {
         }.values(in: db)
     }
 
+    public func observeGenres() -> AsyncValueObservation<[GenreSummary]> {
+        ValueObservation.tracking { db in
+            try GenreSummary.fetchAll(
+                db,
+                sql: """
+                    SELECT name, count(DISTINCT albumId) AS albumCount FROM albumGenre
+                    GROUP BY name ORDER BY lower(name)
+                    """)
+        }.values(in: db)
+    }
+
+    public func observeGenre(name: String) -> AsyncValueObservation<[Album]> {
+        ValueObservation.tracking { db in
+            try Album.fetchAll(
+                db,
+                sql: """
+                    SELECT DISTINCT album.* FROM album
+                    JOIN albumGenre ON albumGenre.albumId = album.id
+                    WHERE albumGenre.name = ?
+                    ORDER BY album.artistSortName, album.year, album.sortName
+                    """, arguments: [name])
+        }.values(in: db)
+    }
+
+    public func trackCredits(trackId: String) async throws -> TrackCredits {
+        try await db.read { db in
+            let credits = try Credit.filter(Column("trackId") == trackId)
+                .order(Column("position")).fetchAll(db)
+            let isrc = try String.fetchAll(
+                db,
+                sql: """
+                    SELECT value FROM trackTag WHERE trackId = ?1 AND key = 'ISRC'
+                    UNION ALL
+                    SELECT value FROM albumTag WHERE key = 'ISRC'
+                        AND albumId = (SELECT albumId FROM track WHERE id = ?1)
+                    """, arguments: [trackId])
+            return TrackCredits(credits: credits, isrc: isrc)
+        }
+    }
+
     public func randomAlbums(limit: Int) async throws -> [Album] {
         try await db.read { try Album.order(sql: "random()").limit(limit).fetchAll($0) }
     }
@@ -115,7 +194,8 @@ extension Library {
         guard let pattern = FTS5Pattern(matchingAllPrefixesIn: text) else { return SearchResults() }
         let query = text.trimmingCharacters(in: .whitespaces)
         return try await db.read { db in
-            let artists = try ArtistSummary.fetchAll(
+            var results = SearchResults()
+            results.artists = try ArtistSummary.fetchAll(
                 db,
                 sql: Self.artistSummary + """
                      WHERE artist.rowid IN
@@ -123,7 +203,7 @@ extension Library {
                     GROUP BY artist.id
                     ORDER BY instr(lower(artist.name), lower(?)) = 1 DESC, artist.sortName
                     """, arguments: [pattern, query])
-            let albums = try Album.fetchAll(
+            results.albums = try Album.fetchAll(
                 db,
                 sql: """
                     SELECT album.* FROM album
@@ -139,13 +219,62 @@ extension Library {
                     WHERE trackSearch MATCH ?
                     ORDER BY instr(lower(track.name), lower(?)) = 1 DESC, trackSearch.rank
                     """, arguments: [pattern, query])
-            let trackAlbums = try Album.fetchAll(db, keys: Set(tracks.map(\.albumId)))
-            let byId = Dictionary(uniqueKeysWithValues: trackAlbums.map { ($0.id, $0) })
-            return SearchResults(
-                artists: artists, albums: albums,
-                tracks: tracks.compactMap { track in
-                    byId[track.albumId].map { TrackHit(track: track, album: $0) }
-                })
+            let credits = try Row.fetchAll(
+                db,
+                sql: """
+                    SELECT credit.name, credit.role, credit.kind, track.albumId FROM credit
+                    JOIN creditSearch ON creditSearch.rowid = credit.rowid
+                    JOIN track ON track.id = credit.trackId
+                    WHERE creditSearch MATCH ?
+                    ORDER BY instr(lower(credit.name), lower(?)) = 1 DESC, credit.name,
+                        track.albumId, track.disc, track.number, credit.position
+                    """, arguments: [pattern, query])
+            let lyrics = try Row.fetchAll(
+                db,
+                sql: """
+                    SELECT track.*, lyrics.text AS lyricText FROM lyrics
+                    JOIN lyricsSearch ON lyricsSearch.rowid = lyrics.rowid
+                    JOIN track ON track.id = lyrics.trackId
+                    WHERE lyricsSearch MATCH ?
+                    ORDER BY lyricsSearch.rank LIMIT 200
+                    """, arguments: [pattern])
+            let lyricTracks = try lyrics.map { try Track(row: $0) }
+            let albumIds = Set(
+                tracks.map(\.albumId) + lyricTracks.map(\.albumId)
+                    + credits.map { $0["albumId"] as String })
+            let byId = Dictionary(
+                uniqueKeysWithValues: try Album.fetchAll(db, keys: albumIds).map { ($0.id, $0) })
+            results.tracks = tracks.compactMap { track in
+                byId[track.albumId].map { TrackHit(track: track, album: $0) }
+            }
+            var creditHits: [CreditHit] = []
+            var index: [String: Int] = [:]
+            for row in credits {
+                let albumId: String = row["albumId"]
+                guard let album = byId[albumId] else { continue }
+                let credit = Credit(
+                    trackId: "", name: row["name"], role: row["role"], kind: row["kind"],
+                    position: 0)
+                let key = "\(albumId)\u{0}\(credit.name)"
+                if let i = index[key] {
+                    if !creditHits[i].reads.components(separatedBy: ", ").contains(credit.reads) {
+                        creditHits[i].reads += ", \(credit.reads)"
+                    }
+                } else {
+                    index[key] = creditHits.count
+                    creditHits.append(
+                        CreditHit(album: album, name: credit.name, reads: credit.reads))
+                }
+            }
+            results.credits = creditHits
+            results.lyrics = zip(lyrics, lyricTracks).compactMap { row, track in
+                byId[track.albumId].map {
+                    LyricHit(
+                        hit: TrackHit(track: track, album: $0),
+                        line: matchingLine(row["lyricText"], query: query))
+                }
+            }
+            return results
         }
     }
 
@@ -180,4 +309,22 @@ extension Library {
         case .added: [Column("dateCreated").desc]
         }
     }
+}
+
+func matchingLine(_ text: String, query: String) -> String {
+    let fold = { (s: Substring) in
+        s.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: nil)
+    }
+    let wanted = query.split(whereSeparator: { !$0.isLetter && !$0.isNumber }).map(fold)
+    let lines = text.split(separator: "\n").filter {
+        !$0.trimmingCharacters(in: .whitespaces).isEmpty
+    }
+    var best: (line: Substring, score: Int)?
+    for line in lines {
+        let words = line.split(whereSeparator: { !$0.isLetter && !$0.isNumber }).map(fold)
+        let score = wanted.filter { want in words.contains { $0.hasPrefix(want) } }.count
+        if score > best?.score ?? 0 { best = (line, score) }
+        if score == wanted.count { break }
+    }
+    return String(best?.line ?? lines.first ?? "")
 }
