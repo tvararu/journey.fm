@@ -36,4 +36,5 @@ targets:
         LSRequiresIPhoneOS: true
         UILaunchScreen: {}
         UIBackgroundModes: [audio]
+        BGTaskSchedulerPermittedIdentifiers: [fm.journey.app.downloads.*]
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]

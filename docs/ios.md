@@ -313,6 +313,12 @@ Step 7:
   saved, Download New Albums turns on; after each sync it saves the
   albums Jellyfin added since the last one. Remove All Downloads turns
   both off.
+- While tracks are waiting and nothing pauses them, opening the app or
+  starting a download keeps the app running in the background as a
+  continued processing task: the Lock Screen shows "Downloading Music,
+  1,234 of 7,702 tracks" and can cancel it. It ends when the queue is
+  empty or a pause starts, and is offered again the next time the app
+  opens. Swiping the app away cancels it.
 
 Steps 8 and 9 (2 Nov), designed in
 `docs/superpowers/specs/2026-11-02-ios-metadata-lyrics-design.md`:
@@ -414,13 +420,16 @@ Open:
    the downloaded part, starting the decoder at the nearest FLAC seek
    point; a track that step 5 is still saving plays from the stream.
 7. **Download everything.** Done 1 Nov: Download All and Download New
-   Albums, carried on by the system's background session. Whenever the
-   app runs it queues up to 500 tracks, as many as fit in the free space
-   above 2 GB at 200 kB per second of audio (the largest rate among the
-   first saved tracks). iOS starts transfers queued in the background
-   only at its discretion and rate-limits the wakes that queue them, so
-   queuing 4 at a time (until 3 Nov) saved 4 tracks every 15 to 20
-   minutes in the background, then stopped.
+   Albums, 4 tracks at a time per class (saved or Download All), album by
+   album, in the system's background session. On 3 Nov downloads stalled:
+   with the app suspended, each refill needed a wake, which iOS
+   rate-limits, and transfers queued in the background start only at
+   its discretion, so 4 tracks landed every 15 to 20 minutes, then none.
+   Queuing 500 at once kept them going but split sol's upload 500 ways,
+   since HTTP/2 puts them all on one connection and
+   `httpMaximumConnectionsPerHost` no longer limits them. Now a
+   `BGContinuedProcessingTask` (iOS 26) keeps the app running to refill
+   the 4, and anything over 4 still in the session is cancelled.
 8. **Metadata.** Done 2 Nov, from the journey.fm Jellyfin plugin:
    details, credits and ratings on album pages, a credits sheet per
    track, browsable genres, artist descriptions, search by credit, and

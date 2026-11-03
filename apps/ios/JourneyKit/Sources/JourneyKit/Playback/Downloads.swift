@@ -140,7 +140,6 @@ public final class Downloads {
     public private(set) var summary = DownloadSummary()
     public private(set) var progress: [String: Double] = [:]
     public var paused = false
-    @ObservationIgnored public var room: Int64 = .max
 
     @ObservationIgnored public let files: SavedFiles
     @ObservationIgnored public var finishedEvents: (() -> Void)?
@@ -157,7 +156,7 @@ public final class Downloads {
 
     public init(
         library: Library, client: JellyfinClient, directory: URL,
-        configuration: URLSessionConfiguration, window: Int = 500
+        configuration: URLSessionConfiguration, window: Int = 4
     ) {
         self.window = window
         self.library = library
@@ -278,28 +277,25 @@ public final class Downloads {
                 if live[id] == nil { live[id] = task } else { task.cancel() }
             }
             let pending = try await library.pendingDownloads()
-            let wanted = Set(pending.map(\.trackId))
-            tasks = [:]
-            for (id, task) in live {
-                if wanted.contains(id) { tasks[id] = task } else { task.cancel() }
-            }
-            guard !paused else { return }
-            let wifiOnly = Set(pending.filter(\.wifiOnly).map(\.trackId))
-            let sizes = Dictionary(pending.map { ($0.trackId, Self.estimate($0)) }) { a, _ in a }
             var running = [false: 0, true: 0]
-            var queued: Int64 = 0
-            for id in tasks.keys {
-                running[wifiOnly.contains(id), default: 0] += 1
-                queued += sizes[id] ?? 0
+            tasks = [:]
+            for item in pending {
+                guard let task = live.removeValue(forKey: item.trackId) else { continue }
+                if running[item.wifiOnly, default: 0] < window {
+                    running[item.wifiOnly, default: 0] += 1
+                    tasks[item.trackId] = task
+                } else {
+                    task.cancel()
+                }
             }
+            for task in live.values { task.cancel() }
+            guard !paused else { return }
             let recent = Date.now.addingTimeInterval(-Self.backoff)
             for item in pending where tasks[item.trackId] == nil {
-                let size = Self.estimate(item)
-                guard running[item.wifiOnly, default: 0] < window, queued + size <= room,
+                guard running[item.wifiOnly, default: 0] < window,
                     failedAt[item.trackId].map({ $0 < recent }) ?? true
                 else { continue }
                 running[item.wifiOnly, default: 0] += 1
-                queued += size
                 var request = client.request(client.audioURL(trackId: item.trackId))
                 request.allowsExpensiveNetworkAccess = !item.wifiOnly
                 request.allowsConstrainedNetworkAccess = !item.wifiOnly
@@ -347,10 +343,6 @@ public final class Downloads {
     }
 
     static let backoff: TimeInterval = 5 * 60
-
-    nonisolated static func estimate(_ item: PendingDownload) -> Int64 {
-        Int64(item.duration * 200_000)
-    }
 
     nonisolated static func trackId(_ file: String) -> String {
         String(file.prefix { $0 != "." })
