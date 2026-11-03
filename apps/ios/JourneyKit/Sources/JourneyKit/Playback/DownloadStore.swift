@@ -19,6 +19,7 @@ public struct PendingDownload: Sendable, Equatable {
     public var trackId: String
     public var file: String
     public var wifiOnly: Bool
+    public var duration: Double
 }
 
 extension Library {
@@ -88,12 +89,15 @@ extension Library {
             return try Row.fetchAll(
                 db,
                 sql: """
-                    SELECT download.trackId, \(Self.file) AS file, download.wifiOnly FROM download
-                    JOIN track ON track.id = download.trackId WHERE download.savedAt IS NULL
+                    SELECT download.trackId, \(Self.file) AS file, download.wifiOnly, track.duration
+                    FROM download JOIN track ON track.id = download.trackId
+                    WHERE download.savedAt IS NULL
                     ORDER BY download.wifiOnly, track.albumId, track.disc, track.number
                     """
             ).map {
-                PendingDownload(trackId: $0["trackId"], file: $0["file"], wifiOnly: $0["wifiOnly"])
+                PendingDownload(
+                    trackId: $0["trackId"], file: $0["file"], wifiOnly: $0["wifiOnly"],
+                    duration: $0["duration"])
             }
         }
     }

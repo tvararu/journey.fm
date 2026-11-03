@@ -119,6 +119,23 @@ struct DownloadTests {
         #expect(stub.lock.withLock { stub.mostActive } <= 3)
     }
 
+    @Test func onlyAsManyTracksAsFitInTheRoomAreQueued() async throws {
+        let stub = Stub(body: pattern(64 * 1024))
+        stub.delay = 5
+        let tracks = (1...6).map { track("x\($0)", album: "x") }
+        let (_, downloads) = try await setUp(stub, tracks: tracks)
+        let size = Downloads.estimate(
+            PendingDownload(trackId: "x1", file: "x1.flac", wifiOnly: true, duration: 60))
+        downloads.room = size * 2 + size / 2
+
+        await downloads.saveEverything()
+        #expect(downloads.tasks.count == 2)
+        downloads.room = size * 5
+        await downloads.resume()
+        #expect(downloads.tasks.count == 5)
+        downloads.invalidate()
+    }
+
     @Test func downloadNewAlbumsOnlyWantsAlbumsAddedAfterTheCutoff() async throws {
         let stub = Stub(body: pattern(100))
         let (library, downloads) = try await setUp(

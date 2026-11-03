@@ -414,8 +414,13 @@ Open:
    the downloaded part, starting the decoder at the nearest FLAC seek
    point; a track that step 5 is still saving plays from the stream.
 7. **Download everything.** Done 1 Nov: Download All and Download New
-   Albums, carried on by the system's background session a few tracks at
-   a time, with the app woken to queue the next ones.
+   Albums, carried on by the system's background session. Whenever the
+   app runs it queues up to 500 tracks, as many as fit in the free space
+   above 2 GB at 200 kB per second of audio (the largest rate among the
+   first saved tracks). iOS starts transfers queued in the background
+   only at its discretion and rate-limits the wakes that queue them, so
+   queuing 4 at a time (until 3 Nov) saved 4 tracks every 15 to 20
+   minutes in the background, then stopped.
 8. **Metadata.** Done 2 Nov, from the journey.fm Jellyfin plugin:
    details, credits and ratings on album pages, a credits sheet per
    track, browsable genres, artist descriptions, search by credit, and

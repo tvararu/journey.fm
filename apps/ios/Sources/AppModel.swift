@@ -131,6 +131,7 @@ final class AppModel {
         ])
         freeSpace = values?.volumeAvailableCapacityForImportantUsage
         guard let downloads, let freeSpace else { return }
+        downloads.room = freeSpace - Self.reserve
         let full = freeSpace < Self.reserve
         if downloads.paused != full {
             downloads.paused = full
