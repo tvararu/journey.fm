@@ -43,21 +43,19 @@ what sync takes from Jellyfin, and nothing else:
 
 | Item | Fields |
 |---|---|
-| Album | title, album artists, year, genres, cover art, date added |
-| Artist | name, image (album artists only) |
-| Track | title, disc and track number, duration, artists, album |
+| Album | title, album artists, year, genres, cover art, date added; from 2 Nov the first release date, RYM rating, label, ReplayGain and every `KEY:Value` tag the journey.fm plugin serves |
+| Artist | name, image (album artists only), description |
+| Track | title, disc and track number, duration, artists, album; from 2 Nov credits (Jellyfin's people and the `PERFORMER` tags), tags, ReplayGain, lyrics |
 
 Jellyfin's track count per album can be wrong, so counts and total
 durations come from the synced tracks.
 
-Not available yet, so any screen that needs it waits for a later step:
+Not available:
 
-- Play history, so no recently played or jump back in: step 4
-- Downloaded state and storage used: step 5
-- Lyrics: step 9
-- RYM, MusicBrainz, Discogs and RED data (ratings, descriptors, labels,
-  credits, release types): only in the catalogue (`apps/web`) until tags
-  are written back to the FLACs, step 8
+- Genre descriptions and moods: no source has them
+- Artist origins: 49 of 293 artists have one, so no flags
+- Whether a track is instrumental: not in the tags, so instrumental
+  tracks look like tracks without lyrics
 - Playlists and favourites: in Jellyfin, but not synced
 
 The library is about 680 albums by 300 album artists. 181 artists have
@@ -316,10 +314,39 @@ Step 7:
   albums Jellyfin added since the last one. Remove All Downloads turns
   both off.
 
-Step 8:
+Steps 8 and 9 (2 Nov), designed in
+`docs/superpowers/specs/2026-11-02-ios-metadata-lyrics-design.md`:
 
-- Lyrics replace the art in now playing; the current line is bold,
-  tapping a line seeks. Step 8 metadata appears only where it exists.
+- Album page: the meta line puts a release type that isn't Album first
+  ("EP · 2012 · Stoner") and opens the album's genre, or a menu of its
+  genres. After the tracks: Details (released, this edition when it
+  differs, label, catalogue number, format, country, language, barcode,
+  RYM genres, scene, descriptors), Credits (each person once, roles and
+  track numbers, "all tracks" where it applies) and Ratings (RYM score
+  and votes, opening the RYM page; rank; when it was fetched). Rows and
+  sections without values are left out.
+- View Credits on every track's context menu and in now playing's "…"
+  menu opens a sheet: Performers, Written By, Production and Engineering,
+  then the ISRC.
+- Library gains a Genres capsule (the curated `GENRE` tag, 134 genres)
+  with an A–Z index; a genre page lists its albums by artist, with Play,
+  Shuffle and the grid or list layout.
+- Artist pages show TheAudioDB's description, three lines then More.
+- Search also finds credited people (the album, "Madlib · producer,
+  engineer") and lyric lines (the track, with the line).
+- Lyrics (the quote button left of AirPlay, greyed out without lyrics)
+  replace the art in now playing as the queue does. Synced lines follow
+  playback with the current one brightest, played ones dimmest; tapping
+  a line seeks; scrolling by hand pauses the following for 3 s. Plain
+  lyrics scroll freely under "Not Synced". The choice stays across
+  tracks.
+- Every track's lyrics are kept on the phone: after each sync they are
+  fetched 8 at a time beside the covers (Settings shows "Fetching
+  lyrics"), again when a track's `Etag` changes; a 404 is remembered as
+  no lyrics. All 5,551 take about 10 MB.
+- Playback runs at the album's ReplayGain, or the track's without one,
+  capped by the peak so nothing clips; there is no setting. Jellyfin's
+  own `NormalizationGain` is its own scan and is ignored.
 
 Left for the catalogue: Celldweller's five albums want distinct titles,
 and the hyphen variants want one spelling, both written back to the tags
@@ -389,13 +416,14 @@ Open:
 7. **Download everything.** Done 1 Nov: Download All and Download New
    Albums, carried on by the system's background session a few tracks at
    a time, with the app woken to queue the next ones.
-8. **Metadata.** Once the catalogue writes it back to the FLACs or
-   serves it alongside them: genres, browsable and on album and artist
-   pages; genre descriptions; moods; artist origins, shown as the
-   country's flag; artist descriptions.
-9. **Lyrics.** Plain lyrics, and synced lyrics that follow playback,
-   from `/Audio/{id}/Lyrics`, filling the empty slot left of AirPlay in
-   now playing.
+8. **Metadata.** Done 2 Nov, from the journey.fm Jellyfin plugin:
+   details, credits and ratings on album pages, a credits sheet per
+   track, browsable genres, artist descriptions, search by credit, and
+   ReplayGain in playback. Genre descriptions, moods and artist origins
+   have no source yet.
+9. **Lyrics.** Done 2 Nov: every track's lyrics on the phone, synced
+   lyrics that follow playback and plain ones, in the slot left of
+   AirPlay, and search by lyric line.
 10. **Play log.** Done 2 Nov: a play counts after half the track or 4
     minutes heard (never under 30 s), is kept on the phone and feeds the
     queue's History and Recently Played.

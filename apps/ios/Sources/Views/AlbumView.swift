@@ -48,6 +48,7 @@ struct AlbumView: View {
 
     private func content(_ detail: AlbumDetail) -> some View {
         let album = detail.album
+        let facts = AlbumFacts(album: album, tags: detail.tags)
         let discs = Dictionary(grouping: detail.tracks) { $0.disc ?? 1 }
         let hits = detail.tracks.map { TrackHit(track: $0, album: album) }
         let row = { (track: Track) in
@@ -64,8 +65,7 @@ struct AlbumView: View {
                     .font(.title2.bold())
                     .multilineTextAlignment(.center)
                 artists(detail)
-                Text(album.meta).lineLimit(1)
-                    .font(.subheadline).foregroundStyle(.secondary)
+                AlbumMetaLine(detail: detail, facts: facts)
                 Text(album.counts)
                     .font(.subheadline).foregroundStyle(.secondary)
             }
@@ -100,6 +100,7 @@ struct AlbumView: View {
                     ForEach(detail.tracks) { row($0) }
                 }
             }
+            AlbumSections(detail: detail, facts: facts)
             if let artist = detail.artists.first, !detail.more.isEmpty {
                 Section("More by \(artist.name)") {
                     ScrollView(.horizontal) {
@@ -282,6 +283,11 @@ struct ArtistView: View {
             }
             .frame(maxWidth: .infinity)
             .listRowSeparator(.hidden)
+            if let overview = artist.overview {
+                ExpandableText(text: overview)
+                    .listRowSeparator(.hidden)
+                    .accessibilityIdentifier("artist-overview")
+            }
             PlayButtons(
                 play: { load(shuffled: false) }, shuffle: { load(shuffled: true) }
             )

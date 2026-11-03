@@ -54,12 +54,16 @@ struct PlayPauseButton: View {
 }
 
 struct NowPlayingView: View {
+    @Environment(AppModel.self) private var model
     @Environment(Player.self) private var player
     @Environment(\.dismiss) private var dismiss
     let open: (Route) -> Void
     @State private var scrub: Double?
     @State private var scrubbing = false
     @State private var showingQueue = false
+    @State private var showingLyrics = false
+    @State private var lyrics: Lyrics?
+    @State private var credits: TrackHit?
 
     var body: some View {
         Group {
@@ -80,6 +84,9 @@ struct NowPlayingView: View {
             ZStack {
                 if showingQueue {
                     QueuePanel { header(entry) }
+                        .transition(.opacity)
+                } else if showingLyrics, let lyrics {
+                    LyricsPanel(lyrics: lyrics) { header(entry) }
                         .transition(.opacity)
                 } else {
                     VStack(spacing: 0) {
@@ -106,6 +113,11 @@ struct NowPlayingView: View {
         }
         .padding(.bottom, 8)
         .background { Backdrop(art: entry.album.art) }
+        .task(id: entry.track.id) {
+            lyrics = nil
+            await watch(model.library.observeLyrics(trackId: entry.track.id)) { lyrics = $0 }
+        }
+        .sheet(item: $credits) { CreditsSheet(hit: $0) }
     }
 
     private func titleRow(_ entry: QueueEntry) -> some View {
@@ -142,6 +154,11 @@ struct NowPlayingView: View {
     private func more(_ entry: QueueEntry) -> some View {
         Menu {
             TrackDownloadActions(track: entry.track)
+            Section {
+                Button("View Credits", systemImage: "person.2") {
+                    credits = TrackHit(track: entry.track, album: entry.album)
+                }
+            }
             Section {
                 Button {
                     open(.album(entry.album.id))
@@ -233,7 +250,16 @@ struct NowPlayingView: View {
             .foregroundStyle(.secondary)
             .accessibilityElement(children: .contain)
             HStack {
-                Color.clear.frame(width: 44, height: 44).frame(maxWidth: .infinity)
+                panelButton(
+                    "Lyrics", systemImage: "quote.bubble", on: showingLyrics && lyrics != nil
+                ) {
+                    showingQueue = false
+                    showingLyrics.toggle()
+                }
+                .disabled(lyrics == nil)
+                .accessibilityIdentifier("now-playing-lyrics")
+                .opacity(lyrics == nil ? 0.35 : 1)
+                .frame(maxWidth: .infinity)
                 ZStack {
                     Image(systemName: "airplay.audio")
                         .font(.system(size: 24))
@@ -244,20 +270,29 @@ struct NowPlayingView: View {
                 .accessibilityElement(children: .contain)
                 .accessibilityLabel("AirPlay")
                 .frame(maxWidth: .infinity)
-                Button("Queue", systemImage: "list.bullet") {
-                    withAnimation(.spring(duration: 0.4)) { showingQueue.toggle() }
+                panelButton("Queue", systemImage: "list.bullet", on: showingQueue) {
+                    showingLyrics = false
+                    showingQueue.toggle()
                 }
-                .labelStyle(.iconOnly)
-                .font(.system(size: 24))
-                .foregroundStyle(showingQueue ? AnyShapeStyle(.black) : AnyShapeStyle(.secondary))
-                .frame(width: 44, height: 44)
-                .background(showingQueue ? Color.white.opacity(0.85) : .clear, in: .circle)
-                .accessibilityAddTraits(showingQueue ? .isSelected : [])
                 .accessibilityIdentifier("now-playing-queue")
                 .frame(maxWidth: .infinity)
             }
             .buttonStyle(.plain)
         }
+    }
+
+    private func panelButton(
+        _ title: String, systemImage: String, on: Bool, action: @escaping () -> Void
+    ) -> some View {
+        Button(title, systemImage: systemImage) {
+            withAnimation(.spring(duration: 0.4)) { action() }
+        }
+        .labelStyle(.iconOnly)
+        .font(.system(size: 24))
+        .foregroundStyle(on ? AnyShapeStyle(.black) : AnyShapeStyle(.secondary))
+        .frame(width: 44, height: 44)
+        .background(on ? Color.white.opacity(0.85) : .clear, in: .circle)
+        .accessibilityAddTraits(on ? .isSelected : [])
     }
 }
 

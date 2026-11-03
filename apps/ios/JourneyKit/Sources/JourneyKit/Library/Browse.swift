@@ -40,6 +40,11 @@ public struct GenreSummary: Codable, Sendable, Hashable, Identifiable, Fetchable
 public struct TrackCredits: Sendable, Equatable {
     public var credits: [Credit]
     public var isrc: [String]
+
+    public init(credits: [Credit], isrc: [String]) {
+        self.credits = credits
+        self.isrc = isrc
+    }
 }
 
 public struct TrackHit: Sendable, Equatable, Identifiable {

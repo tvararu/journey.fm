@@ -33,6 +33,11 @@ struct SettingsView: View {
                         LabeledContent(
                             "Fetching covers", value: "\(covers.done) of \(covers.total)")
                     }
+                    if let lyrics = model.lyrics, lyrics.total > 0 {
+                        LabeledContent(
+                            "Fetching lyrics",
+                            value: "\(lyrics.done.formatted()) of \(lyrics.total.formatted())")
+                    }
                     Button(model.syncError == nil ? "Sync Now" : "Try Again") {
                         Task { await model.sync() }
                     }

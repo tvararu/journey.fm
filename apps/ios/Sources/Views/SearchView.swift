@@ -16,7 +16,7 @@ struct SearchView: View {
                 .navigationTitle("Search")
                 .searchable(
                     text: $query, placement: .navigationBarDrawer(displayMode: .always),
-                    prompt: "Artists, Albums and Tracks"
+                    prompt: "Artists, Albums, Tracks and Lyrics"
                 )
                 .searchFocused($searching)
                 .onChange(of: focusRequest) { searching = true }
@@ -40,7 +40,8 @@ struct SearchView: View {
             if recent.isEmpty {
                 ContentUnavailableView(
                     "Search Your Library", systemImage: "magnifyingglass",
-                    description: Text("Artists, albums and tracks, searched on this iPhone."))
+                    description: Text(
+                        "Artists, albums, tracks, credits and lyrics, searched on this iPhone."))
             } else {
                 List {
                     Section {
@@ -83,6 +84,18 @@ struct SearchView: View {
                         seeAll(results.tracks.count, "Tracks", 4, .searchTracks(trimmed))
                     }
                 }
+                if !results.credits.isEmpty {
+                    Section("Credits") {
+                        ForEach(results.credits.prefix(4)) { CreditHitRow(hit: $0) }
+                        seeAll(results.credits.count, "Credits", 4, .searchCredits(trimmed))
+                    }
+                }
+                if !results.lyrics.isEmpty {
+                    Section("Lyrics") {
+                        ForEach(results.lyrics.prefix(4)) { LyricHitRow(hit: $0) }
+                        seeAll(results.lyrics.count, "Lyrics", 4, .searchLyrics(trimmed))
+                    }
+                }
             }
             .listStyle(.plain)
         }
@@ -110,7 +123,7 @@ func searchSubtitle(_ album: Album) -> String {
 
 struct SearchAllView: View {
     enum Kind {
-        case artists, albums, tracks
+        case artists, albums, tracks, credits, lyrics
     }
 
     @Environment(AppModel.self) private var model
@@ -126,6 +139,8 @@ struct SearchAllView: View {
                 case .albums:
                     ForEach(results.albums) { AlbumRow(album: $0, subtitle: searchSubtitle($0)) }
                 case .tracks: ForEach(results.tracks) { TrackHitRow(hit: $0) }
+                case .credits: ForEach(results.credits) { CreditHitRow(hit: $0) }
+                case .lyrics: ForEach(results.lyrics) { LyricHitRow(hit: $0) }
                 }
             }
             .listSectionSeparator(.hidden, edges: .top)
@@ -140,6 +155,24 @@ struct SearchAllView: View {
         case .artists: "Artists"
         case .albums: "Albums"
         case .tracks: "Tracks"
+        case .credits: "Credits"
+        case .lyrics: "Lyrics"
         }
+    }
+}
+
+struct CreditHitRow: View {
+    let hit: CreditHit
+
+    var body: some View {
+        AlbumRow(album: hit.album, subtitle: "\(hit.name) · \(hit.reads)")
+    }
+}
+
+struct LyricHitRow: View {
+    let hit: LyricHit
+
+    var body: some View {
+        TrackHitRow(hit: hit.hit, subtitle: hit.line)
     }
 }

@@ -6,6 +6,7 @@ enum AppTab: Hashable {
 }
 
 struct RootView: View {
+    @Environment(AppModel.self) private var model
     @Environment(Player.self) private var player
     @State private var tab = AppTab.home
     @State private var paths: [AppTab: [Route]] = [:]
@@ -14,6 +15,7 @@ struct RootView: View {
     @Namespace private var playerZoom
 
     var body: some View {
+        @Bindable var model = model
         TabView(selection: Binding(get: { tab }, set: select)) {
             Tab("Home", systemImage: "house", value: AppTab.home) { HomeView(path: path(.home)) }
             Tab("Library", systemImage: "square.stack", value: AppTab.library) {
@@ -35,6 +37,7 @@ struct RootView: View {
             }
             .navigationTransition(.zoom(sourceID: "player", in: playerZoom))
         }
+        .sheet(item: $model.credits) { CreditsSheet(hit: $0) }
     }
 
     private func select(_ chosen: AppTab) {

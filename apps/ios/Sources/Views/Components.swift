@@ -4,11 +4,14 @@ import SwiftUI
 enum Route: Hashable {
     case album(String)
     case artist(String)
+    case genre(String)
     case recentlyAdded
     case recentlyPlayed
     case searchArtists(String)
     case searchAlbums(String)
     case searchTracks(String)
+    case searchCredits(String)
+    case searchLyrics(String)
 }
 
 struct Navigator: Equatable {
@@ -33,11 +36,14 @@ struct TabStack<Content: View>: View {
                 switch route {
                 case .album(let id): AlbumView(id: id)
                 case .artist(let id): ArtistView(id: id)
+                case .genre(let name): GenreView(name: name)
                 case .recentlyAdded: RecentlyAddedView()
                 case .recentlyPlayed: RecentlyPlayedView()
                 case .searchArtists(let query): SearchAllView(query: query, kind: .artists)
                 case .searchAlbums(let query): SearchAllView(query: query, kind: .albums)
                 case .searchTracks(let query): SearchAllView(query: query, kind: .tracks)
+                case .searchCredits(let query): SearchAllView(query: query, kind: .credits)
+                case .searchLyrics(let query): SearchAllView(query: query, kind: .lyrics)
                 }
             }
         }
@@ -57,11 +63,6 @@ func watch<S: AsyncSequence>(_ values: S, _ update: (S.Element) -> Void) async {
 
 extension Album {
     var art: ArtItem? { imageTag.map { ArtItem(id: id, tag: $0) } }
-
-    var meta: String {
-        [year.map(String.init), genres.isEmpty ? nil : genres].compactMap(\.self)
-            .joined(separator: " · ")
-    }
 
     var counts: String { "\(tracksText(trackCount)) · \(lengthText(duration))" }
 
@@ -232,6 +233,7 @@ struct PlayActions: View {
 }
 
 struct TrackActions: View {
+    @Environment(AppModel.self) private var model
     @Environment(Player.self) private var player
     let hit: TrackHit
 
@@ -245,6 +247,9 @@ struct TrackActions: View {
             }
         }
         TrackDownloadActions(track: hit.track)
+        Section {
+            Button("View Credits", systemImage: "person.2") { model.credits = hit }
+        }
     }
 }
 
@@ -411,6 +416,7 @@ struct TrackHitRow: View {
     @Environment(\.navigate) private var navigate
     @Environment(Player.self) private var player
     let hit: TrackHit
+    var subtitle: String?
 
     var body: some View {
         Button {
@@ -424,7 +430,7 @@ struct TrackHitRow: View {
                 ArtView(item: hit.album.art, size: 48)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(hit.track.name).lineLimit(1)
-                    Text("\(hit.track.artistName) · \(hit.album.name)")
+                    Text(subtitle ?? "\(hit.track.artistName) · \(hit.album.name)")
                         .font(.subheadline).foregroundStyle(.secondary).lineLimit(1)
                 }
                 Spacer()

@@ -2,7 +2,7 @@ import JourneyKit
 import SwiftUI
 
 enum LibraryKind: String {
-    case albums, artists
+    case albums, artists, genres
 }
 
 struct LibraryView: View {
@@ -13,6 +13,7 @@ struct LibraryView: View {
     @Binding var path: [Route]
     @State private var albums: [Album] = []
     @State private var artists: [ArtistSummary] = []
+    @State private var genres: [GenreSummary] = []
 
     var body: some View {
         TabStack(path: $path) {
@@ -45,6 +46,7 @@ struct LibraryView: View {
                     await watch(model.library.observeAlbums(sort: sort)) { albums = $0 }
                 }
                 .task { await watch(model.library.observeArtists()) { artists = $0 } }
+                .task { await watch(model.library.observeGenres()) { genres = $0 } }
         }
     }
 
@@ -56,6 +58,8 @@ struct LibraryView: View {
             albumList
         case .artists:
             artistList
+        case .genres:
+            genreList
         }
     }
 
@@ -63,6 +67,7 @@ struct LibraryView: View {
         HStack {
             chip("Albums", .albums)
             chip("Artists", .artists)
+            chip("Genres", .genres)
         }
     }
 
@@ -117,14 +122,24 @@ struct LibraryView: View {
         .listSectionIndexVisibility(.visible)
     }
 
-    @ViewBuilder private func header(_ label: String) -> some View {
-        if !label.isEmpty {
-            Text(label)
-                .font(.title3.weight(.semibold))
-                .foregroundStyle(Color.primary)
-                .textCase(nil)
-                .accessibilityAddTraits(.isHeader)
+    private var genreList: some View {
+        List {
+            chips.buttonBorderShape(.capsule).listRowSeparator(.hidden)
+            ForEach(indexed(genres) { indexLetter($0.name) }) { section in
+                Section {
+                    ForEach(section.items) { GenreRow(genre: $0) }
+                } header: {
+                    header(section.label)
+                }
+                .sectionIndexLabel(section.label)
+            }
         }
+        .listStyle(.plain)
+        .listSectionIndexVisibility(.visible)
+    }
+
+    @ViewBuilder private func header(_ label: String) -> some View {
+        if !label.isEmpty { SectionHeading(title: label) }
     }
 
     private func sectionKey(_ album: Album) -> String {

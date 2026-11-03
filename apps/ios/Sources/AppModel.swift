@@ -18,6 +18,8 @@ final class AppModel {
     var syncing = false
     var syncProgress = SyncProgress()
     var covers: CoverProgress?
+    var lyrics: CoverProgress?
+    var credits: TrackHit?
     var syncError: String?
     var error: String?
     var syncOffline = false { didSet { player.offline = offline } }
@@ -213,7 +215,9 @@ final class AppModel {
         } else {
             await downloads?.resume()
         }
+        async let fetchingLyrics: Void = fetchLyrics(JellyfinClient(session: session))
         await fetchCovers(art)
+        await fetchingLyrics
     }
 
     private func runSync(_ client: JellyfinClient) async -> Bool {
@@ -257,6 +261,21 @@ final class AppModel {
             }
         } catch {
             Log.art.error("Listing covers failed: \(String(describing: error), privacy: .public)")
+        }
+    }
+
+    private func fetchLyrics(_ client: JellyfinClient) async {
+        guard lyrics == nil else { return }
+        lyrics = CoverProgress(done: 0, total: 0)
+        defer { lyrics = nil }
+        do {
+            try await LyricsSync(source: client, library: library).run { done, total in
+                Task { @MainActor in
+                    if self.lyrics != nil { self.lyrics = CoverProgress(done: done, total: total) }
+                }
+            }
+        } catch {
+            Log.sync.error("Lyrics stopped: \(String(describing: error), privacy: .public)")
         }
     }
 
