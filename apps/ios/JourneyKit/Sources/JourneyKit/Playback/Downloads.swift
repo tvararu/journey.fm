@@ -321,11 +321,24 @@ public final class Downloads {
             let waiting = pending.filter {
                 tasks[$0.trackId] == nil && failedAt[$0.trackId].map({ $0 < recent }) ?? true
             }
-            for batch in Self.batches(waiting) {
+            let byId = Dictionary(waiting.map { ($0.trackId, $0) }) { first, _ in first }
+            var resumable: [[PendingDownload]] = []
+            for key in resumeData.keys {
+                let ids = key.split(separator: ",").map(String.init)
+                let batch = ids.compactMap { byId[$0] }
+                if batch.count == ids.count {
+                    resumable.append(batch)
+                } else {
+                    resumeData[key] = nil
+                }
+            }
+            let claimed = Set(resumable.joined().map(\.trackId))
+            for batch in resumable + Self.batches(waiting.filter { !claimed.contains($0.trackId) })
+            {
                 let wifiOnly = batch[0].wifiOnly
                 guard running[wifiOnly, default: 0] < window else { continue }
                 running[wifiOnly, default: 0] += 1
-                var request = client.request(client.archiveURL(trackIds: batch.map(\.trackId)))
+                var request = client.request(client.archiveURL(ids: Self.request(batch)))
                 request.allowsExpensiveNetworkAccess = !wifiOnly
                 request.allowsConstrainedNetworkAccess = !wifiOnly
                 let task =
@@ -334,8 +347,7 @@ public final class Downloads {
                     ?? session.downloadTask(with: request)
                 task.taskDescription = batch.map { "\($0.trackId)/\($0.file)" }.joined(
                     separator: ",")
-                task.priority =
-                    wifiOnly ? URLSessionTask.lowPriority : URLSessionTask.defaultPriority
+                task.priority = wifiOnly ? URLSessionTask.lowPriority : URLSessionTask.highPriority
                 for item in batch { tasks[item.trackId] = task }
                 task.resume()
             }
@@ -387,7 +399,8 @@ public final class Downloads {
     }
 
     static let backoff: TimeInterval = 5 * 60
-    nonisolated static let batch = 50
+    nonisolated static let archiveAlbums = 20
+    nonisolated static let archiveIds = 150
 
     nonisolated static func trackId(_ file: String) -> String {
         String(file.prefix { $0 != "." })
@@ -404,16 +417,36 @@ public final class Downloads {
 
     nonisolated static func batches(_ items: [PendingDownload]) -> [[PendingDownload]] {
         var batches: [[PendingDownload]] = []
-        for item in items {
-            if let last = batches.last, last.count < batch, last[0].album == item.album,
-                last[0].wifiOnly == item.wifiOnly
+        for album in albums(items) {
+            if let last = batches.last, last[0].wifiOnly == album[0].wifiOnly,
+                albums(last).count < archiveAlbums, request(last + album).count <= archiveIds
             {
-                batches[batches.count - 1].append(item)
+                batches[batches.count - 1] += album
             } else {
-                batches.append([item])
+                batches.append(album)
             }
         }
         return batches
+    }
+
+    nonisolated static func request(_ batch: [PendingDownload]) -> [String] {
+        albums(batch).flatMap {
+            $0.count == $0[0].albumTracks ? [$0[0].album] : $0.map(\.trackId)
+        }
+    }
+
+    nonisolated static func albums(_ items: [PendingDownload]) -> [[PendingDownload]] {
+        var albums: [[PendingDownload]] = []
+        for item in items {
+            if let last = albums.last?.last, last.album == item.album,
+                last.wifiOnly == item.wifiOnly
+            {
+                albums[albums.count - 1].append(item)
+            } else {
+                albums.append([item])
+            }
+        }
+        return albums
     }
 }
 

@@ -139,15 +139,18 @@ something specific that would be annoying to do ourselves:
   container and duration to the tick, so a re-ripped track downloads
   again while a tag rewrite, which keeps both, doesn't. On launch, on
   sync and when the network returns, files and rows are reconciled. The
-  system gets at most four tracks you saved and four from Download All
+  system gets at most four archives you saved and four from Download All
   at a time, and each finished task hands it the next, also when iOS
   wakes the app in the background to deliver results. Handing it all
   7,706 at once (1 Nov) made nsurlsessiond open every request together,
   thousands against Jellyfin, because HTTP/2 doesn't count streams
-  against the connection limit. A failed track waits five minutes before
-  the next attempt, or until launch, sync or the network returning. A
-  track streamed while waiting to be saved is saved from the stream and
-  its download cancelled.
+  against the connection limit. Tasks the app starts in the background
+  are always discretionary, so iOS holds them until the phone is
+  charging on Wi-Fi or the app is opened (4 Nov: one sat 43 minutes);
+  large archives keep that rare. A failed track waits five minutes
+  before the next attempt, or until launch, sync or the network
+  returning. A track streamed while waiting to be saved is saved from
+  the stream and its download cancelled.
 
 Sync pages through `/Items` 1,000 at a time with
 `EnableTotalRecordCount=false`: Jellyfin takes about 13 s to count 1,000
@@ -313,12 +316,13 @@ Step 7:
   saved, Download New Albums turns on; after each sync it saves the
   albums Jellyfin added since the last one. Remove All Downloads turns
   both off.
-- Downloads go one album at a time per request: the journey.fm plugin's
-  `GET /Journey/Archive?ids=…` streams the tracks as one uncompressed tar
-  (at most 50 per request), which the app unpacks as it lands. Four
-  albums are in flight per class, all in the background session. An
-  interrupted album resumes from where it stopped, through the
-  endpoint's range support and the failed task's resume data.
+- Downloads go up to 20 albums per request: the journey.fm plugin's
+  `GET /Journey/Archive?ids=…` streams them as one uncompressed tar,
+  which the app unpacks once it lands. A whole album is named by its
+  album id and a partly saved one by its track ids, at most 150 ids,
+  since Kestrel refuses request lines over 8 KB. An interrupted archive
+  resumes from where it stopped, through the endpoint's range support
+  and the failed task's resume data.
 
 Steps 8 and 9 (2 Nov), designed in
 `docs/superpowers/specs/2026-11-02-ios-metadata-lyrics-design.md`:

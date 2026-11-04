@@ -20,6 +20,7 @@ public struct PendingDownload: Sendable, Equatable {
     public var file: String
     public var wifiOnly: Bool
     public var album: String
+    public var albumTracks: Int
 }
 
 extension Library {
@@ -90,14 +91,17 @@ extension Library {
                 db,
                 sql: """
                     SELECT download.trackId, \(Self.file) AS file, download.wifiOnly,
-                        track.albumId FROM download
+                        track.albumId,
+                        (SELECT COUNT(*) FROM track AS t WHERE t.albumId = track.albumId)
+                            AS albumTracks
+                    FROM download
                     JOIN track ON track.id = download.trackId WHERE download.savedAt IS NULL
                     ORDER BY download.wifiOnly, track.albumId, track.disc, track.number
                     """
             ).map {
                 PendingDownload(
                     trackId: $0["trackId"], file: $0["file"], wifiOnly: $0["wifiOnly"],
-                    album: $0["albumId"])
+                    album: $0["albumId"], albumTracks: $0["albumTracks"])
             }
         }
     }

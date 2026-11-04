@@ -27,15 +27,25 @@ public class ArchiveController(ILibraryManager library, IUserManager users) : Co
         var files = new List<(string Name, string Path)>();
         foreach (var id in ids.Split(',', StringSplitOptions.RemoveEmptyEntries))
         {
-            if (!Guid.TryParse(id, out var guid)
-                || library.GetItemById(guid) is not Audio track
-                || !track.IsVisible(user)
-                || !System.IO.File.Exists(track.Path))
+            var item = Guid.TryParse(id, out var guid) ? library.GetItemById(guid) : null;
+            List<Audio> tracks = item switch
+            {
+                Audio track => [track],
+                MusicAlbum album => album.Tracks
+                    .OrderBy(t => t.ParentIndexNumber)
+                    .ThenBy(t => t.IndexNumber)
+                    .ThenBy(t => t.Id)
+                    .ToList(),
+                _ => [],
+            };
+            if (tracks.Count == 0
+                || !item!.IsVisible(user)
+                || tracks.Any(t => !t.IsVisible(user) || !System.IO.File.Exists(t.Path)))
             {
                 return NotFound(id);
             }
 
-            files.Add((guid.ToString("N"), track.Path));
+            files.AddRange(tracks.Select(t => (t.Id.ToString("N"), t.Path)));
         }
 
         var versions = files.Select(f => new FileInfo(f.Path)).ToList();

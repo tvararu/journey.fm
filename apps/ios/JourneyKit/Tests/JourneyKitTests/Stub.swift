@@ -17,6 +17,8 @@ final class Stub: @unchecked Sendable {
     var mostActive = 0
     var drops = 0
     var dropAfter = Int.max
+    var albums: [String: [String]] = [:]
+    var requested: [[String]] = []
 
     init(body: Data) {
         self.body = body
@@ -63,17 +65,22 @@ final class StubProtocol: URLProtocol, @unchecked Sendable {
         guard let stub = Stub.find(request), let url = request.url else { return }
         let range = request.value(forHTTPHeaderField: "Range")
         self.stub = stub
-        let (stored, status, chunk, delay) = stub.lock.withLock {
+        let ids =
+            URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems?
+            .first { $0.name == "ids" }?.value?.split(separator: ",").map(String.init) ?? []
+        let (stored, status, chunk, delay, tracks) = stub.lock.withLock {
             stub.active += 1
             stub.mostActive = max(stub.mostActive, stub.active)
             stub.ranges.append(range)
-            return (stub.body, stub.status, stub.chunk, stub.delay)
+            stub.requested.append(ids)
+            return (
+                stub.body, stub.status, stub.chunk, stub.delay,
+                ids.flatMap { stub.albums[$0] ?? [$0] }
+            )
         }
-        let ids = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems?
-            .first { $0.name == "ids" }?.value?.split(separator: ",").map(String.init)
         let body =
             status == 200 && url.path().hasSuffix("/Journey/Archive")
-            ? tar((ids ?? []).map { ($0, stored) }) : stored
+            ? tar(tracks.map { ($0, stored) }) : stored
         var headers = ["Content-Length": String(body.count), "Accept-Ranges": "bytes"]
         var code = status
         remaining = body

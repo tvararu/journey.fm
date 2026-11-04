@@ -107,9 +107,9 @@ public struct JellyfinClient: LibrarySource {
         ])
     }
 
-    public func archiveURL(trackIds: [String]) -> URL {
+    public func archiveURL(ids: [String]) -> URL {
         session.server.appending(path: "Journey/Archive").appending(queryItems: [
-            .init(name: "ids", value: trackIds.joined(separator: ","))
+            .init(name: "ids", value: ids.joined(separator: ","))
         ])
     }
 

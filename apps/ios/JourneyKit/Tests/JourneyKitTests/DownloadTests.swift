@@ -8,8 +8,11 @@ struct DownloadTests {
     let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
 
     func setUp(_ stub: Stub, tracks: [Track]) async throws -> (Library, Downloads) {
+        let albums = Dictionary(grouping: tracks, by: \.albumId).mapValues { $0.map(\.id) }
+        stub.lock.withLock { stub.albums = albums }
         let library = try await librarySynced(
-            artists: [], albums: [album("x"), album("y")], tracks: tracks)
+            artists: [], albums: Set(albums.keys + ["x", "y"]).sorted().map { album($0) },
+            tracks: tracks)
         let downloads = Downloads(
             library: library, client: stub.client, directory: directory,
             configuration: stub.configuration)
@@ -99,11 +102,12 @@ struct DownloadTests {
         #expect(cache.isOnPhone(track("x1", album: "x")))
     }
 
-    @Test func downloadEverythingFetchesOneArchivePerAlbumWithinTheWindow() async throws {
-        let stub = Stub(body: pattern(64 * 1024))
-        stub.chunk = 16 * 1024
+    @Test func downloadEverythingFetchesTwentyAlbumsPerArchiveWithinTheWindow() async throws {
+        let stub = Stub(body: pattern(16 * 1024))
+        stub.chunk = 4 * 1024
         stub.delay = 0.01
-        let tracks = (1...6).map { track("x\($0)", album: "x") } + [track("y1", album: "y")]
+        let albums = (1...21).map { String(format: "a%02d", $0) }
+        let tracks = albums.map { track("\($0)t", album: $0) }
         let (_, downloads) = try await setUp(stub, tracks: tracks)
         let windowed = Downloads(
             library: downloads.library, client: stub.client, directory: directory,
@@ -111,13 +115,23 @@ struct DownloadTests {
         downloads.invalidate()
 
         await windowed.saveEverything()
-        #expect(Set(windowed.tasks.keys) == ["x1", "x2", "x3", "x4", "x5", "x6"])
-        #expect(await eventually(10) { windowed.summary.saved.count == 7 })
+        #expect(windowed.tasks.count == 20)
+        #expect(await eventually(10) { windowed.summary.saved.count == 21 })
         #expect(windowed.summary.everything)
-        #expect(files().count == 7)
-        #expect(try Data(contentsOf: directory.appending(path: "x6.flac")) == pattern(64 * 1024))
-        #expect(stub.requestedRanges.count == 2)
+        #expect(files().count == 21)
+        #expect(stub.lock.withLock { stub.requested } == [Array(albums.prefix(20)), ["a21"]])
         #expect(stub.lock.withLock { stub.mostActive } == 1)
+    }
+
+    @Test func anArchiveNamesWholeAlbumsAndOnlyTheMissingTracksOfOthers() {
+        func pending(_ id: String, _ album: String, of count: Int) -> PendingDownload {
+            PendingDownload(
+                trackId: id, file: "\(id).flac", wifiOnly: true, album: album, albumTracks: count)
+        }
+        let batch = [
+            pending("x1", "x", of: 2), pending("x2", "x", of: 2), pending("y2", "y", of: 3),
+        ]
+        #expect(Downloads.request(batch) == ["x", "y2"])
     }
 
     @Test func removingATrackLeavesTheRestOfItsAlbumDownloading() async throws {
