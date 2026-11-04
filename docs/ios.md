@@ -316,7 +316,9 @@ Step 7:
 - Downloads go one album at a time per request: the journey.fm plugin's
   `GET /Journey/Archive?ids=…` streams the tracks as one uncompressed tar
   (at most 50 per request), which the app unpacks as it lands. Four
-  albums are in flight per class, all in the background session.
+  albums are in flight per class, all in the background session. An
+  interrupted album resumes from where it stopped, through the
+  endpoint's range support and the failed task's resume data.
 
 Steps 8 and 9 (2 Nov), designed in
 `docs/superpowers/specs/2026-11-02-ios-metadata-lyrics-design.md`:
