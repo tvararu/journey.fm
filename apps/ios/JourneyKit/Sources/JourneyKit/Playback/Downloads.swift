@@ -341,6 +341,7 @@ public final class Downloads {
                 var request = client.request(client.archiveURL(ids: Self.request(batch)))
                 request.allowsExpensiveNetworkAccess = !wifiOnly
                 request.allowsConstrainedNetworkAccess = !wifiOnly
+                request.networkServiceType = .background
                 let task =
                     resumeData.removeValue(forKey: batch.map(\.trackId).joined(separator: ","))
                     .map { session.downloadTask(withResumeData: $0) }

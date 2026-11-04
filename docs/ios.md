@@ -132,8 +132,12 @@ something specific that would be annoying to do ourselves:
   restarts it with a `Range` request there (Jellyfin answers 206); once
   the end arrives, the gap is fetched before the file is cached. A seek
   to 14 minutes into a 17-minute track plays within a second.
-- Downloads: a background `URLSession` (`fm.journey.app.downloads`, four
-  connections) into `Application Support/audio`, excluded from backup.
+- Downloads: a background `URLSession` (`fm.journey.app.downloads`) into
+  `Application Support/audio`, excluded from backup. Its requests are
+  background traffic (`networkServiceType = .background`): while the
+  app streams or syncs, the kernel's receive LEDBAT shrinks their window
+  so the foreground requests get through. Before that (4 Nov), three
+  archives starved sync pages for 60 to 208 s until they timed out.
   The `download` table holds what is wanted; a row is saved once the
   file is in place after a 2xx response. The audio's version is the
   container and duration to the tick, so a re-ripped track downloads

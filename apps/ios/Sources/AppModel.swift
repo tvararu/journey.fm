@@ -152,7 +152,6 @@ final class AppModel {
                 withIdentifier: "fm.journey.app.downloads")
             configuration.sessionSendsLaunchEvents = true
             configuration.isDiscretionary = false
-            configuration.httpMaximumConnectionsPerHost = 4
             return Downloads(
                 library: library, client: JellyfinClient(session: $0),
                 directory: Self.downloadsDirectory, configuration: configuration)
