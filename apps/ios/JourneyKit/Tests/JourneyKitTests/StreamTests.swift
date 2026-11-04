@@ -31,3 +31,23 @@ import Testing
     let gaps = stub.requestedRanges.filter { $0?.hasSuffix("-\(offset - 1)") == true }
     #expect(gaps.count == 1)
 }
+
+@Test func aStreamPicksUpWhereADroppedConnectionLeftOff() async throws {
+    let size = 1024 * 1024
+    let stub = Stub(body: pattern(size))
+    stub.chunk = 64 * 1024
+    stub.delay = 0.01
+    stub.drops = 2
+    stub.dropAfter = 256 * 1024
+    let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+    let cache = AudioCache(
+        directory: directory, client: stub.client, configuration: stub.configuration)
+    let track = track("t1", album: "x")
+    let source = try cache.source(for: track)
+    #expect(try source.size(ReadToken()) == Int64(size))
+
+    #expect(await eventually(20) { cache.isOnPhone(track) })
+    #expect(try Data(contentsOf: directory.appending(path: "t1.flac")) == pattern(size))
+    #expect(stub.requestedRanges.count == 3)
+    #expect(stub.requestedRanges.dropFirst().allSatisfy { $0?.hasPrefix("bytes=") == true })
+}

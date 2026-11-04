@@ -282,10 +282,10 @@ Step 5:
 
 - The album page's toolbar has Download, or Remove Download (confirmed)
   once every track is wanted. Download progress is linear: a bar under
-  the album header ("Downloading 3 of 13"), a state per row (saved,
-  downloading with a ring, waiting), a badge on covers when an album is
-  complete. Settings shows the space downloads take and what is free,
-  and Remove All Downloads (confirmed).
+  the album header ("Downloading 3 of 13") and a state per row (saved,
+  downloading with a ring, waiting). Covers carry no badge since 4 Nov:
+  with everything downloaded it was noise. Settings shows the space
+  downloads take and what is free, and Remove All Downloads (confirmed).
 - Offline (no network, or the last sync couldn't reach the server),
   tracks not on the phone are dimmed, not hidden or disabled; tapping one
   offers Download When Online. A queue that reaches a missing track

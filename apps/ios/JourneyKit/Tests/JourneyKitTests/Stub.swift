@@ -15,6 +15,8 @@ final class Stub: @unchecked Sendable {
     var ranges: [String?] = []
     var active = 0
     var mostActive = 0
+    var drops = 0
+    var dropAfter = Int.max
 
     init(body: Data) {
         self.body = body
@@ -44,6 +46,7 @@ final class Stub: @unchecked Sendable {
 final class StubProtocol: URLProtocol, @unchecked Sendable {
     var timer: Timer?
     var remaining = Data()
+    var sent = 0
     var stub: Stub?
     var ended = false
 
@@ -99,7 +102,18 @@ final class StubProtocol: URLProtocol, @unchecked Sendable {
             let piece = self.remaining.prefix(chunk)
             self.remaining = self.remaining.dropFirst(piece.count)
             self.client?.urlProtocol(self, didLoad: Data(piece))
-            if self.remaining.isEmpty {
+            self.sent += piece.count
+            let sent = self.sent
+            let drop = stub.lock.withLock {
+                guard stub.drops > 0, sent >= stub.dropAfter else { return false }
+                stub.drops -= 1
+                return true
+            }
+            if drop {
+                timer.invalidate()
+                self.end()
+                self.client?.urlProtocol(self, didFailWithError: URLError(.networkConnectionLost))
+            } else if self.remaining.isEmpty {
                 timer.invalidate()
                 self.end()
                 self.client?.urlProtocolDidFinishLoading(self)

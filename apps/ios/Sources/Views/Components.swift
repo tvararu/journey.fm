@@ -296,28 +296,6 @@ struct AlbumDownloadActions: View {
     }
 }
 
-struct SavedBadge: ViewModifier {
-    @Environment(AppModel.self) private var model
-    let album: Album
-    var small = false
-
-    func body(content: Content) -> some View {
-        let saved = model.downloads?.summary.completeAlbums.contains(album.id) == true
-        content
-            .overlay(alignment: .bottomTrailing) {
-                if saved {
-                    Image(systemName: "arrow.down.circle.fill")
-                        .symbolRenderingMode(.palette)
-                        .foregroundStyle(.white, .tint)
-                        .font(small ? .footnote : .title3)
-                        .shadow(color: .black.opacity(0.4), radius: 2)
-                        .padding(small ? 2 : 6)
-                        .accessibilityLabel("Downloaded")
-                }
-            }
-    }
-}
-
 struct DownloadIndicator: View {
     let state: DownloadState?
 
@@ -359,7 +337,6 @@ struct AlbumTile: View {
         NavigationLink(value: Route.album(album.id)) {
             VStack(alignment: .leading, spacing: 2) {
                 ArtView(item: album.art, size: size)
-                    .modifier(SavedBadge(album: album))
                     .padding(.bottom, 6)
                 Text(album.name).lineLimit(1)
                 Text(subtitle).font(.subheadline).foregroundStyle(.secondary).lineLimit(1)
@@ -382,7 +359,6 @@ struct AlbumRow: View {
         NavigationLink(value: Route.album(album.id)) {
             HStack(spacing: 12) {
                 ArtView(item: album.art, size: 56)
-                    .modifier(SavedBadge(album: album, small: true))
                 VStack(alignment: .leading, spacing: 2) {
                     Text(album.name).lineLimit(1)
                     Text(subtitle).font(.subheadline).foregroundStyle(.secondary).lineLimit(1)

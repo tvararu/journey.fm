@@ -2,6 +2,8 @@ import Foundation
 
 final class StreamDownload: NSObject, URLSessionDataDelegate, @unchecked Sendable {
     static let ahead: Int64 = 512 * 1024
+    static let idle: TimeInterval = 15
+    static let pauses: [TimeInterval] = [1, 2, 4, 8, 15]
 
     let source: ByteSource
     let partial: URL
@@ -14,6 +16,7 @@ final class StreamDownload: NSObject, URLSessionDataDelegate, @unchecked Sendabl
     var task: URLSessionDataTask?
     var cursor: Int64 = 0
     var stopped = false
+    var failures = 0
 
     init(
         request: URLRequest, partial: URL, destination: URL, session: URLSession,
@@ -58,6 +61,7 @@ final class StreamDownload: NSObject, URLSessionDataDelegate, @unchecked Sendabl
     func fetch(_ range: Range<Int64>?) {
         task?.cancel()
         var request = request
+        request.timeoutInterval = Self.idle
         if let range {
             let end = range.upperBound == .max ? "" : String(range.upperBound - 1)
             request.setValue("bytes=\(range.lowerBound)-\(end)", forHTTPHeaderField: "Range")
@@ -98,6 +102,7 @@ final class StreamDownload: NSObject, URLSessionDataDelegate, @unchecked Sendabl
     func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive data: Data) {
         lock.withLock {
             guard dataTask === task else { return }
+            failures = 0
             do {
                 try writer.seek(toOffset: UInt64(cursor))
                 try writer.write(contentsOf: data)
@@ -116,7 +121,20 @@ final class StreamDownload: NSObject, URLSessionDataDelegate, @unchecked Sendabl
         let next: Next = lock.withLock {
             guard task === self.task else { return .ignore }
             self.task = nil
-            if let error { return .finish(error) }
+            if let error {
+                guard !stopped, failures < Self.pauses.count, Self.transient(error) else {
+                    return .finish(error)
+                }
+                let pause = Self.pauses[failures]
+                failures += 1
+                Log.audio.info(
+                    "Retrying \(self.destination.lastPathComponent, privacy: .public) in \(pause) s: \(error, privacy: .public)"
+                )
+                DispatchQueue.global().asyncAfter(deadline: .now() + pause) { [weak self] in
+                    self?.retry()
+                }
+                return .ignore
+            }
             if stopped { return .finish(SourceError.cancelled) }
             if let gap = source.missing() {
                 fetch(gap)
@@ -125,6 +143,32 @@ final class StreamDownload: NSObject, URLSessionDataDelegate, @unchecked Sendabl
             return .finish(nil)
         }
         if case .finish(let error) = next { complete(error) }
+    }
+
+    func retry() {
+        let finished: Bool = lock.withLock {
+            guard !stopped, task == nil else { return false }
+            let length = source.condition.withLock { source.length }
+            if let length, cursor < length {
+                fetch(cursor..<length)
+            } else if let gap = source.missing() {
+                fetch(gap)
+            } else if length == nil {
+                fetch(nil)
+            } else {
+                return true
+            }
+            return false
+        }
+        if finished { complete(nil) }
+    }
+
+    static func transient(_ error: any Error) -> Bool {
+        guard let code = (error as? URLError)?.code else { return false }
+        return [
+            .timedOut, .networkConnectionLost, .notConnectedToInternet, .cannotConnectToHost,
+            .cannotFindHost, .dnsLookupFailed,
+        ].contains(code)
     }
 
     enum Next {
