@@ -87,7 +87,7 @@ public final class SavedFiles: @unchecked Sendable {
 
 enum DownloadEvent: Sendable {
     case progress([String], Double)
-    case done([String], task: Int, saved: Set<String>, cancelled: Bool)
+    case done([String], task: Int, saved: Set<String>, cancelled: Bool, resume: Data?)
     case finishedEvents
 }
 
@@ -144,7 +144,11 @@ final class DownloadDelegate: NSObject, URLSessionDownloadDelegate, @unchecked S
                 "Download of \(batch.map(\.id), privacy: .public) failed: \(error, privacy: .public)"
             )
         }
-        send(.done(batch.map(\.id), task: task.taskIdentifier, saved: saved, cancelled: cancelled))
+        let resume = (error as NSError?)?.userInfo[NSURLSessionDownloadTaskResumeData] as? Data
+        send(
+            .done(
+                batch.map(\.id), task: task.taskIdentifier, saved: saved, cancelled: cancelled,
+                resume: resume))
     }
 
     func urlSessionDidFinishEvents(forBackgroundURLSession session: URLSession) {
@@ -171,6 +175,7 @@ public final class Downloads {
     @ObservationIgnored var resuming: Task<Void, Never>?
     @ObservationIgnored var again = false
     @ObservationIgnored var failedAt: [String: Date] = [:]
+    @ObservationIgnored var resumeData: [String: Data] = [:]
 
     public init(
         library: Library, client: JellyfinClient, directory: URL,
@@ -323,7 +328,10 @@ public final class Downloads {
                 var request = client.request(client.archiveURL(trackIds: batch.map(\.trackId)))
                 request.allowsExpensiveNetworkAccess = !wifiOnly
                 request.allowsConstrainedNetworkAccess = !wifiOnly
-                let task = session.downloadTask(with: request)
+                let task =
+                    resumeData.removeValue(forKey: batch.map(\.trackId).joined(separator: ","))
+                    .map { session.downloadTask(withResumeData: $0) }
+                    ?? session.downloadTask(with: request)
                 task.taskDescription = batch.map { "\($0.trackId)/\($0.file)" }.joined(
                     separator: ",")
                 task.priority =
@@ -344,14 +352,15 @@ public final class Downloads {
             {
                 progress[id] = fraction
             }
-        case .done(let ids, let task, let saved, let cancelled):
+        case .done(let ids, let task, let saved, let cancelled, let partial):
             for id in ids {
                 if tasks[id].map({ $0.taskIdentifier == task }) ?? true {
                     tasks[id] = nil
                     progress[id] = nil
                 }
-                if !cancelled && !saved.contains(id) { failedAt[id] = .now }
+                if !cancelled && !saved.contains(id) && partial == nil { failedAt[id] = .now }
             }
+            if let partial { resumeData[ids.joined(separator: ",")] = partial }
             Task { await resume(retry: false) }
         case .finishedEvents:
             Task {

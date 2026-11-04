@@ -1,8 +1,10 @@
+using System.Security.Cryptography;
+using System.Text;
 using MediaBrowser.Controller.Entities.Audio;
 using MediaBrowser.Controller.Library;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Net.Http.Headers;
 
 namespace Jellyfin.Plugin.Journey;
 
@@ -12,7 +14,7 @@ namespace Jellyfin.Plugin.Journey;
 public class ArchiveController(ILibraryManager library, IUserManager users) : ControllerBase
 {
     [HttpGet("Archive")]
-    public async Task<ActionResult> Archive([FromQuery] string ids, CancellationToken cancellation)
+    public ActionResult Archive([FromQuery] string ids)
     {
         var user = Guid.TryParse(User.FindFirst("Jellyfin-UserId")?.Value, out var userId)
             ? users.GetUserById(userId)
@@ -36,9 +38,15 @@ public class ArchiveController(ILibraryManager library, IUserManager users) : Co
             files.Add((guid.ToString("N"), track.Path));
         }
 
-        Response.ContentType = "application/x-tar";
-        Response.ContentLength = Tar.Length(files.Select(f => new FileInfo(f.Path).Length));
-        await Tar.Write(Response.Body, files, cancellation);
-        return new EmptyResult();
+        var versions = files.Select(f => new FileInfo(f.Path)).ToList();
+        var modified = versions.Select(f => f.LastWriteTimeUtc).DefaultIfEmpty(DateTime.UnixEpoch).Max();
+        var identity = string.Join('\n', files.Zip(versions, (f, v) => $"{f.Name} {v.Length} {v.LastWriteTimeUtc.Ticks}"));
+        var tag = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(identity)))[..32];
+        return File(
+            new TarStream(files),
+            "application/x-tar",
+            new DateTimeOffset(modified),
+            new EntityTagHeaderValue($"\"{tag}\""),
+            enableRangeProcessing: true);
     }
 }
