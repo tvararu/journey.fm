@@ -99,7 +99,7 @@ struct DownloadTests {
         #expect(cache.isOnPhone(track("x1", album: "x")))
     }
 
-    @Test func downloadEverythingKeepsOnlyAWindowOfRequestsOpen() async throws {
+    @Test func downloadEverythingFetchesOneArchivePerAlbumWithinTheWindow() async throws {
         let stub = Stub(body: pattern(64 * 1024))
         stub.chunk = 16 * 1024
         stub.delay = 0.01
@@ -107,16 +107,31 @@ struct DownloadTests {
         let (_, downloads) = try await setUp(stub, tracks: tracks)
         let windowed = Downloads(
             library: downloads.library, client: stub.client, directory: directory,
-            configuration: stub.configuration, window: 2)
+            configuration: stub.configuration, window: 1)
         downloads.invalidate()
 
         await windowed.saveEverything()
-        #expect(windowed.tasks.count == 2)
-        await windowed.save(trackIds: ["y1"])
-        #expect(windowed.tasks.count == 3)
+        #expect(Set(windowed.tasks.keys) == ["x1", "x2", "x3", "x4", "x5", "x6"])
         #expect(await eventually(10) { windowed.summary.saved.count == 7 })
         #expect(windowed.summary.everything)
-        #expect(stub.lock.withLock { stub.mostActive } <= 3)
+        #expect(files().count == 7)
+        #expect(try Data(contentsOf: directory.appending(path: "x6.flac")) == pattern(64 * 1024))
+        #expect(stub.requestedRanges.count == 2)
+        #expect(stub.lock.withLock { stub.mostActive } == 1)
+    }
+
+    @Test func removingATrackLeavesTheRestOfItsAlbumDownloading() async throws {
+        let stub = Stub(body: pattern(64 * 1024))
+        stub.chunk = 16 * 1024
+        stub.delay = 0.02
+        let (_, downloads) = try await setUp(
+            stub, tracks: [track("x1", album: "x"), track("x2", album: "x")])
+
+        await downloads.save(albumIds: ["x"])
+        await downloads.remove(trackIds: ["x2"])
+        #expect(await eventually { downloads.summary.saved == ["x1"] })
+        #expect(files() == ["x1.flac"])
+        #expect(stub.requestedRanges.count == 1)
     }
 
     @Test func downloadNewAlbumsOnlyWantsAlbumsAddedAfterTheCutoff() async throws {

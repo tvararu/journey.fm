@@ -60,12 +60,17 @@ final class StubProtocol: URLProtocol, @unchecked Sendable {
         guard let stub = Stub.find(request), let url = request.url else { return }
         let range = request.value(forHTTPHeaderField: "Range")
         self.stub = stub
-        let (body, status, chunk, delay) = stub.lock.withLock {
+        let (stored, status, chunk, delay) = stub.lock.withLock {
             stub.active += 1
             stub.mostActive = max(stub.mostActive, stub.active)
             stub.ranges.append(range)
             return (stub.body, stub.status, stub.chunk, stub.delay)
         }
+        let ids = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems?
+            .first { $0.name == "ids" }?.value?.split(separator: ",").map(String.init)
+        let body =
+            status == 200 && url.path().hasSuffix("/Journey/Archive")
+            ? tar((ids ?? []).map { ($0, stored) }) : stored
         var headers = ["Content-Length": String(body.count), "Accept-Ranges": "bytes"]
         var code = status
         remaining = body
@@ -113,6 +118,33 @@ final class StubProtocol: URLProtocol, @unchecked Sendable {
 
 func pattern(_ count: Int) -> Data {
     Data((0..<count).map { UInt8(truncatingIfNeeded: $0 &* 7 &+ $0 >> 8) })
+}
+
+func tar(_ entries: [(String, Data)]) -> Data {
+    var archive = Data()
+    for (name, contents) in entries {
+        var header = [UInt8](repeating: 0, count: 512)
+        func field(_ offset: Int, _ text: String) {
+            header.replaceSubrange(offset..<(offset + text.utf8.count), with: Array(text.utf8))
+        }
+        field(0, name)
+        field(100, "0000644\0")
+        field(124, String(contents.count, radix: 8).leftPadded(11) + "\0")
+        field(156, "0")
+        field(257, "ustar\u{0}00")
+        field(148, "        ")
+        let sum = header.reduce(0) { $0 + Int($1) }
+        field(148, String(sum, radix: 8).leftPadded(6) + "\0 ")
+        archive += header + contents
+        archive += Data(count: (512 - contents.count % 512) % 512)
+    }
+    return archive + Data(count: 1024)
+}
+
+extension String {
+    func leftPadded(_ length: Int) -> String {
+        String(repeating: "0", count: max(0, length - count)) + self
+    }
 }
 
 func eventually(

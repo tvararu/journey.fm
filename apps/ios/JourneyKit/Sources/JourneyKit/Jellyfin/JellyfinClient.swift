@@ -107,6 +107,12 @@ public struct JellyfinClient: LibrarySource {
         ])
     }
 
+    public func archiveURL(trackIds: [String]) -> URL {
+        session.server.appending(path: "Journey/Archive").appending(queryItems: [
+            .init(name: "ids", value: trackIds.joined(separator: ","))
+        ])
+    }
+
     public func download(from url: URL, to destination: URL) async throws {
         let (temporary, response) = try await urlSession.download(for: request(url))
         defer { try? FileManager.default.removeItem(at: temporary) }

@@ -1,4 +1,3 @@
-import BackgroundTasks
 import JourneyKit
 import Network
 import Observation
@@ -45,8 +44,6 @@ final class AppModel {
     let library: Library
     let player: Player
     private var system: SystemAudio?
-    private var continuing = false
-    private var continued: BGContinuedProcessingTask?
     private let monitor = NWPathMonitor()
     #if DEBUG
         private let forcedOffline = ProcessInfo.processInfo.environment["JOURNEY_OFFLINE"] == "1"
@@ -111,8 +108,8 @@ final class AppModel {
     private func update(_ path: NWPath) {
         let wasUp = network == .satisfied
         network = path.status
-        expensiveNetwork = path.isExpensive || path.isConstrained
-        updateContinued()
+        let local = path.usesInterfaceType(.wifi) || path.usesInterfaceType(.wiredEthernet)
+        expensiveNetwork = path.isConstrained || (path.isExpensive && !local)
         if !wasUp && path.status == .satisfied {
             Task {
                 await sync()
@@ -127,58 +124,6 @@ final class AppModel {
             downloadingEverything = false
             downloadNew = true
         }
-        if UIApplication.shared.applicationState == .active { keepDownloading() }
-        updateContinued()
-    }
-
-    func keepDownloading() {
-        guard !continuing, let downloads, !downloads.summary.waiting.isEmpty, downloadPause == nil
-        else { return }
-        let identifier = "fm.journey.app.downloads.\(UUID().uuidString)"
-        BGTaskScheduler.shared.register(forTaskWithIdentifier: identifier, using: .main) {
-            [weak self] task in
-            guard let task = task as? BGContinuedProcessingTask else { return }
-            MainActor.assumeIsolated { self?.run(task) }
-        }
-        let request = BGContinuedProcessingTaskRequest(
-            identifier: identifier, title: "Downloading Music", subtitle: downloadedText)
-        request.strategy = .fail
-        do {
-            try BGTaskScheduler.shared.submit(request)
-            continuing = true
-        } catch {
-            Log.audio.error("Keeping downloads going failed: \(error, privacy: .public)")
-        }
-    }
-
-    private func run(_ task: BGContinuedProcessingTask) {
-        continued = task
-        task.expirationHandler = { [weak self] in
-            Task { @MainActor in self?.endContinued(success: false) }
-        }
-        updateContinued()
-    }
-
-    private func updateContinued() {
-        guard let task = continued, let summary = downloads?.summary else { return }
-        if summary.waiting.isEmpty || downloadPause != nil {
-            endContinued(success: summary.waiting.isEmpty)
-            return
-        }
-        task.progress.totalUnitCount = Int64(summary.wanted)
-        task.progress.completedUnitCount = Int64(summary.saved.count)
-        task.updateTitle("Downloading Music", subtitle: downloadedText)
-    }
-
-    private func endContinued(success: Bool) {
-        continued?.setTaskCompleted(success: success)
-        continued = nil
-        continuing = false
-    }
-
-    private var downloadedText: String {
-        let summary = downloads?.summary ?? DownloadSummary()
-        return "\(summary.saved.count.formatted()) of \(summary.wanted.formatted()) tracks"
     }
 
     func checkSpace() {
