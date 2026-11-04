@@ -23,13 +23,18 @@ enum Tar {
             let output = try FileHandle(forWritingTo: file)
             var left = size
             while left > 0 {
-                guard let chunk = try input.read(upToCount: Int(min(left, 1 << 20))), !chunk.isEmpty
-                else {
+                let copied = try autoreleasepool {
+                    guard let chunk = try input.read(upToCount: Int(min(left, 1 << 20))),
+                        !chunk.isEmpty
+                    else { return 0 }
+                    try output.write(contentsOf: chunk)
+                    return chunk.count
+                }
+                guard copied > 0 else {
                     try? output.close()
                     throw Truncated()
                 }
-                try output.write(contentsOf: chunk)
-                left -= UInt64(chunk.count)
+                left -= UInt64(copied)
             }
             try output.close()
             try input.seek(toOffset: input.offsetInFile + padding)
