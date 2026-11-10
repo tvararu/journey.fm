@@ -1,11 +1,28 @@
 # journey.fm
 
-A catalogue and tagger for a FLAC library, a Jellyfin plugin that serves
-its tags, and an iOS player that reads them.
+My personal music stack consisting of:
 
-It was built for one library of about 670 albums and one person, with
-most of the code written by agents. It is published as it is, for anyone
-who wants to read it or take parts of it.
+- Catalogue and tagger web app for my FLAC library
+- Jellyfin plugin that serves my custom tags
+- Jellyfin client for iOS in pure Swift
+
+Published as-is, feel free to use as inspiration or give to your agent!
+
+## Screenshots
+
+
+| Library                                                       | Album review                                                                 |
+| ------------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| ![The catalogue's library page](docs/screenshots/library.jpg) | ![An album's review page, with cover candidates](docs/screenshots/album.jpg) |
+
+
+
+
+
+| Home                                                                           | Lyrics                                                                                 |
+| ------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------- |
+| <img src="docs/screenshots/home.png" alt="The iOS app's Home tab" width="320"> | <img src="docs/screenshots/lyrics.png" alt="Synced lyrics in now playing" width="320"> |
+
 
 ```mermaid
 flowchart LR
@@ -20,27 +37,27 @@ flowchart LR
 ## Parts
 
 - `packages/catalogue`, `tools/tagging`: find each album's exact
-  MusicBrainz edition, gather covers, credits and synced lyrics, resolve
-  one record per album, and write it to the files with `metaflac`.
-  Rules in [`docs/catalogue.md`](docs/catalogue.md).
+MusicBrainz edition, gather covers, credits and synced lyrics, resolve
+one record per album, and write it to the files with `metaflac`.
+Rules in [`docs/catalogue.md`](docs/catalogue.md).
 - `apps/web`: the viewer. What the files say, what the catalogue
-  proposes, what each source said, cover candidates, accept or request
-  changes.
+proposes, what each source said, cover candidates, accept or request
+changes.
 - `apps/jellyfin`: a Jellyfin plugin that maps the tags into Jellyfin's
-  fields (credits, original dates, ratings, everything else as
-  `KEY:Value` tags) and streams whole albums as one archive.
+fields (credits, original dates, ratings, everything else as
+`KEY:Value` tags) and streams whole albums as one archive.
 - `apps/ios`: a SwiftUI player for that Jellyfin. The library lives in a
-  database on the phone, search is offline, playback is gapless and
-  starts while a track is still downloading, and the whole library can
-  be saved in the background. Design and roadmap in
-  [`docs/ios.md`](docs/ios.md).
+database on the phone, search is offline, playback is gapless and
+starts while a track is still downloading, and the whole library can
+be saved in the background. Design and roadmap in
+[`docs/ios.md`](docs/ios.md).
 
-## Needs
+## Requirements
 
 - [mise](https://mise.jdx.dev), which installs Bun and .NET
 - `ffmpeg`, `rsync` and `ssh` here; a host with the FLACs under
-  `Music/<Artist>/<Album>/`, reachable over ssh, with `bun`, `flac`
-  (for `metaflac`), `fpcalc` and `sqlite3`
+`Music/<Artist>/<Album>/`, reachable over ssh, with `bun`, `flac`
+(for `metaflac`), `fpcalc` and `sqlite3`
 - Jellyfin 12.4 for the plugin
 - A Mac with Xcode 26 and XcodeGen for the app
 
@@ -56,27 +73,16 @@ mise run write <slug> --plan            # the tags it would write
 ```
 
 `mise tasks` lists the rest. For the app, copy
-`apps/ios/Local.example.xcconfig` to `Local.xcconfig`, then `mise run
-ios sim`. [`AGENTS.md`](AGENTS.md) describes how a batch of albums is
+`apps/ios/Local.example.xcconfig` to `Local.xcconfig`, then `mise run ios sim`. [`AGENTS.md`](AGENTS.md) describes how a batch of albums is
 run with agents reviewing.
-
-## Before you use it
-
-- `mise run write` replaces every tag and picture in the files it is
-  pointed at. Use `--plan` first and `--backup` always.
-- The genres in the original library came from RateYourMusic, and some
-  edition evidence from a tracker's rip logs. The code that fetched
-  those is not here; the resolver still reads their saved responses,
-  which is why both are named throughout. Without them, genres fall back
-  to MusicBrainz, Discogs and the files.
-- The history was rewritten before publishing to take out one library's
-  records, so older commits don't build.
-- Nothing here is packaged or versioned, and paths assume the layout
-  above.
 
 ## Licence
 
-MIT, see [`LICENSE`](LICENSE). The Jellyfin plugin in `apps/jellyfin`
-links Jellyfin's GPL packages and is GPL-3.0-only, see
-[`apps/jellyfin/LICENSE`](apps/jellyfin/LICENSE). The Iosevka fonts in
-`apps/web/public/fonts` are under the SIL Open Font License.
+The code is MIT. See [`LICENSE`](LICENSE).
+
+The Jellyfin plugin in `apps/jellyfin` is GPL-3.0-only, because it links
+Jellyfin's GPL packages. See
+[`apps/jellyfin/LICENSE`](apps/jellyfin/LICENSE).
+
+The Iosevka fonts in `apps/web/public/fonts` are under the SIL Open Font
+License. See [`OFL.md`](apps/web/public/fonts/OFL.md).
