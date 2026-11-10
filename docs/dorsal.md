@@ -6,9 +6,8 @@ CarPlay. The plan was to fork it, but the UX we want probably differs too
 much, so it is prior art instead: we take ideas and code where they save
 time.
 
-`~/Code/dorsal` is a clone of the fork `a fork` (`origin`), with
-`jaredreich/dorsal` as `upstream`. The two were identical on 1 Nov. The
-licence is MIT, so code can be copied as long as the notice is kept.
+Upstream is `jaredreich/dorsal`. The licence is MIT, so code can be
+copied as long as the notice is kept.
 
 ## Shape
 

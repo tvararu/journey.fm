@@ -28,8 +28,7 @@ note the alternative in the approval. The resolver already prefers the
 files' label when RED disagrees with them.
 
 Working directory: the repo root. Use `mise run <task>` for everything;
-they load the secrets. Agreed rules: `docs/library.md` from "### Next:
-the catalogue" onward.
+they load the secrets. Agreed rules: `docs/catalogue.md`.
 
 ## Per album
 
@@ -94,7 +93,7 @@ the catalogue" onward.
 
 ## Rules
 
-- Never write to FLAC files or anything on sol. No deletions, no git
+- Never write to FLAC files or anything on the host. No deletions, no git
   commits, no Python, no browser.
 - Never print secrets.
 - Long commands (covers, lyrics) can take several minutes: run them in

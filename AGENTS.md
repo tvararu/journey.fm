@@ -1,51 +1,53 @@
 # journey.fm
 
-A catalogue of the FLAC library on sol (`/mnt/pool/Music`), resolved from
-MusicBrainz, RED, RYM, Discogs, AcoustID and LRCLIB, reviewed by agents,
-and later written back as tags. `docs/library.md` holds the agreed rules.
+A catalogue of a FLAC library: each album resolved from MusicBrainz,
+Discogs, AcoustID, the Cover Art Archive and LRCLIB, reviewed by agents,
+written back as tags, served by Jellyfin and played on the phone.
+`docs/catalogue.md` holds the agreed rules.
+
+Notes about the machines this checkout runs on, if there are any, are in
+`AGENTS.local.md`, which git ignores. Read it when it exists.
 
 ## Layout
 
 - `apps/web`: the catalogue viewer (Astro on Bun, port 8786)
-- `apps/ios`: the iOS player (SwiftUI, XcodeGen `project.yml`, bundle
-  `fm.journey.app`, logic in the `JourneyKit` package); `mise run ios
-  sim | device | log | test | format | cli | testflight`, described with
-  the vision, UX and roadmap in `docs/ios.md`
+- `apps/jellyfin`: the Jellyfin plugin (C#, .NET 10) that maps the
+  catalogue's tags into Jellyfin's fields and serves album archives;
+  `mise run jellyfin test | plugin`
+- `apps/ios`: the iOS player (SwiftUI, XcodeGen `project.yml`, logic in
+  the `JourneyKit` package); `mise run ios sim | device | log | test |
+  format | cli | testflight`, described with the UX and roadmap in
+  `docs/ios.md`
 - `packages/catalogue`: the pipeline and reviewer tools
-- `apps/jellyfin`: the Jellyfin plugin that maps the tags into Jellyfin's
-  fields (C#); `mise run jellyfin test | plugin | options | refresh`
-- `tools/tagging`: scripts that run on sol, plus the RYM grabbers
-- `records/`: reviews, verdicts, notes and RYM IDs (committed)
-- `data/`: raw responses, covers, catalogue, design boards in
-  `data/design` (gitignored, backed up to sol with `mise run push`)
+- `tools/tagging`: scripts that run on the host that holds the FLACs
+- `records/`: reviews, verdicts, notes and overrides (append-only,
+  ignored by git: they describe one library)
+- `data/`: the inventory, raw responses, covers and the catalogue
+  (ignored by git, backed up to the host with `mise run push`)
 - `.omp/agents`: the triage and fixer subagents
 
 ## Where things run
 
-- sol keeps the FLACs and does inventory and fingerprinting over ssh;
-  its `/mnt/pool/music-meta` is the backup of `data/`.
-- t1 does the cataloguing: pipeline, data, ComfyUI upscales and RYM in
-  Orca. The viewer runs from `apps/web/dist` as the systemd user unit
-  `journey-web` on 127.0.0.1:8786 (rebuild and restart to update), and
-  is published as the Tailscale Service `svc:journey`
-  (`journey.example`).
-- The Mac builds the iOS app (Xcode, XcodeGen from Homebrew), team
-  ABCDE12345 (paid until 1 Nov 2027). `mise run ios testflight` signs
-  and exports with an App Store Connect API key (`ASC_KEY_ID`,
-  `ASC_ISSUER_ID`, `ASC_KEY_P8` as the base64 `.p8`) and uploads with
-  `altool`, since `xcodebuild`'s own upload rejects the key's JWT. The
-  App Store Connect app is `journey.fm` (0000000000); its internal
-  TestFlight group `deity` gets every build.
+- The host (`JOURNEY_HOST`) keeps the FLACs under `JOURNEY_LIBRARY` and
+  does inventory, fingerprinting and tag writes over ssh. Its
+  `JOURNEY_META` folder is the backup of `data/`.
+- This machine does the cataloguing: the pipeline, `data/` and the
+  viewer.
+- A Mac builds the iOS app (Xcode, XcodeGen from Homebrew). The bundle
+  identifier and team are in `apps/ios/Local.xcconfig`.
+
+`mise.example.toml` lists every setting.
 
 ## Rules
 
-- Bun + TypeScript + mise only, Swift for the iOS app and C# for the
-  Jellyfin plugin. No Python.
+- Bun + TypeScript + mise, Swift for the iOS app and C# for the Jellyfin
+  plugin. No Python.
 - Run everything through `mise run <task>`; tasks load the secrets.
 - Never print a secret. Secrets are set by deity in their own terminal
-  with `mise set --age-encrypt --prompt NAME`; list names only.
-- Nothing is written to the FLACs or anything else on sol's music until
-  the whole library is catalogued.
+  with `mise set --file mise.local.toml --age-encrypt --prompt NAME`;
+  list names only.
+- The FLACs change only through `mise run write`, and only for accepted
+  albums.
 - Any deletion needs explicit approval; moves go to archive folders.
 - Never install software without asking.
 - In records and the UI, the human is `deity`, agents are `claude`.
@@ -58,26 +60,6 @@ and later written back as tags. `docs/library.md` holds the agreed rules.
 ## Running a batch
 
 The session coordinates; nothing spawns child agent processes.
-
-RYM comes first and is deity's job: `mise run rym [count]` names one
-album at a time while deity finds its page in the Orca tab; the page is
-saved once it is open. Albums are not marked In collection.
-`mise run rym auto [count]` does the searching and saving itself, 10 to
-20 s apart, and rings a bell when it needs deity: a security check, a
-lost login, or an album it can't match. When claude runs it, claude
-starts it as a pty service so it can send keys to it, and keeps `mise
-run rym alert` running beside it; that returns at the next call for
-help, and claude asks deity with the ask tool, which shows a blocking
-question in Orca. Claude's bell and desktop notification go to t1, not
-to deity. `s` marks an album not on RYM
-(`records/rym-skip.tsv`). Batches take only albums listed by `mise run
-rym ready`, and `prepare` refuses any others.
-
-RED is optional. While it is up, `mise run red` caches every album's
-RED match in the background (about 2.3 s per request). `prepare` reads
-that cache, fetches uncached albums if RED answers, and otherwise picks
-the edition without RED. When RED is back, run `mise run red`, then
-prepare again the albums `mise run red stale` lists.
 
 Any album field can be set by hand with `mise run set <slug> <field>
 <value>... --by deity [--why "<why>"]` (`--clear` undoes it). It goes to
@@ -104,5 +86,8 @@ triage, which treats a `deity` value as settled.
 5. Report the totals, every flag with its reason, and what the review
    changed.
 
+Accepted albums are written with `mise run write <slug>... --backup`,
+then checked with `--verify`.
+
 Slugs are `squash(artist dir)[:12]-squash(album dir)[:16]` (see
-`packages/catalogue/prepare.ts`).
+`packages/catalogue/lib/albums.ts`).

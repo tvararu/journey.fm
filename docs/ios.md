@@ -1,9 +1,8 @@
 # iOS app
 
-The player for the library, in `apps/ios`. `docs/library.md` has the end
-state and the player design (28 Oct); `docs/dorsal.md` has the prior art
-from Dorsal, and `docs/ios-prior-art/` the research into other music
-apps (1 Nov).
+The player for the library, in `apps/ios`. `docs/catalogue.md` has the
+tags it reads; `docs/dorsal.md` has the prior art from Dorsal, and
+`docs/ios-prior-art/` the research into other music apps (1 Nov).
 
 ## UX (1 Nov)
 
@@ -32,9 +31,8 @@ decorative images are hidden from VoiceOver.
 
 No CarPlay: the car is a Tesla.
 
-The app icon is a placeholder: SF Symbols' `music.note`, which Apple's
-licence does not allow in app icons. Replace it before anything goes
-beyond internal TestFlight.
+The app icon is a stand-in, a plain drawing of a record, until a proper
+one is designed.
 
 ## What the screens can show (1 Nov)
 
@@ -86,9 +84,11 @@ end of the track and prints the hand-over to the next one.
 | `cli …` | The `journey` command |
 | `testflight` | Archive, upload, and wait until App Store Connect has processed the build |
 
-Day to day, changes go to the phone with `device` (Developer Mode is on,
-the phone is registered with the team). TestFlight isn't part of the
-loop.
+Day to day, changes go to the phone with `device` (Developer Mode on,
+the phone registered with the team). TestFlight isn't part of the loop.
+The bundle identifier and the development team come from
+`apps/ios/Local.xcconfig`, which git ignores; copy
+`Local.example.xcconfig` to make it.
 
 Debug builds sign in on their own when launched with `JELLYFIN_URL`,
 `JELLYFIN_USERNAME` and `JELLYFIN_PASSWORD`, which `sim` passes from
@@ -97,7 +97,7 @@ drives input and reads the screen (`orca emulator tap`, `type`,
 `gesture`, `ax`); installing, launching, the keychain, logs and
 screenshots go through `xcrun simctl`, which Orca doesn't wrap for iOS.
 Never run `orca emulator kill` or `shutdown`: the helper is shared with
-deity's simulator pane, which goes dark when it stops. The simulator
+the simulator pane, which goes dark when it stops. The simulator
 runs in dark mode (`xcrun simctl ui booted appearance dark`).
 
 The Jellyfin device ID lives in the Keychain apart from the session, so
@@ -118,7 +118,7 @@ something specific that would be annoying to do ourselves:
   `AudioFileOpenWithCallbacks`, whose read callback waits for bytes that
   haven't arrived, so playback starts about half a second after Play
   rather than after the 30 to 50 s a whole track takes at the 7 to 12
-  Mbit/s measured from sol. A feeder thread keeps five seconds decoded
+  Mbit/s measured from the server. A feeder thread keeps five seconds decoded
   ahead and schedules the next track's buffers straight after the
   current one's, which makes playback gapless; a test renders two tracks
   offline and checks the second starts on the sample after the first
@@ -163,8 +163,8 @@ track whose album isn't stored yet waits for the next sync.
 ## Screens (1 Nov)
 
 Artboards for every step, drawn by Claude Design from the docs above,
-are in `data/design/ios-board.zip` (gitignored; backed up to sol with
-`mise run push`). Each artboard names the SwiftUI component for every
+are in `data/design/ios-board.zip` (gitignored). Each artboard names the
+SwiftUI component for every
 element; `renders/` has the PNGs, `renders/Main.png` the flow and
 `renders/o-decisions.png` the decisions. What follows is what was agreed
 from it.
@@ -401,9 +401,9 @@ Open:
 
 1. **Ship to the phone.** Done 1 Nov: builds go to TestFlight with
    `mise run ios testflight`.
-2. **Sign in and sync.** Done 1 Nov: sign-in to sol's Jellyfin
-   (`JELLYFIN_URL`, https://jellyfin.example; the account is
-   in `JELLYFIN_USERNAME` and `JELLYFIN_PASSWORD`), the session in the
+2. **Sign in and sync.** Done 1 Nov: sign-in to Jellyfin (the debug
+   build takes `JELLYFIN_URL`, `JELLYFIN_USERNAME` and
+   `JELLYFIN_PASSWORD` from the environment), the session in the
    Keychain, full and delta sync into the local database, album art
    cached by `ImageTags`. A stand-in screen shows the counts and the
    albums added most recently.
@@ -428,7 +428,7 @@ Open:
    at 4 tracks every 15 to 20 minutes with the app suspended: a transfer
    queued from the background starts only at iOS's discretion, after a
    delay that grows with every wake. Queuing 500 tracks instead split
-   sol's upload 500 ways over one HTTP/2 connection, and a
+   the server's upload 500 ways over one HTTP/2 connection, and a
    `BGContinuedProcessingTask` was expired within minutes, as Apple
    reserves it for short jobs a tap starts. Apple's advice for thousands
    of transfers is fewer, larger ones, so since 4 Nov each request is an
