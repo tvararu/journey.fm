@@ -1,7 +1,7 @@
 import { yearOf } from "./lib/albums";
-import { mb, REL_INC, redUp } from "./lib/fetch";
+import { mb, REL_INC } from "./lib/fetch";
 import { discOf, files, type InvFile } from "./lib/inventory";
-import { cachedRed, fetchRed, redCopy, redDirs, type RedMatch, type Torrent } from "./lib/red";
+import { cachedRed, redCopy, type Torrent } from "./lib/red-cache";
 import { dumps, fixed1, py, similarTitle, unescapeHtml } from "./lib/py";
 import { save } from "./lib/raw";
 
@@ -92,12 +92,10 @@ export async function edition(slug: string, path: string): Promise<Record<string
   const t0 = f0.tags;
   const artist = (t0["ALBUMARTIST"] || t0["ARTIST"]) ?? null;
   const album = t0["ALBUM"] ?? null;
-  const dirs = redDirs(path);
-  const report: Record<string, unknown> = { path, red_dirs: dirs };
+  const match = cachedRed(slug);
+  const report: Record<string, unknown> = { path, red_dirs: match?.dirs ?? [] };
 
-  let match: RedMatch | null = cachedRed(slug, path);
-  if (!match && (!dirs.length || (await redUp()))) match = await fetchRed(slug, path).catch(() => null);
-  report["red_status"] = !match ? "unavailable" : match.torrent ? "matched" : dirs.length ? "no match" : "not on RED";
+  if (match) report["red_status"] = match.torrent ? "matched" : match.dirs.length ? "no match" : "not on RED";
   const copy = match && redCopy(slug, match);
   const torrent: Torrent | null = copy?.torrent ?? null;
   const group = copy?.group ?? null;
@@ -194,6 +192,5 @@ if (import.meta.main) {
     console.error("usage: edition <slug> <Music/Artist/Album>");
     process.exit(1);
   }
-  if (process.env["REDACTED_API_KEY"] === undefined) throw new Error("REDACTED_API_KEY is not set");
   console.log(dumps(await edition(slug, path)));
 }

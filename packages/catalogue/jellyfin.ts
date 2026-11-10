@@ -1,6 +1,9 @@
+import { hostname } from "node:os";
+
 const base = process.env["JELLYFIN_URL"];
 if (!base) throw new Error("JELLYFIN_URL is not set");
-const auth = `MediaBrowser Client="journey", Device="t1", DeviceId="journey-t1", Version="1"`;
+const device = hostname();
+const auth = `MediaBrowser Client="journey", Device="${device}", DeviceId="journey-${device}", Version="1"`;
 const login = await fetch(`${base}/Users/AuthenticateByName`, {
   method: "POST",
   headers: { "Content-Type": "application/json", Authorization: auth },

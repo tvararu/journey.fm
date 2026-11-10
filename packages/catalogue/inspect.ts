@@ -30,7 +30,7 @@ line(`  why: ${choice.how}`);
 const red = report.red;
 line(red
   ? `  RED: torrent ${red.torrent}, ${red.media}, ${red.year ?? "?"}, ${red.label || "no label"} ${red.catno || "no catno"}${red.title ? `, "${red.title}"` : ""}`
-  : report.red_status === "unavailable" ? "  RED: not checked, RED was not answering; that is fine" : "  RED: no torrent matched");
+  : "  RED: no cached torrent");
 const fs = files(choice.path);
 const tagged = fs[0]?.tags["MUSICBRAINZ_ALBUMID"];
 line(`  files tagged: ${tagged ? `${tagged}${tagged === choice.release ? " (this release)" : " (a different release)"}` : "no MusicBrainz release"}`);

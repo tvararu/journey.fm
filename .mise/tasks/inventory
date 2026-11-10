@@ -1,17 +1,18 @@
 #!/usr/bin/env bash
-#MISE description="Rescan sol's Music into a new dated inventory on sol (read-only on the music), then pull it"
+#MISE description="Rescan the host's Music into a new dated inventory there (read-only on the music), then pull it"
 set -euo pipefail
+: "${JOURNEY_HOST:?set it in mise.local.toml, see mise.example.toml}" "${JOURNEY_LIBRARY:?}" "${JOURNEY_META:?}"
 
 stamp=$(date +%Y-%m-%d-%H%M)
-dest="/mnt/pool/music-meta/inventory-$stamp"
-scp -q "$MISE_PROJECT_ROOT/tools/tagging/inventory.ts" sol:catalogue/inventory.ts
-ssh sol bash -s <<SH
+dest="$JOURNEY_META/inventory-$stamp"
+tools="$JOURNEY_META/tools"
+ssh "$JOURNEY_HOST" mkdir -p "'$tools'"
+scp -q "$MISE_PROJECT_ROOT/tools/tagging/inventory.ts" "$JOURNEY_HOST:$tools/inventory.ts"
+ssh "$JOURNEY_HOST" bash -s <<SH
 set -euo pipefail
 [ ! -e "$dest" ] || { echo "$dest exists" >&2; exit 1; }
 mkdir -p "$dest"
-cd ~/catalogue
-/home/user/.local/share/mise/installs/bun/latest/bin/bun inventory.ts "$dest" | awk 'NR % 100 == 0 { print NR, \$0; fflush() }'
-cp ~/catalogue/music-red.json "$dest/"
+JOURNEY_LIBRARY="$JOURNEY_LIBRARY" ${JOURNEY_HOST_BUN:-bun} "$tools/inventory.ts" "$dest" | awk 'NR % 100 == 0 { print NR, \$0; fflush() }'
 sqlite3 "$dest/inventory.sqlite" "select count(*) || ' albums' from albums; select count(*) || ' files, ' || sum(error is not null) || ' errors' from files;"
 SH
 exec mise run pull

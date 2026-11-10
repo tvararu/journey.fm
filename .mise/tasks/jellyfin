@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#MISE description="Jellyfin: refresh (replace all metadata from the tags, then the album artists) | clear (online leftovers on albums) | options (prefer ARTISTS, hide tags in the web UI) | test (the plugin's tests) | plugin (build and install the plugin on sol)"
+#MISE description="Jellyfin: refresh (replace all metadata from the tags, then the album artists) | clear (online leftovers on albums) | options (prefer ARTISTS, hide tags in the web UI) | test (the plugin's tests) | plugin (build the plugin and install it into the host's Jellyfin container)"
 set -euo pipefail
 root="$MISE_PROJECT_ROOT"
 case "${1:-}" in
@@ -21,7 +21,7 @@ plugin)
   "guid": "5f0c4a7e-3b9d-4c21-8e6a-9d2b7f1c4e83",
   "name": "journey.fm",
   "overview": "Maps the catalogue's tags into Jellyfin's fields.",
-  "owner": "deity",
+  "owner": "journey.fm",
   "targetAbi": "12.4.0.0",
   "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
   "version": "$version",
@@ -30,9 +30,11 @@ plugin)
   "assemblies": []
 }
 EOF
-  ssh sol bash -c "'rm -rf $stage && mkdir -p $stage/Journey_$version'"
-  scp -q "$out/Jellyfin.Plugin.Journey.dll" "$out/meta.json" "sol:$stage/Journey_$version/"
-  ssh sol bash -c "'docker exec jellyfin sh -c \"rm -rf /config/plugins/Journey_*\" && docker cp $stage/Journey_$version jellyfin:/config/plugins/ && rm -rf $stage && docker restart jellyfin'"
+  : "${JOURNEY_HOST:?set it in mise.local.toml, see mise.example.toml}"
+  box="${JELLYFIN_CONTAINER:-jellyfin}"
+  ssh "$JOURNEY_HOST" bash -c "'rm -rf $stage && mkdir -p $stage/Journey_$version'"
+  scp -q "$out/Jellyfin.Plugin.Journey.dll" "$out/meta.json" "$JOURNEY_HOST:$stage/Journey_$version/"
+  ssh "$JOURNEY_HOST" bash -c "'docker exec $box sh -c \"rm -rf /config/plugins/Journey_*\" && docker cp $stage/Journey_$version $box:/config/plugins/ && rm -rf $stage && docker restart $box'"
   ;;
 *)
   cd "$root/packages/catalogue"

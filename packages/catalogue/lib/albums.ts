@@ -1,12 +1,10 @@
-import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync } from "node:fs";
 
 import { files, inventory } from "./inventory";
-import { CATALOGUE, RAW, RECORDS } from "./paths";
+import { CATALOGUE, RAW } from "./paths";
 import { squash } from "./py";
 
 export type Album = { path: string; slug: string; artist: string; title: string };
-
-export const RYM_SKIP = `${RECORDS}/rym-skip.tsv`;
 
 const shortSlug = (path: string): string => {
   const [, artistDir = "", albumDir = ""] = path.split("/");
@@ -88,6 +86,3 @@ export const catalogued = (slug: string): boolean => existsSync(`${CATALOGUE}/${
 
 export const rymGrabbed = (slug: string): boolean =>
   existsSync(`${RAW}/${slug}`) && readdirSync(`${RAW}/${slug}`).some((n) => /^rym-\d{4}-\d{2}-\d{2}\.json$/.test(n));
-
-export const rymSkipped = (): Set<string> =>
-  new Set(existsSync(RYM_SKIP) ? readFileSync(RYM_SKIP, "utf8").split("\n").slice(1).filter(Boolean) : []);

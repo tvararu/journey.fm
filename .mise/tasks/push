@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
-#MISE description="Back up raw responses, the catalogue and design boards to sol's music-meta (adds and updates, never deletes)"
+#MISE description="Back up raw responses, the catalogue and design boards to the host's metadata folder (adds and updates, never deletes)"
 set -euo pipefail
+: "${JOURNEY_HOST:?set it in mise.local.toml, see mise.example.toml}" "${JOURNEY_META:?}"
 
 data="$MISE_PROJECT_ROOT/data"
 for dir in raw catalogue catalogue-removed design; do
   [ -d "$data/$dir" ] || continue
-  rsync -au "$data/$dir" sol:/mnt/pool/music-meta/
-  echo "pushed $dir/ to sol"
+  rsync -au "$data/$dir" "$JOURNEY_HOST:$JOURNEY_META/"
+  echo "pushed $dir/ to $JOURNEY_HOST"
 done

@@ -284,11 +284,11 @@ function boot(): void {
       ? [
           fact("original", i.original), fact("edition", i.edition), fact("tracks", `${i.n} · ${mins(i.dur)}`),
           fact("audio", audio), fact("size", size(i.bytes)), fact("label", i.label), fact("genre", i.genre),
-          fact("on sol", i.path),
+          fact("path", i.path),
         ]
       : [
           fact("date tag", i.dateTag || null), fact("tracks", `${i.n} · ${mins(i.dur)}`), fact("audio", audio),
-          fact("size", size(i.bytes)), fact("on sol", i.path),
+          fact("size", size(i.bytes)), fact("path", i.path),
           fact("issues", i.issues.length ? i.issues.join(", ") : "none", i.issues.length ? "text-danger" : ""),
         ];
     const w = i.word;

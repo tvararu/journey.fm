@@ -1,0 +1,34 @@
+# Copy to mise.local.toml, which git ignores, and fill it in.
+# Secrets are best set encrypted:
+#   mise set --file mise.local.toml --age-encrypt --prompt NAME
+
+[settings]
+age.key_file = "~/.config/journey.fm/age.key"
+
+[env]
+# The machine that holds the FLACs, as ssh knows it.
+JOURNEY_HOST = "nas"
+# The folder on it that holds Music/<Artist>/<Album>.
+JOURNEY_LIBRARY = "/srv/media"
+# A folder on it for inventories, raw responses, staged writes and backups.
+JOURNEY_META = "/srv/media/music-meta"
+# bun on that machine, when it isn't on the PATH of a non-interactive shell.
+# JOURNEY_HOST_BUN = "/usr/local/bin/bun"
+
+# AcoustID lookups in `mise run prepare`.
+ACOUSTID_API_KEY = ""
+
+# `mise run jellyfin ...` and the iOS debug build's automatic sign-in.
+JELLYFIN_URL = "https://jellyfin.example"
+JELLYFIN_USERNAME = ""
+JELLYFIN_PASSWORD = ""
+# The Docker container `mise run jellyfin plugin` installs into.
+# JELLYFIN_CONTAINER = "jellyfin"
+
+# ComfyUI for cover upscales; this is the default.
+# COMFY_URL = "http://127.0.0.1:8188"
+
+# `mise run ios testflight`: an App Store Connect API key, the .p8 as base64.
+ASC_KEY_ID = ""
+ASC_ISSUER_ID = ""
+ASC_KEY_P8 = ""

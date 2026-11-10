@@ -221,7 +221,7 @@ const queue = disc.map((r) => ({ id: r.id, title: r.title, artist: r.artist, cov
           {fromCat.map(([k, v]) => <div class="leader"><span class="shrink-0 text-muted">{k}</span><i></i><span>{v}</span></div>)}
         </div>
         <div class="box px-3 pt-4 pb-3">
-          <span class="absolute -top-2 left-2 bg-bg px-1 leading-4"><b class="font-extrabold">on disk</b><span class="text-muted"> · sol, scanned {stats.scanned ? day(stats.scanned) : "—"}</span></span>
+          <span class="absolute -top-2 left-2 bg-bg px-1 leading-4"><b class="font-extrabold">on disk</b><span class="text-muted"> · scanned {stats.scanned ? day(stats.scanned) : "—"}</span></span>
           {onDisk.map(([k, v]) => <div class="leader"><span class="shrink-0 text-muted">{k}</span><i></i><span>{v}</span></div>)}
         </div>
       </div>

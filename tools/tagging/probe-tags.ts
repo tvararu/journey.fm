@@ -1,7 +1,8 @@
 import { lstatSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 
-const ROOT = "/mnt/pool";
+const ROOT = process.env["JOURNEY_LIBRARY"] ?? "";
+if (!ROOT) throw new Error("JOURNEY_LIBRARY is not set: the folder that holds Music");
 const AUDIO = [".flac", ".mp3", ".m4a", ".ogg", ".opus"];
 
 class Float {
@@ -85,7 +86,7 @@ function folder(rel: string): Json {
 
 const input = Bun.argv[2];
 if (!input) {
-  console.error("usage: sol-tags.ts <slug-to-dirs.json>");
+  console.error("usage: probe-tags.ts <slug-to-dirs.json>");
   process.exit(1);
 }
 const albums = JSON.parse(readFileSync(input, "utf8")) as Record<string, string[]>;

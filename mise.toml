@@ -2,16 +2,3 @@
 age = "latest"
 bun = "latest"
 dotnet = "10"
-
-[settings]
-age.key_file = "~/.config/journey.fm/age.key"
-
-[env]
-JELLYFIN_URL = "https://jellyfin.example"
-REDACTED_API_KEY = { age = "REMOVED" }
-ACOUSTID_API_KEY = { age = "REMOVED" }
-ASC_KEY_ID = { age = "REMOVED" }
-ASC_ISSUER_ID = { age = "REMOVED" }
-ASC_KEY_P8 = { age = "REMOVED" }
-JELLYFIN_USERNAME = { age = "REMOVED" }
-JELLYFIN_PASSWORD = { age = "REMOVED" }

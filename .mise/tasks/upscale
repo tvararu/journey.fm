@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#MISE description="Upscale a cover candidate on t1's ComfyUI: upscale <slug> <candidate-id> [ultrasharpv2 | seedvr2-3b | seedvr2-7b-sharp]"
+#MISE description="Upscale a cover candidate with ComfyUI (COMFY_URL): upscale <slug> <candidate-id> [ultrasharpv2 | seedvr2-3b | seedvr2-7b-sharp]"
 set -euo pipefail
 cd "$MISE_PROJECT_ROOT/packages/catalogue"
 exec bun upscale.ts "$@"

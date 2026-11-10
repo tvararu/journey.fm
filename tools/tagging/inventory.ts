@@ -2,7 +2,8 @@ import { Database } from "bun:sqlite";
 import { closeSync, existsSync, fstatSync, lstatSync, mkdirSync, openSync, readdirSync, readFileSync, readSync, statSync, writeFileSync } from "node:fs";
 import { join, relative } from "node:path";
 
-const ROOT = process.env.INVENTORY_ROOT ?? "/mnt/pool";
+const ROOT = process.env["JOURNEY_LIBRARY"] ?? "";
+if (!ROOT) throw new Error("JOURNEY_LIBRARY is not set: the folder that holds Music");
 const COLLECTIONS = ["Music"];
 const AUDIO = [".flac", ".mp3", ".m4a", ".ogg", ".opus"];
 const KEEP = [".jpg", ".jpeg", ".png", ".gif", ".log", ".cue", ".txt", ".nfo", ".m3u", ".m3u8", ".accurip"];

@@ -3,9 +3,9 @@ import { existsSync, readFileSync } from "node:fs";
 import { album as lookupAcoustid, prints } from "./acoustid";
 import { edition as runEdition } from "./edition";
 import { enrich } from "./enrich";
-import { albumOf, rymGrabbed, rymSkipped, yearOf, type Album as Base } from "./lib/albums";
+import { albumOf, rymGrabbed, yearOf, type Album as Base } from "./lib/albums";
 import { files } from "./lib/inventory";
-import { CATALOGUE, META, PREVIEWS, RAW, SCRIPTS, TAGGING } from "./lib/paths";
+import { CATALOGUE, host, META, PREVIEWS, RAW, SCRIPTS, TAGGING } from "./lib/paths";
 import { load } from "./lib/raw";
 
 type Candidate = { how: string; id: string; date: string | null; evidence: string[]; lengths: string };
@@ -14,7 +14,6 @@ type Release = { media: { tracks?: { recording?: { id: string } }[] }[] };
 type Album = Base & { log: string[] };
 
 const HERE = SCRIPTS;
-const SOL_BUN = "/home/user/.local/share/mise/installs/bun/latest/bin/bun";
 const COVER_TIERS = [
   "Cover Art Archive (release)", "Cover Art Archive (same catalogue number)", "Cover Art Archive (release group)",
   "iTunes", "Deezer", "files (folder)", "files (embedded)",
@@ -39,28 +38,24 @@ async function runAsync(cmd: string[], cwd = HERE, env: Record<string, string> =
 }
 
 const albums: Album[] = paths.map((path) => ({ ...albumOf(path), log: [] }));
-const skipped = rymSkipped();
-const noRym = albums.filter((a) => !rymGrabbed(a.slug) && !skipped.has(a.path));
-if (noRym.length) {
-  console.error(`no RYM page and not marked "not on RYM"; run mise run rym first:\n${noRym.map((a) => `  ${a.path}`).join("\n")}`);
-  process.exit(1);
-}
 const say = (a: Album, line: string) => {
   a.log.push(line);
   console.log(`${a.slug}: ${line}`);
 };
 
 function fingerprints(): void {
-  run(["rsync", "-a", "sol:/mnt/pool/music-meta/fingerprints/", `${META}/fingerprints/`]);
+  const remote = `${host.meta}/fingerprints`;
+  run(["rsync", "-a", `${host.ssh}:${remote}/`, `${META}/fingerprints/`]);
   const have = prints();
   const missing = albums.filter((a) => files(a.path).some((f) => !have.has(`${a.path}/${f.relpath}`)));
   if (!missing.length) return;
-  run(["scp", "-q", `${TAGGING}/fingerprint.ts`, "sol:catalogue/fingerprint.ts"]);
   const q = (x: string) => `'${x.replaceAll("'", "'\\''")}'`;
-  const script = `cd ~/catalogue && ${SOL_BUN} fingerprint.ts /mnt/pool/music-meta/fingerprints/music.jsonl ${missing.map((a) => q(a.path)).join(" ")}\n`;
-  const p = Bun.spawnSync(["ssh", "sol", "bash", "-s"], { stdin: Buffer.from(script), stderr: "pipe", stdout: "pipe" });
-  if (p.exitCode !== 0) throw new Error(`fingerprinting on sol failed: ${p.stderr.toString().slice(-400)}`);
-  run(["rsync", "-a", "sol:/mnt/pool/music-meta/fingerprints/", `${META}/fingerprints/`]);
+  run(["ssh", host.ssh, "mkdir", "-p", q(`${host.meta}/tools`)]);
+  run(["scp", "-q", `${TAGGING}/fingerprint.ts`, `${host.ssh}:${host.meta}/tools/fingerprint.ts`]);
+  const script = `JOURNEY_LIBRARY=${q(host.library)} ${host.bun} ${q(`${host.meta}/tools/fingerprint.ts`)} ${q(`${remote}/music.jsonl`)} ${missing.map((a) => q(a.path)).join(" ")}\n`;
+  const p = Bun.spawnSync(["ssh", host.ssh, "bash", "-s"], { stdin: Buffer.from(script), stderr: "pipe", stdout: "pipe" });
+  if (p.exitCode !== 0) throw new Error(`fingerprinting on ${host.ssh} failed: ${p.stderr.toString().slice(-400)}`);
+  run(["rsync", "-a", `${host.ssh}:${remote}/`, `${META}/fingerprints/`]);
 }
 
 function acoustidHits(slug: string, rid: string): [number, number] {
@@ -75,8 +70,7 @@ function acoustidHits(slug: string, rid: string): [number, number] {
 async function edition(a: Album): Promise<boolean> {
   const [, looked] = await Promise.all([runEdition(a.slug, a.path), lookupAcoustid(a.slug, a.path)]);
   if (looked.missing.length) say(a, `AcoustID: no fingerprint for ${looked.missing.length} files`);
-  const report = load(a.slug, "edition-report") as { candidates: Candidate[]; red?: { year?: number }; red_status?: string } | null;
-  if (report?.red_status === "unavailable") say(a, "RED: not answering; edition picked without it (mise run red, then prepare again)");
+  const report = load(a.slug, "edition-report") as { candidates: Candidate[]; red?: { year?: number } } | null;
   const cands = report?.candidates ?? [];
   if (!cands.length) {
     say(a, "edition: no candidates; needs a release picked by hand");
@@ -250,7 +244,7 @@ async function album(a: Album): Promise<boolean> {
       say(a, `lyrics: ${count("synced")} synced, ${count("plain")} plain, ${count("instrumental")} instrumental, ${count("missing")} missing${
         count("failed") ? `, ${count("failed")} failed (rerun lyrics)` : ""}`);
     }));
-    say(a, skipped.has(a.path) ? "RYM: not on RYM" : "RYM: page grabbed");
+    say(a, rymGrabbed(a.slug) ? "RYM: saved page found" : "RYM: no saved page; genres come from the other sources");
     run(["bun", `${SCRIPTS}/resolve.ts`, a.slug]);
     const rec = JSON.parse(readFileSync(`${CATALOGUE}/${a.slug}.json`, "utf8")) as { tracks: { ids: { acoustid_agrees?: boolean | null } }[] };
     const agree = rec.tracks.map((t) => t.ids.acoustid_agrees);

@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
-#MISE description="Copy sol's music-meta (inventories, raw responses, catalogue) here and point data/inventory at the newest scan"
+#MISE description="Copy the host's metadata folder (inventories, raw responses, catalogue) here and point data/inventory at the newest scan"
 set -euo pipefail
+: "${JOURNEY_HOST:?set it in mise.local.toml, see mise.example.toml}" "${JOURNEY_META:?}"
 
 data="$MISE_PROJECT_ROOT/data"
 mkdir -p "$data"
-rsync -au sol:/mnt/pool/music-meta/ "$data/"
+rsync -au "$JOURNEY_HOST:$JOURNEY_META/" "$data/"
 latest=$(cd "$data" && ls -d inventory-*/ | sort | tail -1)
 ln -sfn "${latest%/}" "$data/inventory"
 echo "data/inventory -> ${latest%/}"

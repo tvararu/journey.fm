@@ -37,7 +37,7 @@ const narrow = dots(stats.accepted, stats.albums, 10);
             </a>
           ))}
         </nav>
-        <span class="flex items-center gap-2.5"><span class="block size-1.5 bg-fg"></span><span>sol · Music · {stats.albums} albums · {size(stats.bytes)}{stats.scanned ? ` · scanned ${day(stats.scanned)}` : ""}</span></span>
+        <span class="flex items-center gap-2.5"><span class="block size-1.5 bg-fg"></span><span>Music · {stats.albums} albums · {size(stats.bytes)}{stats.scanned ? ` · scanned ${day(stats.scanned)}` : ""}</span></span>
         <div class="justify-self-end flex items-center gap-3.5">
           <span class="flex items-center gap-2"><span>accepted</span><span class="tracking-[1px]">{wide.on}<span class="text-faint">{wide.off}</span></span><span>{stats.accepted}/{stats.albums}</span></span>
           <span class="text-muted">written 0</span>

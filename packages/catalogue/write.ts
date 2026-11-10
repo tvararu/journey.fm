@@ -1,7 +1,7 @@
 import { appendFileSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { parseArgs } from "node:util";
 
-import { CATALOGUE, META, RAW, RECORDS } from "./lib/paths";
+import { CATALOGUE, host, META, RAW, RECORDS } from "./lib/paths";
 import { load } from "./lib/raw";
 
 // apps/web reads JOURNEY_ROOT when it loads, so it is imported after setting it.
@@ -11,10 +11,9 @@ const { verdicts } = await import("../../apps/web/src/lib/verdicts");
 type J = any;
 type Tags = [string, string][];
 
-const MUSIC = "/mnt/pool/Music";
-const STAGE = "/mnt/pool/music-meta/writes";
-const ARCHIVE = "/mnt/pool/music-meta/archive";
-const BACKUP = "/mnt/pool/music-meta/write-backup";
+const STAGE = () => `${host.meta}/writes`;
+const ARCHIVE = () => `${host.meta}/archive`;
+const BACKUP = () => `${host.meta}/write-backup`;
 const CREDITS = ["composer", "lyricist", "writer", "arranger", "conductor", "performer", "producer", "engineer", "mixer", "remixer"];
 const LANGUAGES: Record<string, string> = {
   Arabic: "ara", Chinese: "zho", Dutch: "nld", English: "eng", French: "fra", German: "deu", Greek: "ell",
@@ -128,10 +127,10 @@ function stage(rec: J, stamp: string, dir: string, backup: boolean): void {
   writeFileSync(`${dir}/embed.jpg`, readFileSync(`${META}/${covers.embed}`));
   const album = albumTags(rec, stamp);
   const rel = rec.path.replace(/^Music\//, "");
-  const A = `${MUSIC}/${rel}`;
-  const S = `${STAGE}/${rec.slug}`;
+  const A = `${host.library}/${rec.path}`;
+  const S = `${STAGE()}/${rec.slug}`;
   const sh = ["set -euo pipefail", `A=${q(A)}`, `S=${q(S)}`];
-  if (backup) sh.push(`B=${q(`${BACKUP}/${rel}`)}`, `if [[ ! -e "$B" ]]; then mkdir -p "$B" && cp -a "$A/." "$B/"; fi`);
+  if (backup) sh.push(`B=${q(`${BACKUP()}/${rel}`)}`, `if [[ ! -e "$B" ]]; then mkdir -p "$B" && cp -a "$A/." "$B/"; fi`);
   rec.tracks.forEach((t: J, i: number) => {
     const n = String(i + 1).padStart(3, "0");
     const tags = [...album, ...trackTags(rec, t)];
@@ -155,7 +154,7 @@ function stage(rec: J, stamp: string, dir: string, backup: boolean): void {
     `flac -t -s "\${files[@]}"`,
     `shopt -s nullglob nocaseglob`,
     `old=("$A"/*.jpg "$A"/*.jpeg "$A"/*.png)`,
-    `if ((\${#old[@]})); then mkdir -p ${q(`${ARCHIVE}/${rel}`)}; mv "\${old[@]}" ${q(`${ARCHIVE}/${rel}`)}/; fi`,
+    `if ((\${#old[@]})); then mkdir -p ${q(`${ARCHIVE()}/${rel}`)}; mv "\${old[@]}" ${q(`${ARCHIVE()}/${rel}`)}/; fi`,
     `install -m 644 "$S/cover.jpg" "$A/cover.jpg"`,
     `echo WROTE ${rec.slug}`,
   );
@@ -186,14 +185,14 @@ function diff(want: string[], got: string[]): string[] {
 }
 
 function verify(rec: J): string[] {
-  const A = `${MUSIC}/${rec.path.replace(/^Music\//, "")}`;
+  const A = `${host.library}/${rec.path}`;
   const sh = ["set -uo pipefail", `A=${q(A)}`];
   rec.tracks.forEach((t: J, i: number) => {
     const F = `"$A"/${q(t.file)}`;
     sh.push(`echo @@FILE ${i}`, `metaflac --list --block-type=VORBIS_COMMENT ${F}`, `echo @@PICTURE`, `metaflac --list --block-type=PICTURE ${F} | grep -E '^  (type|MIME type|width|height): '`);
   });
   sh.push(`echo @@COVER`, `stat -c '%a %s' "$A/cover.jpg"`, `echo @@IMAGES`, `cd "$A" && shopt -s nullglob nocaseglob && printf '%s\\n' *.jpg *.jpeg *.png`);
-  const p = Bun.spawnSync(["ssh", "sol", "bash", "-s"], { stdin: Buffer.from(sh.join("\n")) });
+  const p = Bun.spawnSync(["ssh", host.ssh, "bash", "-s"], { stdin: Buffer.from(sh.join("\n")) });
   const out = p.stdout.toString();
   const sections = out.split(/^@@/m).slice(1);
   const problems: string[] = [];
@@ -267,8 +266,8 @@ for (const slug of positionals) {
   }
   const dir = `${META}/writes/${slug}`;
   stage(rec, stamp, dir, !!values.backup);
-  run(["ssh", "sol", "mkdir", "-p", `${STAGE}/${slug}`]);
-  run(["rsync", "-a", "--delete", `${dir}/`, `sol:${STAGE}/${slug}/`]);
-  run(["ssh", "sol", "bash", `${STAGE}/${slug}/write.sh`]);
+  run(["ssh", host.ssh, "mkdir", "-p", `${STAGE()}/${slug}`]);
+  run(["rsync", "-a", "--delete", `${dir}/`, `${host.ssh}:${STAGE()}/${slug}/`]);
+  run(["ssh", host.ssh, "bash", `${STAGE()}/${slug}/write.sh`]);
   appendFileSync(`${RECORDS}/writes.jsonl`, `${JSON.stringify({ album: rec.path, slug, at: new Date().toISOString().slice(0, 16), by: "claude", fingerprint: fingerprint(rec) })}\n`);
 }

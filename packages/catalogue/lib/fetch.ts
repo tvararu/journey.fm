@@ -39,15 +39,3 @@ export async function fetchJson<T>(url: string, gap: number, headers: Record<str
 
 export const mb = <T>(path: string, q: Record<string, unknown> = {}): Promise<T | null> =>
   fetchJson<T>(`https://musicbrainz.org/ws/2/${path}?${urlencode({ ...q, fmt: "json" })}`, 1.1, {}, true);
-
-const redKey = () => ({ Authorization: process.env["REDACTED_API_KEY"] ?? "" });
-
-export async function red<T>(q: Record<string, unknown>): Promise<T | null> {
-  const r = await fetchJson<{ response?: T }>(`https://redacted.sh/ajax.php?${urlencode(q)}`, 2.3, redKey(), true);
-  return r ? (r.response ?? null) : null;
-}
-
-let probe: Promise<boolean> | null = null;
-export const redUp = (): Promise<boolean> =>
-  (probe ??= fetch("https://redacted.sh/ajax.php?action=index", { headers: redKey(), signal: AbortSignal.timeout(20_000) })
-    .then((r) => r.ok, () => false));

@@ -3,12 +3,13 @@ import { join, relative } from "node:path";
 
 type Row = { path: string; size: number; mtime: number; duration?: number; fingerprint?: string; error?: string };
 
-const ROOT = process.env["FINGERPRINT_ROOT"] ?? "/mnt/pool";
-const FPCALC = process.env["FPCALC"] ?? "/usr/bin/fpcalc";
+const ROOT = process.env["JOURNEY_LIBRARY"] ?? "";
+if (!ROOT) throw new Error("JOURNEY_LIBRARY is not set: the folder that holds Music");
+const FPCALC = process.env["FPCALC"] ?? "fpcalc";
 const JOBS = Number(process.env["JOBS"] ?? 4);
 const [arg, ...dirs] = Bun.argv.slice(2);
 if (!arg) {
-  console.error("usage: fingerprint.ts <out.jsonl> [dir under /mnt/pool ...]  (default: Music)");
+  console.error("usage: fingerprint.ts <out.jsonl> [dir under the library ...]  (default: Music)");
   process.exit(1);
 }
 
