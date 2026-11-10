@@ -12,3 +12,8 @@ apps/jellyfin/**/obj/
 apps/jellyfin/build/
 mise.local.toml
 apps/ios/Local.xcconfig
+/records/*
+!/records/.gitkeep
+/docs/logs/
+/docs/library.md
+AGENTS.local.md
