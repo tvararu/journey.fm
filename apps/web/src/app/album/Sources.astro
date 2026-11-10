@@ -44,7 +44,7 @@ const cols = { gridTemplateColumns: `150px repeat(${sources.length}, minmax(0, 1
   <div class="flex gap-3.5 px-2.5 pt-2.5 text-[11px] text-muted">
     <span><span class="inline-block size-2.5 align-[-1px] shadow-[inset_0_0_0_2px_var(--fg)]"></span> picked</span><span>· none</span>
   </div>
-  <div class="rule-head mt-[22px]"><span>──</span><b class="font-extrabold text-fg">raw responses · {raw.length}</b><span class="truncate">kept whole · raw/{rec.slug}/ on sol</span><i class="h-px flex-1 bg-faint"></i></div>
+  <div class="rule-head mt-[22px]"><span>──</span><b class="font-extrabold text-fg">raw responses · {raw.length}</b><span class="truncate">kept whole · raw/{rec.slug}/</span><i class="h-px flex-1 bg-faint"></i></div>
   <div class="grid grid-cols-2 gap-x-7 gap-y-3.5 px-2.5 pt-2.5 max-lg:grid-cols-1">
     {grouped.filter((x) => x.files.length).map(({ g, files }) => (
       <div class="flex min-w-0 flex-col gap-[3px]">
