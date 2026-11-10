@@ -11,3 +11,4 @@ apps/jellyfin/**/bin/
 apps/jellyfin/**/obj/
 apps/jellyfin/build/
 mise.local.toml
+apps/ios/Local.xcconfig

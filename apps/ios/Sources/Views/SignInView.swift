@@ -2,7 +2,7 @@ import SwiftUI
 
 struct SignInView: View {
     @Environment(AppModel.self) private var model
-    @State private var server = "https://jellyfin.example"
+    @State private var server = ""
     @State private var username = ""
     @State private var password = ""
     @State private var signingIn = false

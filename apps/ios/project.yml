@@ -1,6 +1,5 @@
 name: Journey
 options:
-  bundleIdPrefix: fm.journey
   deploymentTarget:
     iOS: "26.1"
   generateEmptyDirectories: true
@@ -21,11 +20,12 @@ targets:
       - package: JourneyKit
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: fm.journey.app
         TARGETED_DEVICE_FAMILY: "1"
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         CODE_SIGN_STYLE: Automatic
-        DEVELOPMENT_TEAM: ABCDE12345
+    configFiles:
+      Debug: Local.xcconfig
+      Release: Local.xcconfig
     info:
       path: Info.plist
       properties:

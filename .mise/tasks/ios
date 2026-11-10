@@ -11,6 +11,8 @@ filter() {
 
 generate() {
   command -v xcodegen >/dev/null || { echo "xcodegen is missing: brew install xcodegen" >&2; exit 1; }
+  [ -f Local.xcconfig ] || { echo "Local.xcconfig is missing: copy Local.example.xcconfig and fill it in" >&2; exit 1; }
+  bundle=$(sed -n 's/^PRODUCT_BUNDLE_IDENTIFIER *= *//p' Local.xcconfig)
   xcodegen generate --quiet
 }
 
@@ -37,7 +39,7 @@ sim)
   xcrun simctl install "$udid" build/sim/Build/Products/Debug-iphonesimulator/Journey.app
   SIMCTL_CHILD_JELLYFIN_URL="$JELLYFIN_URL" SIMCTL_CHILD_JELLYFIN_USERNAME="$JELLYFIN_USERNAME" \
     SIMCTL_CHILD_JELLYFIN_PASSWORD="$JELLYFIN_PASSWORD" \
-    xcrun simctl launch --terminate-running-process "$udid" fm.journey.app
+    xcrun simctl launch --terminate-running-process "$udid" "$bundle"
   ;;
 device)
   generate

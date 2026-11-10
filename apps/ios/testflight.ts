@@ -27,7 +27,9 @@ async function get(path: string) {
   return (await response.json()).data;
 }
 
-const [app] = await get("apps?filter[bundleId]=fm.journey.app&fields[apps]=bundleId");
+const bundle = /^PRODUCT_BUNDLE_IDENTIFIER *= *(\S+)/m.exec(await Bun.file(`${import.meta.dir}/Local.xcconfig`).text())?.[1];
+if (!bundle) throw new Error("Local.xcconfig has no PRODUCT_BUNDLE_IDENTIFIER");
+const [app] = await get(`apps?filter[bundleId]=${bundle}&fields[apps]=bundleId`);
 const deadline = Date.now() + 45 * 60 * 1000;
 let last = "";
 while (Date.now() < deadline) {

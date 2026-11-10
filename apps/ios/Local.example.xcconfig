@@ -1,0 +1,4 @@
+// Copy to Local.xcconfig, which git ignores, and fill it in.
+// The bundle identifier must be one your Apple developer team can sign.
+PRODUCT_BUNDLE_IDENTIFIER = com.example.journey
+DEVELOPMENT_TEAM = ABCDE12345
