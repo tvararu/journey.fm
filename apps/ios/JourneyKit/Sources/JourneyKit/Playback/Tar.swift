@@ -44,4 +44,16 @@ enum Tar {
             entry(name, file)
         }
     }
+
+    static func names(_ archive: URL) throws -> [String] {
+        var names: [String] = []
+        try unpack(
+            archive, into: FileManager.default.temporaryDirectory,
+            wanted: {
+                names.append($0)
+                return false
+            }
+        ) { _, _ in }
+        return names
+    }
 }

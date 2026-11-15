@@ -101,6 +101,20 @@ struct DownloadTests {
         #expect(stub.lock.withLock { stub.requested }.isEmpty)
     }
 
+    @Test func tracksInAnArchiveWaitingToUnpackAreNotRequestedWhileOthersAre() async throws {
+        let stub = Stub(body: pattern(1000))
+        let (_, downloads) = try await setUp(
+            stub, tracks: [track("x1", album: "x"), track("y1", album: "y")])
+        let incoming = directory.appendingPathExtension("incoming")
+        try FileManager.default.createDirectory(at: incoming, withIntermediateDirectories: true)
+        try tar([("x1", pattern(2000))]).write(to: incoming.appending(path: "left.tar"))
+
+        await downloads.save(trackIds: ["x1", "y1"])
+        #expect(await eventually { downloads.summary.saved == ["x1", "y1"] })
+        #expect(try Data(contentsOf: directory.appending(path: "x1.flac")) == pattern(2000))
+        #expect(stub.lock.withLock { stub.requested } == [["y"]])
+    }
+
     @Test func aStreamedTrackWaitingToBeSavedIsSavedWhenItFinishes() async throws {
         let stub = Stub(body: pattern(256 * 1024))
         stub.chunk = 64 * 1024

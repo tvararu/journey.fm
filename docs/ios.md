@@ -159,8 +159,13 @@ something specific that would be annoying to do ourselves:
   exception for tailnet IP addresses (`100.64.0.0/10`) let sync through
   but nsurlsessiond still refused every download with -1022 (15 Nov),
   so the address must be a name. The delegate only
-  moves a finished archive into `audio.incoming`; the next reconcile
-  unpacks it, so an archive survives the app being killed. Resume data
+  moves a finished archive into `audio.incoming`, so an archive
+  survives the app being killed. Unpacking runs beside scheduling and
+  never before it: a background wake lasts about 30 s, in which the
+  app unpacked 174 of some 880 tracks and, when unpacking came first,
+  was suspended before it asked for the next archives (15 Nov, idle
+  from 19:04 until the app was opened). Tracks inside a waiting
+  archive are not requested again. Resume data
   from a failed archive is kept in `downloadResume` with its URL and
   picked up after a relaunch. A failed track waits five minutes
   before the next attempt, or until launch, sync or the network

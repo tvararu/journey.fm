@@ -58,16 +58,23 @@ public final class SavedFiles: @unchecked Sendable {
         }
     }
 
-    func unpackIncoming() {
-        let manager = FileManager.default
-        let archives =
-            (try? manager.contentsOfDirectory(
-                at: incoming, includingPropertiesForKeys: nil))?
+    func archives() -> [URL] {
+        (try? FileManager.default.contentsOfDirectory(
+            at: incoming, includingPropertiesForKeys: nil))?
             .sorted { $0.lastPathComponent < $1.lastPathComponent } ?? []
+    }
+
+    func held() -> Set<String> {
+        Set(archives().flatMap { (try? Tar.names($0)) ?? [] })
+    }
+
+    func unpackIncoming() -> Bool {
+        let archives = archives()
         for archive in archives {
             unpack(archive)
-            try? manager.removeItem(at: archive)
+            try? FileManager.default.removeItem(at: archive)
         }
+        return !archives.isEmpty
     }
 
     func unpack(_ archive: URL) {
@@ -206,6 +213,7 @@ public final class Downloads {
     @ObservationIgnored var invalidated = false
     @ObservationIgnored var failedAt: [String: Date] = [:]
     @ObservationIgnored var delivered: Set<String> = []
+    @ObservationIgnored var unpacking: Task<Void, Never>?
 
     public init(
         library: Library, client: JellyfinClient, directory: URL,
@@ -323,13 +331,22 @@ public final class Downloads {
         await resume()
     }
 
+    func unpack() {
+        guard unpacking == nil else { return }
+        unpacking = Task {
+            let found = await Task.detached(priority: .utility) { [files] in
+                files.unpackIncoming()
+            }.value
+            unpacking = nil
+            if found { await resume(retry: false) }
+        }
+    }
+
     func reconcile() async {
         guard !invalidated else { return }
         do {
             try files.prepare()
-            let arrived = delivered
-            delivered = []
-            await Task.detached(priority: .utility) { [files] in files.unpackIncoming() }.value
+            unpack()
             let lost = try files.sweep().map(Self.trackId)
             if !lost.isEmpty { try await library.markUnsaved(trackIds: lost) }
 
@@ -348,15 +365,16 @@ public final class Downloads {
                 }
                 for item in batch { live[item.id] = task }
             }
+            let held = await Task.detached { [files] in files.held() }.value
             let pending = try await library.pendingDownloads()
-            for item in pending where arrived.contains(item.trackId) {
-                failedAt[item.trackId] = .now
-            }
+            let resumes = try await library.resumes()
+            for id in delivered { failedAt[id] = .now }
+            delivered = []
             var running = [false: 0, true: 0]
             var kept = Set<Int>()
-            tasks = [:]
+            tasks = tasks.filter { $0.value.state == .completed }
             for item in pending {
-                guard let task = live[item.trackId] else { continue }
+                guard let task = live[item.trackId], task.state != .completed else { continue }
                 if !kept.contains(task.taskIdentifier) {
                     guard running[item.wifiOnly, default: 0] < window else { continue }
                     running[item.wifiOnly, default: 0] += 1
@@ -368,13 +386,14 @@ public final class Downloads {
             guard !paused, !invalidated else { return }
             let recent = Date.now.addingTimeInterval(-Self.backoff)
             let waiting = pending.filter {
-                tasks[$0.trackId] == nil && failedAt[$0.trackId].map({ $0 < recent }) ?? true
+                tasks[$0.trackId] == nil && !held.contains($0.trackId)
+                    && failedAt[$0.trackId].map({ $0 < recent }) ?? true
             }
             let byId = Dictionary(waiting.map { ($0.trackId, $0) }) { first, _ in first }
             let wanted = Set(pending.map(\.trackId))
             var claimed = Set<String>()
             var resumable: [(StoredResume?, [PendingDownload])] = []
-            for stored in try await library.resumes() {
+            for stored in resumes {
                 let ids = Self.parse(stored.description).map(\.id)
                 guard client.serves(stored.url), !ids.isEmpty, ids.allSatisfy(wanted.contains)
                 else {
@@ -446,6 +465,7 @@ public final class Downloads {
         case .finishedEvents:
             Task {
                 await resume()
+                await unpacking?.value
                 finishedEvents?()
                 finishedEvents = nil
             }
