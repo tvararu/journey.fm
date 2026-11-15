@@ -6,14 +6,30 @@ struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var confirmSignOut = false
     @State private var confirmRemoveAll = false
+    @State private var editingServer = false
+    @State private var serverAddress = ""
+    @State private var serverError: String?
 
     var body: some View {
         NavigationStack {
             Form {
-                Section("Account") {
-                    LabeledContent("Server", value: model.session?.server.host() ?? "")
+                Section {
+                    Button {
+                        serverAddress = model.session?.server.absoluteString ?? ""
+                        editingServer = true
+                    } label: {
+                        LabeledContent("Server", value: model.session?.server.host() ?? "")
+                    }
+                    .accessibilityIdentifier("server-address")
                     if let username = model.session?.username {
                         LabeledContent("User", value: username)
+                    }
+                } header: {
+                    Text("Account")
+                } footer: {
+                    if let serverError {
+                        Label(serverError, systemImage: "exclamationmark.triangle")
+                            .foregroundStyle(.red)
                     }
                 }
                 Section {
@@ -73,6 +89,21 @@ struct SettingsView: View {
                     Button("Done", systemImage: "checkmark", role: .confirm) { dismiss() }
                         .accessibilityIdentifier("done")
                 }
+            }
+            .alert("Server Address", isPresented: $editingServer) {
+                TextField("https://…", text: $serverAddress)
+                    .textInputAutocapitalization(.never)
+                    .keyboardType(.URL)
+                    .autocorrectionDisabled()
+                Button("Save") {
+                    serverError = nil
+                    Task { serverError = await model.changeServer(serverAddress) }
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text(
+                    "The library and downloads stay on this iPhone. Use another address of the same server."
+                )
             }
             .confirmationDialog(
                 "Sign out?", isPresented: $confirmSignOut, titleVisibility: .visible

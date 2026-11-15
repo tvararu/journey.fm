@@ -113,6 +113,16 @@ public struct JellyfinClient: LibrarySource {
         ])
     }
 
+    public func userId() async throws -> String {
+        let user: AuthenticationResult.User = try await get("Users/Me", [])
+        return user.id
+    }
+
+    func serves(_ url: URL) -> Bool {
+        url.scheme == session.server.scheme && url.host() == session.server.host()
+            && url.port == session.server.port
+    }
+
     public func download(from url: URL, to destination: URL) async throws {
         let (temporary, response) = try await urlSession.download(for: request(url))
         defer { try? FileManager.default.removeItem(at: temporary) }

@@ -167,13 +167,14 @@ public final class Downloads {
     @ObservationIgnored public var finishedEvents: (() -> Void)?
     @ObservationIgnored public var changed: (DownloadSummary) -> Void = { _ in }
     @ObservationIgnored let library: Library
-    @ObservationIgnored let client: JellyfinClient
+    @ObservationIgnored var client: JellyfinClient
     @ObservationIgnored let session: URLSession
     @ObservationIgnored let window: Int
     @ObservationIgnored var tasks: [String: URLSessionDownloadTask] = [:]
     @ObservationIgnored var watching: Task<Void, Never>?
     @ObservationIgnored var resuming: Task<Void, Never>?
     @ObservationIgnored var again = false
+    @ObservationIgnored var invalidated = false
     @ObservationIgnored var failedAt: [String: Date] = [:]
     @ObservationIgnored var resumeData: [String: Data] = [:]
 
@@ -272,10 +273,16 @@ public final class Downloads {
     }
 
     public func invalidate() {
+        invalidated = true
         watching?.cancel()
         session.invalidateAndCancel()
         tasks = [:]
         progress = [:]
+    }
+
+    public func move(to client: JellyfinClient) {
+        self.client = client
+        Task { await resume() }
     }
 
     func run(_ change: @escaping () async throws -> Void) async {
@@ -288,6 +295,7 @@ public final class Downloads {
     }
 
     func reconcile() async {
+        guard !invalidated else { return }
         do {
             try files.prepare()
             let lost = try files.sweep().map(Self.trackId)
@@ -296,6 +304,12 @@ public final class Downloads {
             var live: [String: URLSessionDownloadTask] = [:]
             for case let task as URLSessionDownloadTask in await session.allTasks {
                 guard let batch = Self.parse(task), task.state != .completed else { continue }
+                if let url = (task.originalRequest ?? task.currentRequest)?.url,
+                    !client.serves(url)
+                {
+                    task.cancel()
+                    continue
+                }
                 if batch.contains(where: { live[$0.id] != nil }) {
                     task.cancel()
                     continue
@@ -316,7 +330,7 @@ public final class Downloads {
                 tasks[item.trackId] = task
             }
             for task in live.values where !kept.contains(task.taskIdentifier) { task.cancel() }
-            guard !paused else { return }
+            guard !paused, !invalidated else { return }
             let recent = Date.now.addingTimeInterval(-Self.backoff)
             let waiting = pending.filter {
                 tasks[$0.trackId] == nil && failedAt[$0.trackId].map({ $0 < recent }) ?? true

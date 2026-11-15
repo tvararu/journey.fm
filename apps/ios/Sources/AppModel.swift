@@ -157,14 +157,18 @@ final class AppModel {
                 directory: Self.downloadsDirectory, configuration: configuration)
         }
         downloads?.changed = { [weak self] in self?.downloadsChanged($0) }
+        connectStreams()
+        checkSpace()
+        if let downloads { Task { await downloads.resume() } }
+    }
+
+    private func connectStreams() {
         audio = session.map {
             AudioCache(
                 directory: .cachesDirectory.appending(path: "audio"),
                 client: JellyfinClient(session: $0), keep: 10, saved: downloads?.files)
         }
         player.connect(audio)
-        checkSpace()
-        if let downloads { Task { await downloads.resume() } }
     }
 
     private static let downloadsDirectory = URL.applicationSupportDirectory.appending(path: "audio")
@@ -191,6 +195,29 @@ final class AppModel {
             Log.session.error("Sign-in failed: \(String(describing: error), privacy: .public)")
             self.error = error.localizedDescription
         }
+    }
+
+    func changeServer(_ address: String) async -> String? {
+        guard let session,
+            let url = URL(string: address.trimmingCharacters(in: .whitespaces)), url.host() != nil
+        else { return "That server address isn't a URL." }
+        var moved = session
+        moved.server = url
+        do {
+            guard try await JellyfinClient(session: moved).userId() == session.userId else {
+                return "That address is a different server or account."
+            }
+            try SessionStore.save(moved)
+        } catch {
+            return error.localizedDescription
+        }
+        Log.session.info("Moved to \(url.absoluteString, privacy: .public)")
+        art = Self.artCache(moved)
+        self.session = moved
+        downloads?.move(to: JellyfinClient(session: moved))
+        connectStreams()
+        Task { await sync() }
+        return nil
     }
 
     #if DEBUG
