@@ -147,7 +147,19 @@ something specific that would be annoying to do ourselves:
   against the connection limit. Tasks the app starts in the background
   are always discretionary, so iOS holds them until the phone is
   charging on Wi-Fi or the app is opened (4 Nov: one sat 43 minutes);
-  large archives keep that rare. A failed track waits five minutes
+  large archives keep that rare. While the app isn't in front,
+  nsurlsessiond cancels a task whose last ten progress samples fall
+  under a floor that climbs from 1 to 128 KiB/s over 45 minutes, and
+  retries it as discretionary. Through `tailscale serve` (userspace TCP
+  in tailscaled) the phone got about 100 kB/s per archive and was
+  cancelled (15 Nov); Jellyfin's own port over the tailnet gave 15 MB/s
+  from the same network. So the server address can be changed in
+  Settings without signing out, and plain HTTP is allowed to `ts.net`
+  names and tailnet addresses (`100.64.0.0/10`). The delegate only
+  moves a finished archive into `audio.incoming`; the next reconcile
+  unpacks it, so an archive survives the app being killed. Resume data
+  from a failed archive is kept in `downloadResume` with its URL and
+  picked up after a relaunch. A failed track waits five minutes
   before the next attempt, or until launch, sync or the network
   returning. A track streamed while waiting to be saved is saved from
   the stream and its download cancelled.
