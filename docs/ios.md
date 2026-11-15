@@ -155,7 +155,10 @@ something specific that would be annoying to do ourselves:
   cancelled (15 Nov); Jellyfin's own port over the tailnet gave 15 MB/s
   from the same network. So the server address can be changed in
   Settings without signing out, and plain HTTP is allowed to `ts.net`
-  names and tailnet addresses (`100.64.0.0/10`). The delegate only
+  names, so the address is `http://sol.<tailnet>.ts.net:8096`. An
+  exception for tailnet IP addresses (`100.64.0.0/10`) let sync through
+  but nsurlsessiond still refused every download with -1022 (15 Nov),
+  so the address must be a name. The delegate only
   moves a finished archive into `audio.incoming`; the next reconcile
   unpacks it, so an archive survives the app being killed. Resume data
   from a failed archive is kept in `downloadResume` with its URL and
