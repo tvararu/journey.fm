@@ -148,6 +148,17 @@ extension Library {
         }) == true
     }
 
+    func waitingFile(trackId: String) -> String? {
+        try? db.read { db in
+            try String.fetchOne(
+                db,
+                sql: """
+                    SELECT \(Self.file) FROM download JOIN track ON track.id = download.trackId
+                    WHERE download.trackId = ? AND download.savedAt IS NULL
+                    """, arguments: [trackId])
+        }
+    }
+
     public func observeDownloads() -> AsyncValueObservation<DownloadSummary> {
         ValueObservation.tracking { db in
             var summary = DownloadSummary()

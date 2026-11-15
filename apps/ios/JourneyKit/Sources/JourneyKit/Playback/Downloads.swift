@@ -3,12 +3,14 @@ import Observation
 
 public final class SavedFiles: @unchecked Sendable {
     public let directory: URL
+    public let incoming: URL
     let library: Library
     let lock = NSLock()
     var adopted: (@Sendable (String) -> Void)?
 
     init(directory: URL, library: Library) {
         self.directory = directory
+        incoming = directory.appendingPathExtension("incoming")
         self.library = library
     }
 
@@ -44,20 +46,42 @@ public final class SavedFiles: @unchecked Sendable {
         }
     }
 
-    func unpack(_ archive: URL, _ batch: [(id: String, file: String)]) -> Set<String> {
-        let names = Dictionary(batch.map { ($0.id, $0.file) }) { first, _ in first }
-        var saved = Set<String>()
+    func accept(_ file: URL) -> Bool {
         do {
-            try Tar.unpack(archive, into: FileManager.default.temporaryDirectory) { id, file in
-                guard let name = names[id], library.isWaiting(trackId: id),
-                    store(file, as: name, trackId: id)
-                else { return }
-                saved.insert(id)
+            try prepare()
+            try FileManager.default.moveItem(
+                at: file, to: incoming.appending(path: UUID().uuidString + ".tar"))
+            return true
+        } catch {
+            Log.audio.error("Keeping an archive failed: \(error, privacy: .public)")
+            return false
+        }
+    }
+
+    func unpackIncoming() {
+        let manager = FileManager.default
+        let archives =
+            (try? manager.contentsOfDirectory(
+                at: incoming, includingPropertiesForKeys: nil))?
+            .sorted { $0.lastPathComponent < $1.lastPathComponent } ?? []
+        for archive in archives {
+            unpack(archive)
+            try? manager.removeItem(at: archive)
+        }
+    }
+
+    func unpack(_ archive: URL) {
+        let wanted = { [library] (id: String) in library.waitingFile(trackId: id) != nil }
+        do {
+            try Tar.unpack(archive, into: FileManager.default.temporaryDirectory, wanted: wanted) {
+                id, file in
+                if let name = library.waitingFile(trackId: id) {
+                    _ = store(file, as: name, trackId: id)
+                }
             }
         } catch {
             Log.audio.error("Unpacking an album failed: \(error, privacy: .public)")
         }
-        return saved
     }
 
     func sweep() throws -> Set<String> {
@@ -75,11 +99,13 @@ public final class SavedFiles: @unchecked Sendable {
     }
 
     func prepare() throws {
-        var directory = directory
-        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        var values = URLResourceValues()
-        values.isExcludedFromBackup = true
-        try directory.setResourceValues(values)
+        for folder in [directory, incoming] {
+            var folder = folder
+            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+            var values = URLResourceValues()
+            values.isExcludedFromBackup = true
+            try folder.setResourceValues(values)
+        }
     }
 
     static func name(_ track: Track) -> String { "\(track.id).\(track.container ?? "flac")" }
@@ -87,7 +113,7 @@ public final class SavedFiles: @unchecked Sendable {
 
 enum DownloadEvent: Sendable {
     case progress([String], Double)
-    case done([String], task: Int, saved: Set<String>, cancelled: Bool, resume: Data?)
+    case done([String], task: Int, delivered: Bool, cancelled: Bool, resume: Data?)
     case finishedEvents
 }
 
@@ -95,7 +121,7 @@ final class DownloadDelegate: NSObject, URLSessionDownloadDelegate, @unchecked S
     let files: SavedFiles
     let lock = NSLock()
     var sink: (@Sendable (DownloadEvent) -> Void)?
-    var stored: [Int: Set<String>] = [:]
+    var accepted: Set<Int> = []
 
     init(files: SavedFiles) {
         self.files = files
@@ -129,15 +155,16 @@ final class DownloadDelegate: NSObject, URLSessionDownloadDelegate, @unchecked S
             )
             return
         }
-        let saved = files.unpack(location, batch)
-        lock.withLock { stored[downloadTask.taskIdentifier] = saved }
+        if files.accept(location) {
+            lock.withLock { _ = accepted.insert(downloadTask.taskIdentifier) }
+        }
     }
 
     func urlSession(
         _ session: URLSession, task: URLSessionTask, didCompleteWithError error: (any Error)?
     ) {
         guard let batch = Downloads.parse(task) else { return }
-        let saved = lock.withLock { stored.removeValue(forKey: task.taskIdentifier) } ?? []
+        let delivered = lock.withLock { accepted.remove(task.taskIdentifier) != nil }
         let cancelled = (error as? URLError)?.code == .cancelled
         if let error, !cancelled {
             Log.audio.error(
@@ -147,8 +174,8 @@ final class DownloadDelegate: NSObject, URLSessionDownloadDelegate, @unchecked S
         let resume = (error as NSError?)?.userInfo[NSURLSessionDownloadTaskResumeData] as? Data
         send(
             .done(
-                batch.map(\.id), task: task.taskIdentifier, saved: saved, cancelled: cancelled,
-                resume: resume))
+                batch.map(\.id), task: task.taskIdentifier, delivered: delivered,
+                cancelled: cancelled, resume: resume))
     }
 
     func urlSessionDidFinishEvents(forBackgroundURLSession session: URLSession) {
@@ -176,6 +203,7 @@ public final class Downloads {
     @ObservationIgnored var again = false
     @ObservationIgnored var invalidated = false
     @ObservationIgnored var failedAt: [String: Date] = [:]
+    @ObservationIgnored var delivered: Set<String> = []
     @ObservationIgnored var resumeData: [String: Data] = [:]
 
     public init(
@@ -298,6 +326,9 @@ public final class Downloads {
         guard !invalidated else { return }
         do {
             try files.prepare()
+            let arrived = delivered
+            delivered = []
+            await Task.detached(priority: .utility) { [files] in files.unpackIncoming() }.value
             let lost = try files.sweep().map(Self.trackId)
             if !lost.isEmpty { try await library.markUnsaved(trackIds: lost) }
 
@@ -317,6 +348,9 @@ public final class Downloads {
                 for item in batch { live[item.id] = task }
             }
             let pending = try await library.pendingDownloads()
+            for item in pending where arrived.contains(item.trackId) {
+                failedAt[item.trackId] = .now
+            }
             var running = [false: 0, true: 0]
             var kept = Set<Int>()
             tasks = [:]
@@ -378,13 +412,15 @@ public final class Downloads {
             {
                 progress[id] = fraction
             }
-        case .done(let ids, let task, let saved, let cancelled, let partial):
-            for id in ids {
-                if tasks[id].map({ $0.taskIdentifier == task }) ?? true {
-                    tasks[id] = nil
-                    progress[id] = nil
-                }
-                if !cancelled && !saved.contains(id) && partial == nil { failedAt[id] = .now }
+        case .done(let ids, let task, let delivered, let cancelled, let partial):
+            for id in ids where tasks[id].map({ $0.taskIdentifier == task }) ?? true {
+                tasks[id] = nil
+                progress[id] = nil
+            }
+            if delivered {
+                self.delivered.formUnion(ids)
+            } else if !cancelled && partial == nil {
+                for id in ids { failedAt[id] = .now }
             }
             if let partial { resumeData[ids.joined(separator: ",")] = partial }
             Task { await resume(retry: false) }

@@ -310,9 +310,11 @@ final class AppModel {
         SessionStore.clear()
         player.connect(nil)
         audio?.clear()
+        let incoming = downloads?.files.incoming
         downloads?.invalidate()
         downloads = nil
         try? FileManager.default.removeItem(at: Self.downloadsDirectory)
+        if let incoming { try? FileManager.default.removeItem(at: incoming) }
         downloadingEverything = false
         downloadNew = false
         try? await art?.clear()

@@ -3,7 +3,10 @@ import Foundation
 enum Tar {
     struct Truncated: Error {}
 
-    static func unpack(_ archive: URL, into directory: URL, _ entry: (String, URL) -> Void) throws {
+    static func unpack(
+        _ archive: URL, into directory: URL, wanted: (String) -> Bool,
+        _ entry: (String, URL) -> Void
+    ) throws {
         let input = try FileHandle(forReadingFrom: archive)
         defer { try? input.close() }
         while let block = try input.read(upToCount: 512), block.count == 512 {
@@ -13,7 +16,7 @@ enum Tar {
             let digits = header[124..<136].filter { (48...55).contains($0) }
             let size = UInt64(String(decoding: digits, as: UTF8.self), radix: 8) ?? 0
             let padding = (512 - size % 512) % 512
-            guard header[156] == 48 || header[156] == 0 else {
+            guard header[156] == 48 || header[156] == 0, wanted(name) else {
                 try input.seek(toOffset: input.offsetInFile + size + padding)
                 continue
             }

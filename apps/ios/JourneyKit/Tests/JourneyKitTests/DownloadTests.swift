@@ -83,6 +83,24 @@ struct DownloadTests {
         #expect(stub.requestedRanges.count == 2)
     }
 
+    @Test func anArchiveLeftByAnInterruptedUnpackIsSavedOnTheNextLaunch() async throws {
+        let stub = Stub(body: pattern(1000))
+        let (_, downloads) = try await setUp(stub, tracks: [track("x1", album: "x")])
+        let incoming = directory.appendingPathExtension("incoming")
+        try FileManager.default.createDirectory(at: incoming, withIntermediateDirectories: true)
+        try tar([("x1", pattern(1000))]).write(to: incoming.appending(path: "left.tar"))
+        downloads.paused = true
+
+        await downloads.save(trackIds: ["x1"])
+        #expect(await eventually { downloads.summary.saved == ["x1"] })
+        #expect(try Data(contentsOf: directory.appending(path: "x1.flac")) == pattern(1000))
+        #expect(
+            try FileManager.default.contentsOfDirectory(
+                atPath: incoming.path(percentEncoded: false)
+            ).isEmpty)
+        #expect(stub.lock.withLock { stub.requested }.isEmpty)
+    }
+
     @Test func aStreamedTrackWaitingToBeSavedIsSavedWhenItFinishes() async throws {
         let stub = Stub(body: pattern(256 * 1024))
         stub.chunk = 64 * 1024
