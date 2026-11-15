@@ -113,7 +113,8 @@ public final class SavedFiles: @unchecked Sendable {
 
 enum DownloadEvent: Sendable {
     case progress([String], Double)
-    case done([String], task: Int, delivered: Bool, cancelled: Bool, resume: Data?)
+    case done(
+        String, url: URL?, task: Int, delivered: Bool, cancelled: Bool, resume: Data?)
     case finishedEvents
 }
 
@@ -174,8 +175,9 @@ final class DownloadDelegate: NSObject, URLSessionDownloadDelegate, @unchecked S
         let resume = (error as NSError?)?.userInfo[NSURLSessionDownloadTaskResumeData] as? Data
         send(
             .done(
-                batch.map(\.id), task: task.taskIdentifier, delivered: delivered,
-                cancelled: cancelled, resume: resume))
+                task.taskDescription ?? "", url: task.originalRequest?.url,
+                task: task.taskIdentifier, delivered: delivered, cancelled: cancelled,
+                resume: resume))
     }
 
     func urlSessionDidFinishEvents(forBackgroundURLSession session: URLSession) {
@@ -204,7 +206,6 @@ public final class Downloads {
     @ObservationIgnored var invalidated = false
     @ObservationIgnored var failedAt: [String: Date] = [:]
     @ObservationIgnored var delivered: Set<String> = []
-    @ObservationIgnored var resumeData: [String: Data] = [:]
 
     public init(
         library: Library, client: JellyfinClient, directory: URL,
@@ -370,34 +371,42 @@ public final class Downloads {
                 tasks[$0.trackId] == nil && failedAt[$0.trackId].map({ $0 < recent }) ?? true
             }
             let byId = Dictionary(waiting.map { ($0.trackId, $0) }) { first, _ in first }
-            var resumable: [[PendingDownload]] = []
-            for key in resumeData.keys {
-                let ids = key.split(separator: ",").map(String.init)
-                let batch = ids.compactMap { byId[$0] }
-                if batch.count == ids.count {
-                    resumable.append(batch)
-                } else {
-                    resumeData[key] = nil
+            let wanted = Set(pending.map(\.trackId))
+            var claimed = Set<String>()
+            var resumable: [(StoredResume?, [PendingDownload])] = []
+            for stored in try await library.resumes() {
+                let ids = Self.parse(stored.description).map(\.id)
+                guard client.serves(stored.url), !ids.isEmpty, ids.allSatisfy(wanted.contains)
+                else {
+                    session.downloadTask(withResumeData: stored.data).cancel()
+                    try await library.dropResume(description: stored.description)
+                    continue
                 }
+                claimed.formUnion(ids)
+                let batch = ids.compactMap { byId[$0] }
+                if batch.count == ids.count { resumable.append((stored, batch)) }
             }
-            let claimed = Set(resumable.joined().map(\.trackId))
-            for batch in resumable + Self.batches(waiting.filter { !claimed.contains($0.trackId) })
-            {
+            let fresh = Self.batches(waiting.filter { !claimed.contains($0.trackId) })
+            for (stored, batch) in resumable + fresh.map({ (nil, $0) }) {
                 let wifiOnly = batch[0].wifiOnly
                 guard running[wifiOnly, default: 0] < window else { continue }
                 running[wifiOnly, default: 0] += 1
-                var request = client.request(client.archiveURL(ids: Self.request(batch)))
-                request.allowsExpensiveNetworkAccess = !wifiOnly
-                request.allowsConstrainedNetworkAccess = !wifiOnly
-                let task =
-                    resumeData.removeValue(forKey: batch.map(\.trackId).joined(separator: ","))
-                    .map { session.downloadTask(withResumeData: $0) }
-                    ?? session.downloadTask(with: request)
-                task.taskDescription = batch.map { "\($0.trackId)/\($0.file)" }.joined(
-                    separator: ",")
+                let task: URLSessionDownloadTask
+                if let stored {
+                    task = session.downloadTask(withResumeData: stored.data)
+                    task.taskDescription = stored.description
+                } else {
+                    var request = client.request(client.archiveURL(ids: Self.request(batch)))
+                    request.allowsExpensiveNetworkAccess = !wifiOnly
+                    request.allowsConstrainedNetworkAccess = !wifiOnly
+                    task = session.downloadTask(with: request)
+                    task.taskDescription = batch.map { "\($0.trackId)/\($0.file)" }.joined(
+                        separator: ",")
+                }
                 task.priority = wifiOnly ? URLSessionTask.lowPriority : URLSessionTask.highPriority
                 for item in batch { tasks[item.trackId] = task }
                 task.resume()
+                if let stored { try await library.dropResume(description: stored.description) }
             }
         } catch {
             Log.audio.error("Resuming downloads failed: \(error, privacy: .public)")
@@ -412,7 +421,8 @@ public final class Downloads {
             {
                 progress[id] = fraction
             }
-        case .done(let ids, let task, let delivered, let cancelled, let partial):
+        case .done(let description, let url, let task, let delivered, let cancelled, let partial):
+            let ids = Self.parse(description).map(\.id)
             for id in ids where tasks[id].map({ $0.taskIdentifier == task }) ?? true {
                 tasks[id] = nil
                 progress[id] = nil
@@ -422,8 +432,17 @@ public final class Downloads {
             } else if !cancelled && partial == nil {
                 for id in ids { failedAt[id] = .now }
             }
-            if let partial { resumeData[ids.joined(separator: ",")] = partial }
-            Task { await resume(retry: false) }
+            Task {
+                if let partial, let url {
+                    do {
+                        try await library.keepResume(
+                            description: description, url: url, data: partial)
+                    } catch {
+                        Log.audio.error("Keeping resume data failed: \(error, privacy: .public)")
+                    }
+                }
+                await resume(retry: false)
+            }
         case .finishedEvents:
             Task {
                 await resume()
@@ -457,12 +476,15 @@ public final class Downloads {
     }
 
     nonisolated static func parse(_ task: URLSessionTask) -> [(id: String, file: String)]? {
-        let batch = (task.taskDescription ?? "").split(separator: ",").compactMap {
-            pair -> (id: String, file: String)? in
+        let batch = parse(task.taskDescription ?? "")
+        return batch.isEmpty ? nil : batch
+    }
+
+    nonisolated static func parse(_ description: String) -> [(id: String, file: String)] {
+        description.split(separator: ",").compactMap { pair -> (id: String, file: String)? in
             let parts = pair.split(separator: "/")
             return parts.count == 2 ? (String(parts[0]), String(parts[1])) : nil
         }
-        return batch.isEmpty ? nil : batch
     }
 
     nonisolated static func batches(_ items: [PendingDownload]) -> [[PendingDownload]] {

@@ -166,6 +166,34 @@ struct DownloadTests {
         #expect(stub.requestedRanges.count == 1)
     }
 
+    @Test func aDroppedDownloadResumesAfterARelaunch() async throws {
+        let stub = Stub(body: pattern(256 * 1024))
+        stub.chunk = 16 * 1024
+        stub.delay = 0.01
+        stub.drops = 1
+        stub.dropAfter = 128 * 1024
+        let (library, downloads) = try await setUp(stub, tracks: [track("x1", album: "x")])
+
+        await downloads.save(trackIds: ["x1"])
+        downloads.paused = true
+        var kept = false
+        for _ in 0..<250 where !kept {
+            kept = try await !library.resumes().isEmpty
+            if !kept { try await Task.sleep(for: .milliseconds(20)) }
+        }
+        #expect(kept)
+        downloads.invalidate()
+
+        let relaunched = Downloads(
+            library: library, client: stub.client, directory: directory,
+            configuration: stub.configuration)
+        await relaunched.resume()
+        #expect(await eventually { relaunched.summary.saved == ["x1"] })
+        #expect(try Data(contentsOf: directory.appending(path: "x1.flac")) == pattern(256 * 1024))
+        #expect(stub.requestedRanges.dropFirst().contains { $0?.hasPrefix("bytes=") == true })
+        #expect(try await library.resumes().isEmpty)
+    }
+
     @Test func downloadNewAlbumsOnlyWantsAlbumsAddedAfterTheCutoff() async throws {
         let stub = Stub(body: pattern(100))
         let (library, downloads) = try await setUp(

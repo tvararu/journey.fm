@@ -55,7 +55,7 @@ public final class Library: Sendable {
             try SyncState.deleteAll(db)
             try db.execute(
                 sql:
-                    "DELETE FROM playback; DELETE FROM play; DELETE FROM history; DELETE FROM download"
+                    "DELETE FROM playback; DELETE FROM play; DELETE FROM history; DELETE FROM download; DELETE FROM downloadResume"
             )
         }
     }
@@ -247,6 +247,13 @@ public final class Library: Sendable {
                 }
             }
             try db.execute(sql: "UPDATE syncState SET lastFullSync = NULL")
+        }
+        migrator.registerMigration("downloadResume") { db in
+            try db.create(table: "downloadResume") { t in
+                t.primaryKey("description", .text)
+                t.column("url", .text).notNull()
+                t.column("data", .blob).notNull()
+            }
         }
         return migrator
     }

@@ -23,6 +23,12 @@ public struct PendingDownload: Sendable, Equatable {
     public var albumTracks: Int
 }
 
+struct StoredResume: Sendable {
+    var description: String
+    var url: URL
+    var data: Data
+}
+
 extension Library {
     static let version = "coalesce(track.container, '') || ':' || track.duration"
     static let file = "track.id || '.' || coalesce(track.container, 'flac')"
@@ -186,5 +192,32 @@ extension Library {
             summary.tracks = try Track.fetchCount(db)
             return summary
         }.values(in: db)
+    }
+
+    func keepResume(description: String, url: URL, data: Data) async throws {
+        try await db.write { db in
+            try db.execute(
+                sql:
+                    "INSERT OR REPLACE INTO downloadResume (description, url, data) VALUES (?, ?, ?)",
+                arguments: [description, url.absoluteString, data])
+        }
+    }
+
+    func resumes() async throws -> [StoredResume] {
+        try await db.read { db in
+            try Row.fetchAll(db, sql: "SELECT description, url, data FROM downloadResume")
+                .compactMap { row in
+                    URL(string: row["url"]).map {
+                        StoredResume(description: row["description"], url: $0, data: row["data"])
+                    }
+                }
+        }
+    }
+
+    func dropResume(description: String) async throws {
+        try await db.write { db in
+            try db.execute(
+                sql: "DELETE FROM downloadResume WHERE description = ?", arguments: [description])
+        }
     }
 }

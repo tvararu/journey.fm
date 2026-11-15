@@ -81,7 +81,9 @@ final class StubProtocol: URLProtocol, @unchecked Sendable {
         let body =
             status == 200 && url.path().hasSuffix("/Journey/Archive")
             ? tar(tracks.map { ($0, stored) }) : stored
-        var headers = ["Content-Length": String(body.count), "Accept-Ranges": "bytes"]
+        var headers = [
+            "Content-Length": String(body.count), "Accept-Ranges": "bytes", "ETag": "\"v1\"",
+        ]
         var code = status
         remaining = body
         if status == 200, let range, let spec = range.split(separator: "=").last {
