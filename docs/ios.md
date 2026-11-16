@@ -140,7 +140,8 @@ something specific that would be annoying to do ourselves:
   again while a tag rewrite, which keeps both, doesn't. On launch, on
   sync and when the network returns, files and rows are reconciled. The
   system is handed every waiting archive at once, while the app is open,
-  and runs four at a time (`httpMaximumConnectionsPerHost`). Tasks the
+  and ran six at a time at 27 MB/s (16 Nov); setting
+  `httpMaximumConnectionsPerHost` to 4 didn't change that. Tasks the
   app starts in the background are always discretionary: handed the
   next four on a background wake, iOS held them 35 minutes on battery
   and a whole night on the charger (15 Nov), until the app was opened.
