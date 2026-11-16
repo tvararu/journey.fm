@@ -139,15 +139,18 @@ something specific that would be annoying to do ourselves:
   container and duration to the tick, so a re-ripped track downloads
   again while a tag rewrite, which keeps both, doesn't. On launch, on
   sync and when the network returns, files and rows are reconciled. The
-  system gets at most four archives you saved and four from Download All
-  at a time, and each finished task hands it the next, also when iOS
-  wakes the app in the background to deliver results. Handing it all
-  7,706 at once (1 Nov) made nsurlsessiond open every request together,
-  thousands against Jellyfin, because HTTP/2 doesn't count streams
-  against the connection limit. Tasks the app starts in the background
-  are always discretionary, so iOS holds them until the phone is
-  charging on Wi-Fi or the app is opened (4 Nov: one sat 43 minutes);
-  large archives keep that rare. While the app isn't in front,
+  system is handed every waiting archive at once, while the app is open,
+  and runs four at a time (`httpMaximumConnectionsPerHost`). Tasks the
+  app starts in the background are always discretionary: handed the
+  next four on a background wake, iOS held them 35 minutes on battery
+  and a whole night on the charger (15 Nov), until the app was opened.
+  Archives are queued only while their estimated size, from the bytes
+  per second of what is already saved, fits in the free space less
+  2 GB; one is always allowed, and the rest follow as space is freed.
+  Handing it all 7,706 tracks singly (1 Nov) made nsurlsessiond open
+  every request together, thousands against Jellyfin, because HTTP/2
+  doesn't count streams against the connection limit; archives keep the
+  count to a few dozen. While the app isn't in front,
   nsurlsessiond cancels a task whose last ten progress samples fall
   under a floor that climbs from 1 to 128 KiB/s over 45 minutes, and
   retries it as discretionary. Through `tailscale serve` (userspace TCP

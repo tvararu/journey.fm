@@ -132,11 +132,9 @@ final class AppModel {
         ])
         freeSpace = values?.volumeAvailableCapacityForImportantUsage
         guard let downloads, let freeSpace else { return }
-        let full = freeSpace < Self.reserve
-        if downloads.paused != full {
-            downloads.paused = full
-            if !full { Task { await downloads.resume() } }
-        }
+        let wasPaused = downloads.paused
+        downloads.room = freeSpace - Self.reserve
+        if wasPaused && !downloads.paused { Task { await downloads.resume() } }
     }
 
     private static let reserve: Int64 = 2_000_000_000
@@ -152,6 +150,7 @@ final class AppModel {
                 withIdentifier: "fm.journey.app.downloads")
             configuration.sessionSendsLaunchEvents = true
             configuration.isDiscretionary = false
+            configuration.httpMaximumConnectionsPerHost = 4
             return Downloads(
                 library: library, client: JellyfinClient(session: $0),
                 directory: Self.downloadsDirectory, configuration: configuration)

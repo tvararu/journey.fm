@@ -89,7 +89,7 @@ struct DownloadTests {
         let incoming = directory.appendingPathExtension("incoming")
         try FileManager.default.createDirectory(at: incoming, withIntermediateDirectories: true)
         try tar([("x1", pattern(1000))]).write(to: incoming.appending(path: "left.tar"))
-        downloads.paused = true
+        downloads.room = 0
 
         await downloads.save(trackIds: ["x1"])
         #expect(await eventually { downloads.summary.saved == ["x1"] })
@@ -120,7 +120,7 @@ struct DownloadTests {
         stub.chunk = 64 * 1024
         stub.delay = 0.02
         let (_, downloads) = try await setUp(stub, tracks: [track("x1", album: "x")])
-        downloads.paused = true
+        downloads.room = 0
         await downloads.save(trackIds: ["x1"])
         let cache = AudioCache(
             directory: directory.appending(path: "cache"), client: stub.client,
@@ -134,17 +134,25 @@ struct DownloadTests {
         #expect(cache.isOnPhone(track("x1", album: "x")))
     }
 
-    @Test func downloadEverythingFetchesTwentyAlbumsPerArchiveWithinTheWindow() async throws {
+    @Test func downloadEverythingHandsOverEveryArchiveAtOnce() async throws {
+        let stub = Stub(body: pattern(16 * 1024))
+        let albums = (1...21).map { String(format: "a%02d", $0) }
+        let (_, downloads) = try await setUp(
+            stub, tracks: albums.map { track("\($0)t", album: $0) })
+
+        await downloads.saveEverything()
+        #expect(downloads.tasks.count == 21)
+        #expect(await eventually(10) { downloads.summary.everything })
+    }
+
+    @Test func archivesThatDoNotFitInTheFreeSpaceWaitForTheOnesBefore() async throws {
         let stub = Stub(body: pattern(16 * 1024))
         stub.chunk = 4 * 1024
         stub.delay = 0.01
         let albums = (1...21).map { String(format: "a%02d", $0) }
         let tracks = albums.map { track("\($0)t", album: $0) }
-        let (_, downloads) = try await setUp(stub, tracks: tracks)
-        let windowed = Downloads(
-            library: downloads.library, client: stub.client, directory: directory,
-            configuration: stub.configuration, window: 1)
-        downloads.invalidate()
+        let (_, windowed) = try await setUp(stub, tracks: tracks)
+        windowed.room = 1
 
         await windowed.saveEverything()
         #expect(windowed.tasks.count == 20)
@@ -158,7 +166,8 @@ struct DownloadTests {
     @Test func anArchiveNamesWholeAlbumsAndOnlyTheMissingTracksOfOthers() {
         func pending(_ id: String, _ album: String, of count: Int) -> PendingDownload {
             PendingDownload(
-                trackId: id, file: "\(id).flac", wifiOnly: true, album: album, albumTracks: count)
+                trackId: id, file: "\(id).flac", wifiOnly: true, album: album, albumTracks: count,
+                bytes: 0)
         }
         let batch = [
             pending("x1", "x", of: 2), pending("x2", "x", of: 2), pending("y2", "y", of: 3),
@@ -189,7 +198,7 @@ struct DownloadTests {
         let (library, downloads) = try await setUp(stub, tracks: [track("x1", album: "x")])
 
         await downloads.save(trackIds: ["x1"])
-        downloads.paused = true
+        downloads.room = 0
         var kept = false
         for _ in 0..<250 where !kept {
             kept = try await !library.resumes().isEmpty
@@ -212,7 +221,7 @@ struct DownloadTests {
         let stub = Stub(body: pattern(100))
         let (library, downloads) = try await setUp(
             stub, tracks: [track("x1", album: "x"), track("y1", album: "y")])
-        downloads.paused = true
+        downloads.room = 0
         try await library.db.write { db in
             try db.execute(
                 sql: "UPDATE album SET dateCreated = '2026-10-01T00:00:00.0000000Z' WHERE id = 'x'")

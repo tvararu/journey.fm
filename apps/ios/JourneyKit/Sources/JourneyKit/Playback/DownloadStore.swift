@@ -21,6 +21,7 @@ public struct PendingDownload: Sendable, Equatable {
     public var wifiOnly: Bool
     public var album: String
     public var albumTracks: Int
+    public var bytes: Int64
 }
 
 struct StoredResume: Sendable {
@@ -32,6 +33,7 @@ struct StoredResume: Sendable {
 extension Library {
     static let version = "coalesce(track.container, '') || ':' || track.duration"
     static let file = "track.id || '.' || coalesce(track.container, 'flac')"
+    static let rate = 176_400
 
     public func want(trackIds: [String], wifiOnly: Bool = false) async throws {
         try await db.write { db in
@@ -99,7 +101,11 @@ extension Library {
                     SELECT download.trackId, \(Self.file) AS file, download.wifiOnly,
                         track.albumId,
                         (SELECT COUNT(*) FROM track AS t WHERE t.albumId = track.albumId)
-                            AS albumTracks
+                            AS albumTracks,
+                        CAST(track.duration * COALESCE(
+                            (SELECT SUM(d.bytes) / SUM(t.duration) FROM download AS d
+                                JOIN track AS t ON t.id = d.trackId WHERE d.savedAt IS NOT NULL),
+                            \(Self.rate)) AS INTEGER) AS bytes
                     FROM download
                     JOIN track ON track.id = download.trackId WHERE download.savedAt IS NULL
                     ORDER BY download.wifiOnly, track.albumId, track.disc, track.number
@@ -107,7 +113,7 @@ extension Library {
             ).map {
                 PendingDownload(
                     trackId: $0["trackId"], file: $0["file"], wifiOnly: $0["wifiOnly"],
-                    album: $0["albumId"], albumTracks: $0["albumTracks"])
+                    album: $0["albumId"], albumTracks: $0["albumTracks"], bytes: $0["bytes"])
             }
         }
     }

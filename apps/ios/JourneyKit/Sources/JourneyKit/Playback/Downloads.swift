@@ -197,7 +197,8 @@ final class DownloadDelegate: NSObject, URLSessionDownloadDelegate, @unchecked S
 public final class Downloads {
     public private(set) var summary = DownloadSummary()
     public private(set) var progress: [String: Double] = [:]
-    public var paused = false
+    public var room: Int64 = .max
+    public var paused: Bool { room <= 0 }
 
     @ObservationIgnored public let files: SavedFiles
     @ObservationIgnored public var finishedEvents: (() -> Void)?
@@ -205,7 +206,6 @@ public final class Downloads {
     @ObservationIgnored let library: Library
     @ObservationIgnored var client: JellyfinClient
     @ObservationIgnored let session: URLSession
-    @ObservationIgnored let window: Int
     @ObservationIgnored var tasks: [String: URLSessionDownloadTask] = [:]
     @ObservationIgnored var watching: Task<Void, Never>?
     @ObservationIgnored var resuming: Task<Void, Never>?
@@ -217,9 +217,8 @@ public final class Downloads {
 
     public init(
         library: Library, client: JellyfinClient, directory: URL,
-        configuration: URLSessionConfiguration, window: Int = 4
+        configuration: URLSessionConfiguration
     ) {
-        self.window = window
         self.library = library
         self.client = client
         let files = SavedFiles(directory: directory, library: library)
@@ -370,18 +369,16 @@ public final class Downloads {
             let resumes = try await library.resumes()
             for id in delivered { failedAt[id] = .now }
             delivered = []
-            var running = [false: 0, true: 0]
+            var room = room
             var kept = Set<Int>()
             tasks = tasks.filter { $0.value.state == .completed }
             for item in pending {
                 guard let task = live[item.trackId], task.state != .completed else { continue }
-                if !kept.contains(task.taskIdentifier) {
-                    guard running[item.wifiOnly, default: 0] < window else { continue }
-                    running[item.wifiOnly, default: 0] += 1
-                    kept.insert(task.taskIdentifier)
-                }
+                kept.insert(task.taskIdentifier)
                 tasks[item.trackId] = task
+                room -= item.bytes
             }
+            var busy = !kept.isEmpty
             for task in live.values where !kept.contains(task.taskIdentifier) { task.cancel() }
             guard !paused, !invalidated else { return }
             let recent = Date.now.addingTimeInterval(-Self.backoff)
@@ -408,8 +405,10 @@ public final class Downloads {
             let fresh = Self.batches(waiting.filter { !claimed.contains($0.trackId) })
             for (stored, batch) in resumable + fresh.map({ (nil, $0) }) {
                 let wifiOnly = batch[0].wifiOnly
-                guard running[wifiOnly, default: 0] < window else { continue }
-                running[wifiOnly, default: 0] += 1
+                let size = batch.reduce(0) { $0 + $1.bytes }
+                guard !busy || size <= room else { continue }
+                busy = true
+                room -= size
                 let task: URLSessionDownloadTask
                 if let stored {
                     task = session.downloadTask(withResumeData: stored.data)
