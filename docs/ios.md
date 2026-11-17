@@ -306,8 +306,8 @@ Step 4:
   playing and VoiceOver). The number column has a fixed width that also
   holds the speaker on the playing track, and the separator starts at
   the title on every row. A cloud marks a track that isn't on the
-  phone; downloaded tracks have no mark. "Played" (it became the current
-  track earlier in this queue) is only read by VoiceOver. Home gains Recently Played, the first shelf:
+  phone; downloaded tracks have no mark, and played ones look the same
+  as the rest. Home gains Recently Played, the first shelf:
   albums with a counted play, newest first.
 - A play counts once half the track or 4 minutes has been heard,
   whichever is less, and never for a track under 30 s; seeking adds

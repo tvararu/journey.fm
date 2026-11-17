@@ -194,7 +194,6 @@ struct TrackRow: View {
 
     var body: some View {
         let playing = player.current?.track.id == track.id
-        let played = !playing && player.queue.played.contains(track.id)
         let state = model.downloads?.state(of: track.id)
         let local = state == .saved || model.isOnPhone(track)
         let away = model.offline && !local
@@ -261,7 +260,7 @@ struct TrackRow: View {
         .accessibilityElement(children: .combine)
         .accessibilityValue(
             [
-                playing ? "Now playing" : played ? "Played" : nil,
+                playing ? "Now playing" : nil,
                 DownloadIndicator.text(state), away ? "Not on this iPhone" : nil,
             ].compactMap(\.self).joined(separator: ", ")
         )
