@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+#MISE description="Snapshot the Music.app library into data/apple-music and compare it with Jellyfin: apple-music [phone library.sqlite]"
+set -euo pipefail
+out="$MISE_PROJECT_ROOT/data/apple-music"
+mkdir -p "$out"
+stamp=$(date +%Y-%m-%d)
+osascript -l JavaScript "$MISE_PROJECT_ROOT/tools/apple-music/export.js" > "$out/library-$stamp.json"
+echo "exported $(jq .trackCount "$out/library-$stamp.json") tracks to data/apple-music/library-$stamp.json"
+library=${1:-$(ls -t "$out"/jellyfin-*.sqlite | head -1)}
+exec bun "$MISE_PROJECT_ROOT/tools/apple-music/compare.ts" "$out/library-$stamp.json" "$library" "$out"
