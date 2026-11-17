@@ -2,7 +2,7 @@ import JourneyKit
 import SwiftUI
 
 enum Route: Hashable {
-    case album(String)
+    case album(String, track: Int? = nil)
     case artist(String)
     case genre(String)
     case recentlyAdded
@@ -34,7 +34,7 @@ struct TabStack<Content: View>: View {
         NavigationStack(path: $path) {
             content.navigationDestination(for: Route.self) { route in
                 switch route {
-                case .album(let id): AlbumView(id: id)
+                case .album(let id, let track): AlbumView(id: id, track: track)
                 case .artist(let id): ArtistView(id: id)
                 case .genre(let name): GenreView(name: name)
                 case .recentlyAdded: RecentlyAddedView()
@@ -298,11 +298,12 @@ struct AlbumDownloadActions: View {
 
 struct DownloadIndicator: View {
     let state: DownloadState?
+    let local: Bool
 
     var body: some View {
         switch state {
         case .saved:
-            Image(systemName: "arrow.down.circle.fill").foregroundStyle(.secondary)
+            EmptyView()
         case .downloading(let fraction):
             ZStack {
                 Circle().stroke(.quaternary, lineWidth: 2)
@@ -314,7 +315,7 @@ struct DownloadIndicator: View {
         case .waiting:
             Image(systemName: "arrow.down.circle.dotted").foregroundStyle(.secondary)
         case nil:
-            EmptyView()
+            if !local { Image(systemName: "icloud").foregroundStyle(.secondary) }
         }
     }
 

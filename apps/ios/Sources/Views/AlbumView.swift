@@ -6,6 +6,7 @@ struct AlbumView: View {
     @Environment(Player.self) private var player
     @Environment(\.navigate) private var navigate
     let id: String
+    var track: Int?
     @State private var detail: AlbumDetail?
     @State private var confirmRemove = false
 
@@ -56,6 +57,21 @@ struct AlbumView: View {
                 player.play(hits, from: hits.firstIndex { $0.track.id == track.id })
             }
         }
+        return ScrollViewReader { proxy in
+            list(detail, facts: facts, discs: discs, hits: hits, row: row)
+                .task(id: detail.tracks.count) {
+                    guard let track, let target = detail.tracks.first(where: { $0.number == track })
+                    else { return }
+                    proxy.scrollTo(target.id, anchor: .center)
+                }
+        }
+    }
+
+    private func list(
+        _ detail: AlbumDetail, facts: AlbumFacts, discs: [Int: [Track]], hits: [TrackHit],
+        row: @escaping (Track) -> TrackRow
+    ) -> some View {
+        let album = detail.album
         return List {
             VStack(spacing: 4) {
                 ArtView(item: album.art, size: 270)
@@ -174,12 +190,14 @@ struct TrackRow: View {
     let album: Album
     let play: () -> Void
     @State private var offerDownload = false
+    @ScaledMetric(relativeTo: .body) private var column = 26
 
     var body: some View {
         let playing = player.current?.track.id == track.id
         let played = !playing && player.queue.played.contains(track.id)
         let state = model.downloads?.state(of: track.id)
-        let away = model.offline && state != .saved && !model.isOnPhone(track)
+        let local = state == .saved || model.isOnPhone(track)
+        let away = model.offline && !local
         Button {
             if away { offerDownload = true } else { play() }
         } label: {
@@ -187,6 +205,7 @@ struct TrackRow: View {
                 Group {
                     if playing {
                         Image(systemName: "speaker.wave.2.fill")
+                            .imageScale(.small)
                             .symbolEffect(.variableColor.iterative, isActive: player.isPlaying)
                             .foregroundStyle(.tint)
                     } else {
@@ -195,22 +214,23 @@ struct TrackRow: View {
                             .foregroundStyle(.secondary)
                     }
                 }
-                .frame(minWidth: 22, alignment: .trailing)
+                .frame(width: column, alignment: .trailing)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(track.name).lineLimit(2)
+                    Text(track.name).lineLimit(1).minimumScaleFactor(0.85)
                         .foregroundStyle(
                             playing
                                 ? AnyShapeStyle(.tint)
                                 : away
                                     ? AnyShapeStyle(.tertiary)
-                                    : AnyShapeStyle(played ? .secondary : .primary))
+                                    : AnyShapeStyle(.primary))
                     if !track.artistName.isEmpty && track.artistName != album.artistName {
                         Text(track.artistName)
                             .font(.subheadline).foregroundStyle(.secondary).lineLimit(1)
                     }
                 }
+                .alignmentGuide(.listRowSeparatorLeading) { $0[.leading] }
                 Spacer()
-                DownloadIndicator(state: state)
+                DownloadIndicator(state: state, local: local)
                 Text(timeText(track.duration)).monospacedDigit()
                     .foregroundStyle(away ? .tertiary : .secondary)
             }
