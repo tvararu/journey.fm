@@ -301,9 +301,9 @@ Step 4:
   remove it, Clear empties Up Next. Scrubber and controls stay put.
   Music shrinks the cover into the header instead of crossfading, but
   SwiftUI's matched geometry doesn't animate into a `List` row.
-- Track rows keep one line: a long title shrinks to 85% and then
-  truncates, so every row is the same height (the full title is in now
-  playing and VoiceOver). The number column has a fixed width that also
+- Track rows keep one line: a long title truncates, so every row is
+  the same height (the full title is in now playing and VoiceOver). The
+  number column has a fixed width that also
   holds the speaker on the playing track, and the separator starts at
   the title on every row. A cloud marks a track that isn't on the
   phone; downloaded tracks have no mark, and played ones look the same

@@ -215,7 +215,7 @@ struct TrackRow: View {
                 }
                 .frame(width: column, alignment: .trailing)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(track.name).lineLimit(1).minimumScaleFactor(0.85)
+                    Text(track.name).lineLimit(1)
                         .foregroundStyle(
                             playing
                                 ? AnyShapeStyle(.tint)
