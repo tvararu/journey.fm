@@ -96,6 +96,16 @@ mise; release builds never read them. On the simulator, Orca
 drives input and reads the screen (`orca emulator tap`, `type`,
 `gesture`, `ax`); installing, launching, the keychain, logs and
 screenshots go through `xcrun simctl`, which Orca doesn't wrap for iOS.
+Links open screens directly, with `xcrun simctl openurl booted <url>`
+(the first one asks to confirm). Releases, artists and genres use
+RYM's paths: `journey://release/album/pantera/far-beyond-driven`, taken
+from the album's `RYM_URL`, or built from the artist and album names
+when it has none; `?track=11` scrolls to that track and `?play=11`
+also plays it. `journey://artist/pantera` matches the artist slug in
+RYM URLs, then names; `journey://genre/groove-metal` matches genre
+names. The rest: `home`, `library`, `search` (`?q=…&type=albums`,
+`artists`, `tracks`, `credits` or `lyrics`), `recently-added`,
+`recently-played`, `player` and `settings`.
 Never run `orca emulator kill` or `shutdown`: the helper is shared with
 the simulator pane, which goes dark when it stops. The simulator
 runs in dark mode (`xcrun simctl ui booted appearance dark`).
@@ -291,9 +301,13 @@ Step 4:
   remove it, Clear empties Up Next. Scrubber and controls stay put.
   Music shrinks the cover into the header instead of crossfading, but
   SwiftUI's matched geometry doesn't animate into a `List` row.
-- "Played" on a track row means it became the current track earlier in
-  this queue, shown as secondary text; starting an album at track 3 does
-  not mark tracks 1 and 2. Home gains Recently Played, the first shelf:
+- Track rows keep one line: a long title shrinks to 85% and then
+  truncates, so every row is the same height (the full title is in now
+  playing and VoiceOver). The number column has a fixed width that also
+  holds the speaker on the playing track, and the separator starts at
+  the title on every row. A cloud marks a track that isn't on the
+  phone; downloaded tracks have no mark. "Played" (it became the current
+  track earlier in this queue) is only read by VoiceOver. Home gains Recently Played, the first shelf:
   albums with a counted play, newest first.
 - A play counts once half the track or 4 minutes has been heard,
   whichever is less, and never for a track under 30 s; seeking adds

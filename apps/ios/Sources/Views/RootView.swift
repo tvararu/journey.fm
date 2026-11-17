@@ -11,6 +11,7 @@ struct RootView: View {
     @State private var tab = AppTab.home
     @State private var paths: [AppTab: [Route]] = [:]
     @State private var showPlayer = false
+    @State private var showSettings = false
     @State private var focusSearch = 0
     @Namespace private var playerZoom
 
@@ -38,6 +39,41 @@ struct RootView: View {
             .navigationTransition(.zoom(sourceID: "player", in: playerZoom))
         }
         .sheet(item: $model.credits) { CreditsSheet(hit: $0) }
+        .sheet(isPresented: $showSettings) { SettingsView() }
+        .onOpenURL { url in Task { await open(url) } }
+    }
+
+    private func open(_ url: URL) async {
+        guard let link = DeepLink(url) else { return }
+        showPlayer = false
+        switch link {
+        case .tab(let chosen):
+            show(chosen, [])
+        case .route(let chosen, let route):
+            show(chosen, [route])
+        case .release(let path, let track, let play):
+            guard let id = try? await model.library.albumId(release: path) else { return }
+            show(.library, [.album(id, track: track ?? play)])
+            if let play {
+                let hits = await model.albumTracks([id])
+                player.play(hits, from: hits.firstIndex { $0.track.number == play })
+            }
+        case .artist(let slug):
+            guard let id = try? await model.library.artistId(slug: slug) else { return }
+            show(.library, [.artist(id)])
+        case .genre(let slug):
+            guard let name = try? await model.library.genre(slug: slug) else { return }
+            show(.library, [.genre(name)])
+        case .player:
+            showPlayer = player.current != nil
+        case .settings:
+            showSettings = true
+        }
+    }
+
+    private func show(_ chosen: AppTab, _ path: [Route]) {
+        tab = chosen
+        paths[chosen] = path
     }
 
     private func select(_ chosen: AppTab) {

@@ -36,6 +36,9 @@ targets:
         LSRequiresIPhoneOS: true
         UILaunchScreen: {}
         UIBackgroundModes: [audio]
+        CFBundleURLTypes:
+          - CFBundleURLName: journey
+            CFBundleURLSchemes: [journey]
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
         NSAppTransportSecurity:
           NSAllowsLocalNetworking: true
